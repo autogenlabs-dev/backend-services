@@ -1,0 +1,78 @@
+{
+  "timestamp": "2025-06-03T04:23:47.830774",
+  "success": false,
+  "results": [
+    {
+      "test": "Health Check",
+      "success": true,
+      "details": "API is responding correctly",
+      "timestamp": "2025-06-03T04:23:47.804737"
+    },
+    {
+      "test": "User Registration",
+      "success": false,
+      "details": "Unexpected status: 404",
+      "timestamp": "2025-06-03T04:23:47.805743"
+    },
+    {
+      "test": "User Login",
+      "success": false,
+      "details": "Unexpected status: 404",
+      "timestamp": "2025-06-03T04:23:47.808256"
+    },
+    {
+      "test": "Profile Access",
+      "success": false,
+      "details": "Unexpected status: 404",
+      "timestamp": "2025-06-03T04:23:47.809773"
+    },
+    {
+      "test": "API Key Creation",
+      "success": false,
+      "details": "Unexpected status: 403",
+      "timestamp": "2025-06-03T04:23:47.811772"
+    },
+    {
+      "test": "API Key Authentication",
+      "success": false,
+      "details": "No API key available for testing",
+      "timestamp": "2025-06-03T04:23:47.811772"
+    },
+    {
+      "test": "Subscription Management",
+      "success": false,
+      "details": "Unexpected status: 404",
+      "timestamp": "2025-06-03T04:23:47.813773"
+    },
+    {
+      "test": "Token Usage",
+      "success": false,
+      "details": "Unexpected status: 404",
+      "timestamp": "2025-06-03T04:23:47.814772"
+    },
+    {
+      "test": "LLM Proxy",
+      "success": false,
+      "details": "Unexpected status: 404",
+      "timestamp": "2025-06-03T04:23:47.816771"
+    },
+    {
+      "test": "Rate Limiting",
+      "success": true,
+      "details": "Rate limiting system operational",
+      "timestamp": "2025-06-03T04:23:47.824772"
+    },
+    {
+      "test": "Admin Access Control",
+      "success": true,
+      "details": "Admin endpoints properly protected",
+      "timestamp": "2025-06-03T04:23:47.825786"
+    },
+    {
+      "test": "Error Handling",
+      "success": true,
+      "details": "Error handling working correctly",
+      "timestamp": "2025-06-03T04:23:47.828774"
+    }
+  ]
+}
