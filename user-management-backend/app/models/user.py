@@ -1,39 +1,8 @@
 from sqlalchemy import Column, String, Boolean, DateTime, Integer, DECIMAL, Text, ForeignKey, JSON
 # SQLite doesn't support UUID natively, so we'll use String(36) instea    request_metadata = Column(JSON, nullable=True)  # Additional request metadata
 # But keep the PostgreSQL UUID import for future compatibility
-try:
-    from sqlalchemy.dialects.postgresql import UUID
-except ImportError:
-    from sqlalchemy.types import TypeDecorator, CHAR
-    
-    class UUID(TypeDecorator):
-        """Platform-independent UUID type.
-        Uses String(36) under the hood.
-        """
-        impl = CHAR
-        
-        def process_bind_param(self, value, dialect):
-            if value is None:
-                return value
-            elif dialect.name == 'postgresql':
-                return str(value)
-            else:
-                if not isinstance(value, uuid.UUID):
-                    try:
-                        return str(uuid.UUID(str(value)))
-                    except (ValueError, AttributeError):
-                        return str(value)
-                else:
-                    return str(value)
-        
-        def process_result_value(self, value, dialect):
-            if value is None:
-                return value
-            else:
-                try:
-                    return uuid.UUID(value)
-                except (ValueError, TypeError):
-                    return value
+from sqlalchemy.types import String
+UUID = String(36)
 
 # SQLite doesn't support JSONB, so we'll use JSON instead
 try:
@@ -51,7 +20,7 @@ class User(Base):
     """User model"""
     __tablename__ = "users"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=str(uuid.uuid4()))
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=True)  # Nullable for OAuth-only users
     name = Column(String(255), nullable=True)  # User display name
@@ -69,7 +38,7 @@ class User(Base):
     role = Column(String(20), nullable=False, default="user")  # user, developer, admin, superadmin
     
     # Sub-user management fields
-    parent_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    parent_user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
     is_sub_user = Column(Boolean, default=False)
     sub_user_permissions = Column(JSON, nullable=True)  # Permissions specific to this sub-user
     sub_user_limits = Column(JSON, nullable=True)  # Token limits and restrictions
@@ -94,7 +63,7 @@ class OAuthProvider(Base):
     """OAuth provider model"""
     __tablename__ = "oauth_providers"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=str(uuid.uuid4()))
     name = Column(String(50), unique=True, nullable=False)  # "openrouter", "glama", "requesty"
     display_name = Column(String(100), nullable=False)     # "OpenRouter", "Glama", "Requesty"
     is_active = Column(Boolean, default=True)
@@ -110,9 +79,9 @@ class UserOAuthAccount(Base):
     """User OAuth account model"""
     __tablename__ = "user_oauth_accounts"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    provider_id = Column(UUID(as_uuid=True), ForeignKey("oauth_providers.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    provider_id = Column(String(36), ForeignKey("oauth_providers.id"), nullable=False)
     provider_user_id = Column(String(255), nullable=False)
     email = Column(String(255), nullable=False)
     connected_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -130,7 +99,7 @@ class SubscriptionPlan(Base):
     """Subscription plan model"""
     __tablename__ = "subscription_plans"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=str(uuid.uuid4()))
     name = Column(String(50), unique=True, nullable=False)  # "Free", "Pro", "Enterprise"
     display_name = Column(String(100), nullable=False)
     monthly_tokens = Column(Integer, nullable=False)  # Token allowance per month
@@ -150,9 +119,9 @@ class UserSubscription(Base):
     """User subscription model"""
     __tablename__ = "user_subscriptions"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("subscription_plans.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    plan_id = Column(String(36), ForeignKey("subscription_plans.id"), nullable=False)
     stripe_subscription_id = Column(String(255), nullable=True)
     status = Column(String(20), nullable=False, default="active")  # active, inactive, cancelled, past_due
     current_period_start = Column(DateTime(timezone=True), nullable=True)
@@ -172,9 +141,9 @@ class TokenUsageLog(Base):
     """Token usage log model"""
     __tablename__ = "token_usage_logs"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=True)  # For org usage
+    id = Column(String(36), primary_key=True, default=str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    organization_id = Column(String(36), ForeignKey("organizations.id"), nullable=True)  # For org usage
     provider = Column(String(50), nullable=False)  # "openrouter", "glama", "requesty"
     model_name = Column(String(100), nullable=False)
     tokens_used = Column(Integer, nullable=False)
@@ -194,9 +163,9 @@ class ApiKey(Base):
     """API key model"""
     __tablename__ = "api_keys"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=True)  # For org keys
+    id = Column(String(36), primary_key=True, default=str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    organization_id = Column(String(36), ForeignKey("organizations.id"), nullable=True)  # For org keys
     key_hash = Column(String(255), nullable=False)  # Hashed API key
     key_preview = Column(String(8), nullable=False)  # First 8 characters for display
     name = Column(String(100), nullable=False)  # User-defined name
@@ -216,11 +185,11 @@ class Organization(Base):
     """Organization model for enterprise features"""
     __tablename__ = "organizations"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(36), primary_key=True, default=str(uuid.uuid4()))
     name = Column(String(255), nullable=False)
     slug = Column(String(100), unique=True, nullable=False, index=True)
     description = Column(Text, nullable=True)
-    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    owner_id = Column(String(36), ForeignKey("users.id"), nullable=False)
     subscription_plan = Column(String(20), nullable=False, default="enterprise")
     monthly_token_limit = Column(Integer, nullable=False, default=1000000)
     tokens_used = Column(Integer, nullable=False, default=0)
@@ -243,9 +212,9 @@ class OrganizationMember(Base):
     """Organization member model"""
     __tablename__ = "organization_members"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=str(uuid.uuid4()))
+    organization_id = Column(String(36), ForeignKey("organizations.id"), nullable=False)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
     role = Column(String(20), nullable=False, default="member")  # owner, admin, member
     joined_at = Column(DateTime(timezone=True), server_default=func.now())
     
@@ -261,12 +230,12 @@ class OrganizationInvitation(Base):
     """Organization invitation model"""
     __tablename__ = "organization_invitations"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=str(uuid.uuid4()))
+    organization_id = Column(String(36), ForeignKey("organizations.id"), nullable=False)
     email = Column(String(255), nullable=False)
     role = Column(String(20), nullable=False, default="member")
     status = Column(String(20), nullable=False, default="pending")  # pending, accepted, expired
-    invited_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    invited_by_id = Column(String(36), ForeignKey("users.id"), nullable=False)
     token = Column(String(255), unique=True, nullable=False)  # Invitation token
     expires_at = Column(DateTime(timezone=True), nullable=False)
     accepted_at = Column(DateTime(timezone=True), nullable=True)
@@ -284,8 +253,8 @@ class OrganizationKey(Base):
     """Organization API keys for team access."""
     __tablename__ = "organization_keys"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=str(uuid.uuid4()))
+    organization_id = Column(String(36), ForeignKey("organizations.id"), nullable=False)
     name = Column(String(255), nullable=False)  # Added name attribute
     key_hash = Column(String(255), unique=True, nullable=False)
     description = Column(Text)
@@ -294,7 +263,7 @@ class OrganizationKey(Base):
     tokens_used = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
     expires_at = Column(DateTime)
-    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    created_by = Column(String(36), ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
     last_used_at = Column(DateTime)
     
@@ -311,9 +280,9 @@ class KeyUsageLog(Base):
     """Log organization key usage for analytics."""
     __tablename__ = "key_usage_logs"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    organization_key_id = Column(UUID(as_uuid=True), ForeignKey("organization_keys.id"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    id = Column(String(36), primary_key=True, default=str(uuid.uuid4()))
+    organization_key_id = Column(String(36), ForeignKey("organization_keys.id"), nullable=False)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
     provider = Column(String(50), nullable=False)
     model_name = Column(String(100), nullable=False)
     tokens_used = Column(Integer, nullable=False)

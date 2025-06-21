@@ -15,6 +15,7 @@ class Token(BaseModel):
     # A4F API key for VS Code extension auto-configuration
     a4f_api_key: Optional[str] = None
     api_endpoint: Optional[str] = None
+    user: Optional[Dict[str, Any]] = None
 
 
 class TokenRefresh(BaseModel):

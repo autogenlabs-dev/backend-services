@@ -64,19 +64,26 @@ async def get_current_user_unified(
                 if payload:
                     user_id = payload.get("sub")
                     if user_id:
-                        user_uuid = UUID(user_id)
-                        user = db.query(User).filter(
-                            User.id == user_uuid,
-                            User.is_active == True
-                        ).first()
-            except (ValueError, TypeError):
-                pass
+                        user = db.query(User).filter(User.id == user_id).first()
+                        if user:
+                            print(f"Found user with ID {user_id}, active status: {user.is_active}")
+                        else:
+                            print(f"No user found with ID {user_id}")
+                        if not user:
+                            auth_method += f" - User not found or inactive for ID {user_id}"
+                    else:
+                        auth_method += " - No 'sub' field in token payload"
+                else:
+                    auth_method += " - Token verification failed"
+            except (ValueError, TypeError) as e:
+                auth_method += f" - Exception during token processing: {str(e)}"
     
     # Authentication failed
     if not user:
+        detail_message = f"Could not validate credentials using {auth_method}. Please provide a valid JWT token or API key."
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials. Please provide a valid JWT token or API key.",
+            detail=detail_message,
             headers={"WWW-Authenticate": "Bearer"}
         )
     

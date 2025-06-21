@@ -129,13 +129,21 @@ async def login_user(
         data={"sub": str(user.id)}
     )
     
-    return Token(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        token_type="bearer",
-        a4f_api_key=settings.a4f_api_key,
-        api_endpoint="http://localhost:8000"
-    )
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "a4f_api_key": settings.a4f_api_key,
+        "api_endpoint": "http://localhost:8000",
+        "user": {
+            "id": str(user.id),
+            "email": user.email,
+            "is_active": user.is_active,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+            "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None
+        }
+    }
         
 @router.post("/login-json", response_model=Token)
 async def login_user_json(
@@ -168,13 +176,21 @@ async def login_user_json(
         data={"sub": str(user.id)}
     )
     
-    return Token(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        token_type="bearer",
-        a4f_api_key=settings.a4f_api_key,
-        api_endpoint="http://localhost:8000"
-    )
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "a4f_api_key": settings.a4f_api_key,
+        "api_endpoint": "http://localhost:8000",
+        "user": {
+            "id": str(user.id),
+            "email": user.email,
+            "is_active": user.is_active,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+            "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None
+        }
+    }
 
 
 @router.get("/{provider}/login")

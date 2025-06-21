@@ -37,7 +37,7 @@ def create_user_with_password(db: Session, user_data: UserCreate) -> User:
     username = user_data.email.split('@')[0] if not hasattr(user_data, 'username') else getattr(user_data, 'username', user_data.email.split('@')[0])
     
     db_user = User(
-        id=uuid4(),
+        id=str(uuid4()),
         email=user_data.email,
         password_hash=hashed_password,
         name=username,  # Use username or email prefix as name
@@ -69,7 +69,7 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
 def create_user(db: Session, user_data: UserCreate) -> User:
     """Create a new user."""
     db_user = User(
-        id=uuid4(),
+        id=str(uuid4()),
         email=user_data.email,
         is_active=True
     )
@@ -136,7 +136,7 @@ def get_or_create_user_by_oauth(
     
     # Create OAuth account link
     oauth_account = UserOAuthAccount(
-        id=uuid4(),
+        id=str(uuid4()),
         user_id=user.id,
         provider_id=provider.id,
         provider_user_id=provider_user_id,
@@ -167,7 +167,7 @@ def get_user_subscription(db: Session, user_id: UUID) -> Optional[UserSubscripti
 def log_token_usage(db: Session, user_id: UUID, usage_data: TokenUsageCreate) -> TokenUsageLog:
     """Log token usage for a user."""
     log_entry = TokenUsageLog(
-        id=uuid4(),
+        id=str(uuid4()),
         user_id=user_id,
         provider=usage_data.provider,
         model_name=usage_data.model_name,
@@ -256,7 +256,7 @@ def create_api_key(db: Session, user_id: UUID, key_data: ApiKeyCreate) -> tuple[
     
     # Create database record
     db_api_key = ApiKey(
-        id=uuid4(),
+        id=str(uuid4()),
         user_id=user_id,
         key_hash=key_hash,
         key_preview=api_key[:8],

@@ -20,6 +20,7 @@ async def get_current_user(
     db: Session = Depends(get_db)
 ) -> User:
     """Get the current authenticated user from JWT token."""
+    from .jwt import verify_token
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -27,35 +28,37 @@ async def get_current_user(
     )
     
     try:
-        # Verify the token
         payload = verify_token(credentials.credentials)
         if payload is None:
             raise credentials_exception
         
-        # Extract user ID from token
-        user_id: str = payload.get("sub")
+        user_id = payload.get("sub")
         if user_id is None:
             raise credentials_exception
             
-        # Convert to UUID
-        user_uuid = UUID(user_id)
+        # Convert user_id to UUID if it's a string
+        try:
+            if isinstance(user_id, str):
+                user_id = UUID(user_id)
+        except (ValueError, TypeError):
+            raise credentials_exception
+            
+        # Get user from database
+        user = db.query(User).filter(User.id == user_id).first()
+        if user is None:
+            raise credentials_exception
+            
+        # Check if user is active
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User account is inactive"
+            )
         
-    except (ValueError, TypeError):
+        return user
+            
+    except JWTError:
         raise credentials_exception
-    
-    # Get user from database
-    user = db.query(User).filter(User.id == user_uuid).first()
-    if user is None:
-        raise credentials_exception
-    
-    # Check if user is active
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is inactive"
-        )
-    
-    return user
 
 
 async def get_current_active_user(

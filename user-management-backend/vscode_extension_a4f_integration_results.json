@@ -1,0 +1,108 @@
+{
+  "summary": {
+    "total_tests": 16,
+    "passed_tests": 7,
+    "success_rate": 43.75,
+    "integration_ready": false,
+    "a4f_api_key_available": true,
+    "test_timestamp": "2025-06-21T17:53:35.090688"
+  },
+  "detailed_results": [
+    {
+      "test": "User Registration",
+      "success": false,
+      "details": "Registration failed: {\"detail\":\"User with this email already exists\"}",
+      "timestamp": "2025-06-21T17:53:01.738944"
+    },
+    {
+      "test": "A4F API Key in Login",
+      "success": true,
+      "details": "A4F key provided: ddc-a4f-a480842d898b...",
+      "timestamp": "2025-06-21T17:53:04.125061"
+    },
+    {
+      "test": "API Endpoint in Login",
+      "success": true,
+      "details": "Endpoint: http://localhost:8000",
+      "timestamp": "2025-06-21T17:53:04.126070"
+    },
+    {
+      "test": "VS Code Login Flow",
+      "success": true,
+      "details": "Login successful for test@example.com with ID b10ad097-48fc-4e15-8aad-5b5876c188cf",
+      "timestamp": "2025-06-21T17:53:04.126070"
+    },
+    {
+      "test": "A4F Config API Key",
+      "success": true,
+      "details": "A4F API key in VS Code config",
+      "timestamp": "2025-06-21T17:53:06.169551"
+    },
+    {
+      "test": "A4F Provider Config",
+      "success": true,
+      "details": "A4F enabled: True",
+      "timestamp": "2025-06-21T17:53:06.170545"
+    },
+    {
+      "test": "Model Routing Config",
+      "success": false,
+      "details": "Model routing config missing",
+      "timestamp": "2025-06-21T17:53:06.171536"
+    },
+    {
+      "test": "VS Code Config Endpoint",
+      "success": true,
+      "details": "Configuration endpoint working properly",
+      "timestamp": "2025-06-21T17:53:06.172539"
+    },
+    {
+      "test": "A4F Models Available",
+      "success": false,
+      "details": "No A4F models found",
+      "timestamp": "2025-06-21T17:53:10.774971"
+    },
+    {
+      "test": "A4F Chat Completion",
+      "success": false,
+      "details": "Chat request failed: {\"detail\":\"Chat completion failed: \"}",
+      "timestamp": "2025-06-21T17:53:15.370411"
+    },
+    {
+      "test": "Route gpt-4",
+      "success": false,
+      "details": "Routing failed: 500",
+      "timestamp": "2025-06-21T17:53:20.010059"
+    },
+    {
+      "test": "Route gpt-3.5-turbo",
+      "success": false,
+      "details": "Routing failed: 500",
+      "timestamp": "2025-06-21T17:53:24.482655"
+    },
+    {
+      "test": "Route claude-3-sonnet",
+      "success": false,
+      "details": "Routing failed: 500",
+      "timestamp": "2025-06-21T17:53:29.009936"
+    },
+    {
+      "test": "Smart Model Routing",
+      "success": false,
+      "details": "No models routed successfully",
+      "timestamp": "2025-06-21T17:53:29.009936"
+    },
+    {
+      "test": "Providers Endpoint",
+      "success": false,
+      "details": "Providers error: 'str' object has no attribute 'get'",
+      "timestamp": "2025-06-21T17:53:33.041073"
+    },
+    {
+      "test": "Health Endpoint",
+      "success": true,
+      "details": "Health check successful",
+      "timestamp": "2025-06-21T17:53:35.080196"
+    }
+  ]
+}

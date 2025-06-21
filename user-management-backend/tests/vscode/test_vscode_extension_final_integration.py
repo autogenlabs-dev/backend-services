@@ -102,7 +102,8 @@ class VSCodeExtensionIntegrationTester:
                 else:
                     self.log_test("API Endpoint in Login", False, "API endpoint not provided")
                 
-                self.log_test("VS Code Login Flow", True, f"Login successful for {data['user']['email']}")
+                user_id = data["user"]["id"]
+                self.log_test("VS Code Login Flow", True, f"Login successful for {data['user']['email']} with ID {user_id}")
                 return True
             else:
                 self.log_test("VS Code Login Flow", False, f"Login failed: {response.text}")
@@ -464,13 +465,13 @@ def main():
             "summary": {
                 "total_tests": len(tester.test_results),
                 "passed_tests": len([t for t in tester.test_results if t["success"]]),
-                "success_rate": len([t for t in tester.test_results if t["success"]]) / len(tester.test_results) * 100,
+                "success_rate": len([t for t in tester.test_results if t["success"]]) / len(tester.test_results) * 100 if len(tester.test_results) > 0 else 0,
                 "integration_ready": integration_ready,
                 "a4f_api_key_available": tester.a4f_api_key is not None,
                 "test_timestamp": datetime.now().isoformat()
             },
             "detailed_results": tester.test_results
-        }, indent=2)
+        }, f, indent=2)
     
     print(f"\n💾 Detailed results saved to: {results_file}")
     
