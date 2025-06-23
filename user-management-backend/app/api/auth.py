@@ -9,7 +9,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from ..database import get_db
+from ..database import get_database # Changed from get_db to get_database
 from ..schemas.auth import Token, TokenRefresh, OAuthCallback, UserCreate, UserLogin, UserResponse
 from ..models.user import User
 from ..auth.jwt import create_access_token, create_refresh_token, verify_token
@@ -44,7 +44,7 @@ async def list_oauth_providers() -> Dict[str, Any]:
 
 
 @router.post("/register", response_model=UserResponse)
-async def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
+async def register_user(user_data: UserCreate, db: Any = Depends(get_database)): # Changed type hint from Session to Any, and get_db to get_database
     """Register a new user with email and password."""
     try:
         user = create_user_with_password(db, user_data)
@@ -73,7 +73,7 @@ async def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
-async def signup_user(user_data: UserCreate, db: Session = Depends(get_db)):
+async def signup_user(user_data: UserCreate, db: Any = Depends(get_database)): # Changed type hint from Session to Any, and get_db to get_database
     """Alias for user registration to support /signup route with token generation."""
     try:
         # Register the user
@@ -100,7 +100,7 @@ async def signup_user(user_data: UserCreate, db: Session = Depends(get_db)):
 @router.post("/login", response_model=Token)
 async def login_user(
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
+    db: Any = Depends(get_database) # Changed type hint from Session to Any, and get_db to get_database
 ):
     """Login user with email and password."""
     user = authenticate_user(db, form_data.username, form_data.password)
@@ -148,7 +148,7 @@ async def login_user(
 @router.post("/login-json", response_model=Token)
 async def login_user_json(
     user_data: UserLogin,
-    db: Session = Depends(get_db)
+    db: Any = Depends(get_database) # Changed type hint from Session to Any, and get_db to get_database
 ):
     """Login user with email and password using JSON."""
     user = authenticate_user(db, user_data.email, user_data.password)
@@ -223,9 +223,9 @@ async def oauth_login(provider: str, request: Request):
 
 @router.get("/{provider}/callback")
 async def oauth_callback(
-    provider: str, 
+    provider: str,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Any = Depends(get_database) # Changed type hint from Session to Any, and get_db to get_database
 ) -> Token:
     """Handle OAuth callback and create user session."""
     if provider not in ["openrouter", "glama", "requesty"]:
@@ -298,7 +298,7 @@ async def oauth_callback(
 @router.post("/refresh")
 async def refresh_access_token(
     token_data: TokenRefresh,
-    db: Session = Depends(get_db)
+    db: Any = Depends(get_database) # Changed type hint from Session to Any, and get_db to get_database
 ) -> Token:
     """Refresh an access token using a refresh token."""
     payload = verify_token(token_data.refresh_token)

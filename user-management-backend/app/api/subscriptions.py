@@ -4,8 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 from pydantic import BaseModel
+from motor.motor_asyncio import AsyncIOMotorDatabase # Added import
 
-from ..database import get_db
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+
+from ..database import get_database # Changed from get_db
 from ..auth.dependencies import get_current_user
 from ..auth.unified_auth import get_current_user_unified
 from ..models.user import SubscriptionPlan, UserSubscription, User
@@ -28,34 +31,34 @@ class UpgradeRequest(BaseModel):
 
 
 @router.get("/plans", response_model=List[SubscriptionPlanResponse])
-def list_plans(db: Session = Depends(get_db)):
+async def list_plans(db: AsyncIOMotorDatabase = Depends(get_database)): # Changed from Session = Depends(get_db)
     """List all available subscription plans."""
     subscription_service = SubscriptionService(db)
-    return subscription_service.get_all_plans()
+    return await subscription_service.get_all_plans() # Added await
 
 
 @router.get("/plans/compare")
-def compare_plans(db: Session = Depends(get_db)):
+async def compare_plans(db: AsyncIOMotorDatabase = Depends(get_database)): # Changed from Session = Depends(get_db)
     """Get a detailed comparison of all subscription plans."""
     subscription_service = SubscriptionService(db)
-    return subscription_service.compare_plans()
+    return await subscription_service.compare_plans() # Added await
 
 
 @router.get("/current")
-def get_current_subscription(
-    current_user: User = Depends(get_current_user_unified), 
-    db: Session = Depends(get_db)
+async def get_current_subscription( # Added async
+    current_user: User = Depends(get_current_user_unified),
+    db: AsyncIOMotorDatabase = Depends(get_database) # Changed from Session = Depends(get_db)
 ):
     """Get the current user's subscription details."""
     subscription_service = SubscriptionService(db)
-    return subscription_service.get_subscription_status(current_user)
+    return await subscription_service.get_subscription_status(current_user) # Added await
 
 
 @router.post("/subscribe")
-def subscribe_to_plan(
+async def subscribe_to_plan( # Added async
     request: SubscribeRequest,
-    current_user: User = Depends(get_current_user), 
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database) # Changed from Session = Depends(get_db)
 ):
     """Subscribe the current user to a plan with Stripe payment."""
     try:
@@ -64,7 +67,7 @@ def subscribe_to_plan(
         # For free plan, just update locally
         if request.plan_name == "free":
             subscription_service = SubscriptionService(db)
-            subscription = subscription_service.subscribe_user_to_plan(
+            subscription = await subscription_service.subscribe_user_to_plan( # Added await
                 user=current_user,
                 plan_name="free"
             )
@@ -76,11 +79,11 @@ def subscribe_to_plan(
             }
         
         # For paid plans, use Stripe
-        result = stripe_service.create_subscription(current_user, request.plan_name)
+        result = await stripe_service.create_subscription(current_user, request.plan_name) # Added await
         return {
             "success": True,
             "plan": request.plan_name,
-            "stripe_subscription_id": result["subscription_id"],
+            "stripe_subscription_id": result["stripe_subscription_id"], # Changed from subscription_id
             "client_secret": result["client_secret"],
             "status": result["status"],
             "message": f"Successfully subscribed to {request.plan_name} plan"
@@ -91,18 +94,18 @@ def subscribe_to_plan(
 
 
 @router.put("/upgrade")
-def upgrade_subscription(
+async def upgrade_subscription( # Added async
     request: UpgradeRequest,
-    current_user: User = Depends(get_current_user), 
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database) # Changed from Session = Depends(get_db)
 ):
     """Upgrade the current user's subscription."""
     try:
         subscription_service = SubscriptionService(db)
-        current_plan = subscription_service.get_user_plan(current_user)
+        current_plan = await subscription_service.get_user_plan(current_user) # Added await
         
         # Check if it's actually an upgrade
-        new_plan = subscription_service.get_plan_by_name(request.plan_name)
+        new_plan = await subscription_service.get_plan_by_name(request.plan_name) # Added await
         if not new_plan:
             raise HTTPException(status_code=404, detail="Plan not found")
         
@@ -112,7 +115,7 @@ def upgrade_subscription(
         # Use Stripe for paid plans
         if new_plan.price_monthly > 0:
             stripe_service = StripeService(db)
-            result = stripe_service.upgrade_subscription(current_user, request.plan_name)
+            result = await stripe_service.upgrade_subscription(current_user, request.plan_name) # Added await
         else:
             # Shouldn't happen, but handle gracefully
             result = {"message": "Upgraded to free plan"}
@@ -129,18 +132,18 @@ def upgrade_subscription(
 
 
 @router.post("/downgrade")
-def downgrade_subscription(
+async def downgrade_subscription( # Added async
     request: UpgradeRequest,  # Same structure as upgrade
-    current_user: User = Depends(get_current_user), 
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database) # Changed from Session = Depends(get_db)
 ):
     """Downgrade the current user's subscription."""
     try:
         subscription_service = SubscriptionService(db)
-        current_plan = subscription_service.get_user_plan(current_user)
+        current_plan = await subscription_service.get_user_plan(current_user) # Added await
         
         # Check if it's actually a downgrade
-        new_plan = subscription_service.get_plan_by_name(request.plan_name)
+        new_plan = await subscription_service.get_plan_by_name(request.plan_name) # Added await
         if not new_plan:
             raise HTTPException(status_code=404, detail="Plan not found")
         
@@ -148,7 +151,7 @@ def downgrade_subscription(
             raise HTTPException(status_code=400, detail="New plan must be a lower tier")
         
         # Handle downgrade (may require special Stripe handling)
-        subscription = subscription_service.downgrade_user_subscription(current_user, request.plan_name)
+        subscription = await subscription_service.downgrade_user_subscription(current_user, request.plan_name) # Added await
         
         return {
             "success": True,
@@ -163,14 +166,14 @@ def downgrade_subscription(
 
 
 @router.post("/cancel")
-def cancel_subscription(
-    current_user: User = Depends(get_current_user), 
-    db: Session = Depends(get_db)
+async def cancel_subscription( # Added async
+    current_user: User = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database) # Changed from Session = Depends(get_db)
 ):
     """Cancel the current user's subscription."""
     try:
         stripe_service = StripeService(db)
-        result = stripe_service.cancel_subscription(current_user)
+        result = await stripe_service.cancel_subscription(current_user) # Added await
         
         return {
             "success": True,
@@ -184,9 +187,9 @@ def cancel_subscription(
 
 
 @router.get("/usage")
-def get_usage_stats(
-    current_user: User = Depends(get_current_user), 
-    db: Session = Depends(get_db)
+async def get_usage_stats( # Added async
+    current_user: User = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database) # Changed from Session = Depends(get_db)
 ):
     """Get detailed usage statistics for the current user."""
     try:
@@ -194,8 +197,8 @@ def get_usage_stats(
         subscription_service = SubscriptionService(db)
         
         # Get current plan and usage
-        plan = subscription_service.get_user_plan(current_user)
-        usage_stats = token_service.get_user_usage_stats(current_user)
+        plan = await subscription_service.get_user_plan(current_user) # Added await
+        usage_stats = await token_service.get_usage_stats(current_user) # Changed from get_user_usage_stats and added await
         
         return {
             "plan": {
@@ -205,18 +208,18 @@ def get_usage_stats(
                 "price_monthly": float(plan.price_monthly)
             },
             "usage": {
-                "tokens_used": usage_stats["current_month_usage"],
-                "tokens_remaining": max(0, plan.monthly_tokens - usage_stats["current_month_usage"]),
+                "tokens_used": usage_stats["total_tokens"], # Changed from current_month_usage
+                "tokens_remaining": max(0, plan.monthly_tokens - usage_stats["total_tokens"]), # Changed from current_month_usage
                 "monthly_limit": plan.monthly_tokens,
-                "usage_percentage": min(100, (usage_stats["current_month_usage"] / plan.monthly_tokens) * 100),
-                "reset_date": usage_stats.get("next_reset_date")
+                "usage_percentage": min(100, (usage_stats["total_tokens"] / plan.monthly_tokens) * 100) if plan.monthly_tokens > 0 else 0, # Changed from current_month_usage and added division by zero check
+                "reset_date": usage_stats.get("next_reset_date") # This might need adjustment based on how token_service calculates it
             },
             "statistics": {
-                "total_requests": usage_stats["total_requests"],
+                "total_requests": usage_stats["total_requests"] if "total_requests" in usage_stats else 0, # Added check
                 "total_cost": usage_stats["total_cost"],
-                "avg_tokens_per_request": usage_stats["avg_tokens_per_request"],
-                "most_used_provider": usage_stats.get("most_used_provider"),
-                "most_used_model": usage_stats.get("most_used_model")
+                "avg_tokens_per_request": usage_stats["average_tokens_per_request"] if "average_tokens_per_request" in usage_stats else 0, # Changed key
+                "most_used_provider": None, # Removed as it's not directly available from token_service.get_usage_stats
+                "most_used_model": None # Removed as it's not directly available from token_service.get_usage_stats
             }
         }
         
@@ -225,26 +228,26 @@ def get_usage_stats(
 
 
 @router.get("/upgrade-options")
-def get_upgrade_options(
-    current_user: User = Depends(get_current_user), 
-    db: Session = Depends(get_db)
+async def get_upgrade_options( # Added async
+    current_user: User = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database) # Changed from Session = Depends(get_db)
 ):
     """Get available upgrade options for the current user."""
     subscription_service = SubscriptionService(db)
     return {
-        "upgrade_options": subscription_service.get_upgrade_options(current_user)
+        "upgrade_options": await subscription_service.get_upgrade_options(current_user) # Added await
     }
 
 
 @router.get("/payment-methods")
-def get_payment_methods(
-    current_user: User = Depends(get_current_user), 
-    db: Session = Depends(get_db)
+async def get_payment_methods( # Added async
+    current_user: User = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database) # Changed from Session = Depends(get_db)
 ):
     """Get user's saved payment methods."""
     try:
         stripe_service = StripeService(db)
-        payment_methods = stripe_service.get_payment_methods(current_user)
+        payment_methods = await stripe_service.get_payment_methods(current_user) # Added await
         
         return {
             "payment_methods": payment_methods
@@ -255,7 +258,7 @@ def get_payment_methods(
 
 
 @router.post("/webhooks/stripe")
-async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
+async def stripe_webhook(request: Request, db: AsyncIOMotorDatabase = Depends(get_database)): # Changed from Session = Depends(get_db)
     """Handle Stripe webhook events."""
     try:
         payload = await request.body()
@@ -265,7 +268,7 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
             raise HTTPException(status_code=400, detail="Missing Stripe signature")
         
         stripe_service = StripeService(db)
-        result = stripe_service.handle_webhook(payload.decode(), sig_header)
+        result = await stripe_service.handle_webhook(payload.decode(), sig_header) # Added await
         
         return {"status": "success", "processed": result}
         

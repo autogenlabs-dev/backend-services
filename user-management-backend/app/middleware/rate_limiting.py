@@ -11,7 +11,7 @@ from fastapi import Request, HTTPException, status, Depends
 from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 from sqlalchemy import select
-from app.database import get_db
+from app.database import get_database # Changed from get_db to get_database
 from app.models.user import User, ApiKey
 from app.config import settings
 from app.auth.jwt import verify_token
@@ -337,7 +337,7 @@ rate_limit_middleware = RateLimitMiddleware()
 
 async def apply_rate_limit(
     request: Request,
-    db: Session = Depends(get_db)
+    db: Any = Depends(get_database) # Changed type hint from Session to Any, and get_db to get_database
 ) -> Dict[str, Any]:
     """
     FastAPI dependency for applying rate limits

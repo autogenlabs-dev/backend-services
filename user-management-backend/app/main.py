@@ -47,11 +47,11 @@ class PerformanceAndRateLimitMiddleware(BaseHTTPMiddleware):
         # Apply rate limiting for non-health endpoints
         if not request.url.path in ["/", "/health", "/docs", "/redoc", "/openapi.json"]:
             try:
-                from .database import get_db
+                from .database import get_database
                 from .middleware.rate_limiting import rate_limit_middleware
-                  # Get database session
-                db_gen = get_db()
-                db = next(db_gen)
+                
+                # Get database instance
+                db = get_database()
                 
                 try:
                     # Check rate limits
@@ -66,8 +66,6 @@ class PerformanceAndRateLimitMiddleware(BaseHTTPMiddleware):
                         "reset": int(time.time()) + 3600,
                         "tier": "fallback"
                     }
-                finally:
-                    db.close()
             except Exception as e:
                 print(f"Rate limiting initialization error: {e}")
         

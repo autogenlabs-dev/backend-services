@@ -5,7 +5,7 @@ import os
 
 class Settings(BaseSettings):
     # Database
-    database_url: str = "sqlite:///./test.db"
+    database_url: str = "mongodb://localhost:27017/user_management_db" # Changed to MongoDB
     redis_url: str = "redis://localhost:6379"
     
     # Redis Configuration
@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     
     # Stripe
     stripe_secret_key: str = "sk_test_51RVi9b00tZAh2watNguPPSVIAwj7mll7RsiqeXfWIvR6JbwsO1vW2j4KWFlh8Tgkpozue2zq993aKn59wCRLZK5O00sbBOVXzr"
-    stripe_publishable_key: str = "pk_test_51RVi9b00tZAh2watbNFlPjw4jKS02yZbKHQ1t97GcyMTOGLwcL8QhzxDSGtGuuEAJP4DHcEWOkut5N0CCTnuqBgh00p44dvGCb"
+    stripe_publishable_key: str = "pk_test_51RVi9b00tZAh2watbNFlPjw4jKS02yZbKHQ1t97GcyMTOGLwcL8QhzxDSGtGu2EAJP4DHcEWOkut5N0CCTnuqBgh00p44dvGCb"
     stripe_webhook_secret: str = "whsec_your_webhook_secret"
     
     # Application
