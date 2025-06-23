@@ -1,0 +1,3 @@
+Requirement already satisfied: motor in c:\users\asus\music\clean-backend\user-management-backend\.venv\lib\site-packages (3.7.1)
+Requirement already satisfied: pymongo<5.0,>=4.9 in c:\users\asus\music\clean-backend\user-management-backend\.venv\lib\site-packages (from motor) (4.13.2)
+Requirement already satisfied: dnspython<3.0.0,>=1.16.0 in c:\users\asus\music\clean-backend\user-management-backend\.venv\lib\site-packages (from pymongo<5.0,>=4.9->motor) (2.7.0)
