@@ -2,15 +2,15 @@
 
 from datetime import datetime, timedelta
 from typing import List, Optional
-from uuid import UUID
+from beanie.odm.fields import PydanticObjectId # Changed from UUID
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase # Added AsyncIOMotorDatabase
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
 
-from ..database import get_db
+from ..database import get_database # Changed from get_db
 from ..schemas.auth import (
-    UserResponse, UserProfile, UserUpdate, TokenUsageLogResponse, 
-    TokenUsageCreate, TokenUsageStats, ApiKeyCreate, ApiKeyResponse, 
+    UserResponse, UserProfile, UserUpdate, TokenUsageLogResponse,
+    TokenUsageCreate, TokenUsageStats, ApiKeyCreate, ApiKeyResponse,
     ApiKeyWithSecret
 )
 from ..auth.dependencies import get_current_user
@@ -28,17 +28,17 @@ router = APIRouter(prefix="/users", tags=["Users"])
 @router.get("/me", response_model=UserProfile)
 async def get_my_profile(
     current_user: User = Depends(get_current_user_unified),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_database) # Changed from Session = Depends(get_db)
 ):
     """Get current user's complete profile."""
     # Get OAuth accounts
-    oauth_accounts = get_user_oauth_accounts(db, current_user.id)
+    oauth_accounts = await get_user_oauth_accounts(db, current_user.id) # Added await
     
     # Get subscription
-    subscription = get_user_subscription(db, current_user.id)
+    subscription = await get_user_subscription(db, current_user.id) # Added await
     
     # Get API keys
-    api_keys = get_user_api_keys(db, current_user.id)
+    api_keys = await get_user_api_keys(db, current_user.id) # Added await
     
     return UserProfile(
         id=current_user.id,
@@ -57,10 +57,10 @@ async def get_my_profile(
 async def update_my_profile(
     user_data: UserUpdate,
     current_user: User = Depends(get_current_user_unified),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_database) # Changed from Session = Depends(get_db)
 ):
     """Update current user's profile."""
-    updated_user = update_user(db, current_user.id, user_data)
+    updated_user = await update_user(db, current_user.id, user_data) # Added await
     if not updated_user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -71,9 +71,9 @@ async def update_my_profile(
 
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(
-    user_id: UUID,
+    user_id: PydanticObjectId, # Changed from UUID
     current_user: User = Depends(get_current_user_unified),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_database) # Changed from Session = Depends(get_db)
 ):
     """Get user by ID (admin only or self)."""
     # For now, users can only access their own profile
@@ -84,7 +84,7 @@ async def get_user(
             detail="Access denied"
         )
     
-    user = get_user_by_id(db, user_id)
+    user = await get_user_by_id(db, user_id) # Added await
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -98,35 +98,35 @@ async def get_user(
 async def log_my_token_usage(
     usage_data: TokenUsageCreate,
     current_user: User = Depends(get_current_user_unified),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_database) # Changed from Session = Depends(get_db)
 ):
     """Log token usage for the current user."""
-    return log_token_usage(db, current_user.id, usage_data)
+    return await log_token_usage(db, current_user.id, usage_data) # Added await
 
 
 @router.get("/me/token-usage", response_model=List[TokenUsageLogResponse])
 async def get_my_token_usage(
     current_user: User = Depends(get_current_user_unified),
-    db: Session = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_database), # Changed from Session = Depends(get_db)
     start_date: Optional[datetime] = Query(None, description="Start date for filtering"),
     end_date: Optional[datetime] = Query(None, description="End date for filtering"),
     provider: Optional[str] = Query(None, description="Filter by provider"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return")
 ):
     """Get token usage logs for the current user."""
-    logs = get_user_token_usage(db, current_user.id, start_date, end_date, provider)
+    logs = await get_user_token_usage(db, current_user.id, start_date, end_date, provider) # Added await
     return logs[:limit]
 
 
 @router.get("/me/token-usage/stats", response_model=TokenUsageStats)
 async def get_my_token_usage_stats(
     current_user: User = Depends(get_current_user_unified),
-    db: Session = Depends(get_db),
+    db: AsyncIOMotorDatabase = Depends(get_database), # Changed from Session = Depends(get_db)
     start_date: Optional[datetime] = Query(None, description="Start date for filtering"),
     end_date: Optional[datetime] = Query(None, description="End date for filtering")
 ):
     """Get aggregated token usage statistics for the current user."""
-    stats = get_user_token_usage_stats(db, current_user.id, start_date, end_date)
+    stats = await get_user_token_usage_stats(db, current_user.id, start_date, end_date) # Added await
     return TokenUsageStats(**stats)
 
 
@@ -135,10 +135,10 @@ async def get_my_token_usage_stats(
 async def create_my_api_key(
     key_data: ApiKeyCreate,
     current_user: User = Depends(get_current_user_unified),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_database) # Changed from Session = Depends(get_db)
 ):
     """Create a new API key for the current user."""
-    api_key_record, api_key = create_api_key(db, current_user.id, key_data)
+    api_key_record, api_key = await create_api_key(db, current_user.id, key_data) # Added await
     
     return ApiKeyWithSecret(
         id=api_key_record.id,
@@ -154,20 +154,20 @@ async def create_my_api_key(
 @router.get("/me/api-keys", response_model=List[ApiKeyResponse])
 async def get_my_api_keys(
     current_user: User = Depends(get_current_user_unified),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_database) # Changed from Session = Depends(get_db)
 ):
     """Get all API keys for the current user."""
-    return get_user_api_keys(db, current_user.id)
+    return await get_user_api_keys(db, current_user.id) # Added await
 
 
 @router.delete("/me/api-keys/{api_key_id}")
 async def deactivate_my_api_key(
-    api_key_id: UUID,
+    api_key_id: PydanticObjectId, # Changed from UUID
     current_user: User = Depends(get_current_user_unified),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_database) # Changed from Session = Depends(get_db)
 ):
     """Deactivate an API key."""
-    success = deactivate_api_key(db, current_user.id, api_key_id)
+    success = await deactivate_api_key(db, current_user.id, api_key_id) # Added await
     if not success:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -179,12 +179,12 @@ async def deactivate_my_api_key(
 @router.get("/developer/name-matches", tags=["Developer"])
 async def developer_name_matches(
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_database) # Changed from Session = Depends(get_db)
 ):
     """Developer-only: Count users with the same name as the current user."""
     if getattr(current_user, "role", "user") != "developer":
         raise HTTPException(status_code=403, detail="Developer access required")
     if not current_user.name:
         return {"count": 0, "message": "Current user has no name set."}
-    count = db.query(User).filter(User.name == current_user.name).count()
+    count = await User.find(User.name == current_user.name).count() # Changed from db.query(User).filter(User.name == current_user.name).count()
     return {"count": count, "name": current_user.name}

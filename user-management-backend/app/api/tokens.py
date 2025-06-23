@@ -1,25 +1,25 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from motor.motor_asyncio import AsyncIOMotorDatabase
 from typing import List, Optional, Dict, Any
-from ..database import get_db
+from ..database import get_database
 from ..auth.dependencies import get_current_user
 from ..auth.unified_auth import get_current_user_unified
-from ..models.user import User, TokenUsageLog
+from ..models.user import User
 from ..services.token_service import TokenService, TokenPricingService
 from ..schemas.auth import TokenUsageLogResponse
 
 router = APIRouter(prefix="/tokens", tags=["Tokens"])
 
 @router.get("/balance")
-def get_token_balance(current_user: User = Depends(get_current_user_unified), db: Session = Depends(get_db)):
+async def get_token_balance(current_user: User = Depends(get_current_user_unified), db: AsyncIOMotorDatabase = Depends(get_database)):
     """Get current user's token balance and usage information."""
     token_service = TokenService(db)
     return token_service.get_token_balance(current_user)
 
 @router.get("/usage", response_model=List[TokenUsageLogResponse])
-def get_token_usage(
-    current_user: User = Depends(get_current_user_unified), 
-    db: Session = Depends(get_db),
+async def get_token_usage(
+    current_user: User = Depends(get_current_user_unified),
+    db: AsyncIOMotorDatabase = Depends(get_database),
     limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
     offset: int = Query(0, ge=0, description="Number of records to skip")
 ):

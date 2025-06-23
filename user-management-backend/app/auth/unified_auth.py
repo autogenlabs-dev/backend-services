@@ -3,13 +3,13 @@ Unified authentication dependency that supports both JWT tokens and API keys.
 This enables seamless authentication for VS Code extensions using persistent API keys.
 """
 
-from typing import Optional, Union
+from typing import Optional, Union, Any # Added Any import
 from uuid import UUID
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
-from ..database import get_db
+from ..database import get_database # Changed from get_db to get_database
 from ..models.user import User
 from .jwt import verify_token
 from .api_key_auth_clean import api_key_service
@@ -21,7 +21,7 @@ security = HTTPBearer(auto_error=False)
 async def get_current_user_unified(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    db: Session = Depends(get_db)
+    db: Any = Depends(get_database) # Changed type hint from Session to Any, and get_db to get_database
 ) -> User:
     """
     Get the current authenticated user using either JWT token or API key.
@@ -64,19 +64,27 @@ async def get_current_user_unified(
                 if payload:
                     user_id = payload.get("sub")
                     if user_id:
-                        user_uuid = UUID(user_id)
-                        user = db.query(User).filter(
-                            User.id == user_uuid,
-                            User.is_active == True
-                        ).first()
-            except (ValueError, TypeError):
-                pass
+                        # MongoDB: Find user by ID
+                        user = await User.get(user_id) # Use Beanie's get method
+                        if user:
+                            print(f"Found user with ID {user_id}, active status: {user.is_active}")
+                        else:
+                            print(f"No user found with ID {user_id}")
+                        if not user:
+                            auth_method += f" - User not found or inactive for ID {user_id}"
+                    else:
+                        auth_method += " - No 'sub' field in token payload"
+                else:
+                    auth_method += " - Token verification failed"
+            except (ValueError, TypeError) as e:
+                auth_method += f" - Exception during token processing: {str(e)}"
     
     # Authentication failed
     if not user:
+        detail_message = f"Could not validate credentials using {auth_method}. Please provide a valid JWT token or API key."
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials. Please provide a valid JWT token or API key.",
+            detail=detail_message,
             headers={"WWW-Authenticate": "Bearer"}
         )
     
@@ -93,7 +101,7 @@ async def get_current_user_unified(
 async def get_optional_current_user_unified(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    db: Session = Depends(get_db)
+    db: Any = Depends(get_database) # Changed type hint from Session to Any, and get_db to get_database
 ) -> Optional[User]:
     """
     Get the current user if authenticated (either JWT or API key), None otherwise.

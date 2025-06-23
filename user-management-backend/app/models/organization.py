@@ -1,96 +1,125 @@
 """Organization models for enterprise features."""
 
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, ForeignKey, DECIMAL, JSON
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-import uuid
+from datetime import datetime
+from typing import Optional, List, Dict, Any
+from pydantic import Field
+from beanie import Document, PydanticObjectId
+from beanie.odm.fields import Indexed
 
-from ..database import Base
 
-
-class Organization(Base):
+class Organization(Document):
     """Organization model for enterprise customers."""
     
-    __tablename__ = "organizations"
+    name: str
+    admin_user_id: PydanticObjectId
+    subscription_plan: str = "enterprise"
+    token_pool: int = 1000000
+    tokens_used: int = 0
+    monthly_limit: int = 1000000
+    reset_date: Optional[datetime] = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
     
-    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    name = Column(String(255), nullable=False)
-    admin_user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
-    subscription_plan = Column(String(50), default="enterprise")
-    token_pool = Column(Integer, default=1000000)
-    tokens_used = Column(Integer, default=0)
-    monthly_limit = Column(Integer, default=1000000)
-    reset_date = Column(DateTime, server_default=func.now())
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    # Organization settings
+    settings: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    is_active: bool = True
     
-    # Relationships
-    admin_user = relationship("User", foreign_keys=[admin_user_id])
-    members = relationship("OrganizationMember", back_populates="organization")
-    keys = relationship("OrganizationKey", back_populates="organization")
+    class Settings:
+        name = "organizations"
+        indexes = [
+            "admin_user_id",
+            "name"
+        ]
+
+    def __repr__(self):
+        return f"<Organization(name='{self.name}')>"
 
 
-class OrganizationKey(Base):
-    """Organization API keys for team access."""
+class OrganizationKey(Document):
+    """API keys for organizations."""
     
-    __tablename__ = "organization_keys"
+    organization_id: PydanticObjectId
+    key_name: str
+    key_hash: str
+    description: Optional[str] = None
+    permissions: Dict[str, Any] = Field(default_factory=dict)
+    monthly_limit: int = 100000
+    tokens_used: int = 0
+    is_active: bool = True
+    expires_at: Optional[datetime] = None
+    created_by: PydanticObjectId
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_used_at: Optional[datetime] = None
     
-    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    organization_id = Column(String(36), ForeignKey("organizations.id"), nullable=False)
-    key_name = Column(String(255), nullable=False)
-    key_hash = Column(String(255), unique=True, nullable=False)
-    description = Column(Text)
-    permissions = Column(JSON, default=lambda: {})
-    monthly_limit = Column(Integer, default=100000)
-    tokens_used = Column(Integer, default=0)
-    is_active = Column(Boolean, default=True)
-    expires_at = Column(DateTime)
-    created_by = Column(String(36), ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
-    last_used_at = Column(DateTime)
-    
-        
-    # Relationships
-    organization = relationship("Organization", back_populates="keys")
-    creator = relationship("User", foreign_keys=[created_by])
-    usage_logs = relationship("KeyUsageLog", back_populates="organization_key")
+    class Settings:
+        name = "organization_keys"
+        indexes = [
+            "organization_id",
+            "key_hash",
+            "created_by"
+        ]
 
 
-class OrganizationMember(Base):
-    """Organization membership table."""
+class OrganizationMember(Document):
+    """Organization member relationships."""
     
-    __tablename__ = "organization_members"
+    organization_id: PydanticObjectId
+    user_id: PydanticObjectId
+    role: str = "member"  # owner, admin, member, viewer
+    assigned_key_id: Optional[PydanticObjectId] = None
+    joined_at: datetime = Field(default_factory=datetime.utcnow)
+    invited_by: Optional[PydanticObjectId] = None
+    is_active: bool = True
     
-    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    organization_id = Column(String(36), ForeignKey("organizations.id"), nullable=False)
-    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
-    role = Column(String(50), default="member")
-    assigned_key_id = Column(String(36), ForeignKey("organization_keys.id"))
-    joined_at = Column(DateTime, server_default=func.now())
-    invited_by = Column(String(36), ForeignKey("users.id"))
-    
-    # Relationships
-    organization = relationship("Organization", back_populates="members")
-    user = relationship("User", foreign_keys=[user_id])
-    inviter = relationship("User", foreign_keys=[invited_by])
-    assigned_key = relationship("OrganizationKey", foreign_keys=[assigned_key_id])
+    class Settings:
+        name = "organization_members"
+        indexes = [
+            "organization_id",
+            "user_id",
+            ("organization_id", "user_id")  # Compound index
+        ]
 
 
-class KeyUsageLog(Base):
+class KeyUsageLog(Document):
     """Log organization key usage for analytics."""
     
-    __tablename__ = "key_usage_logs"
+    organization_key_id: PydanticObjectId
+    user_id: PydanticObjectId
+    provider: str
+    model_name: str
+    tokens_used: int
+    cost_usd: Optional[float] = None
+    request_type: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
     
-    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    organization_key_id = Column(String(36), ForeignKey("organization_keys.id"), nullable=False)
-    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
-    provider = Column(String(50), nullable=False)
-    model_name = Column(String(100), nullable=False)
-    tokens_used = Column(Integer, nullable=False)
-    cost_usd = Column(DECIMAL(10, 6))
-    request_type = Column(String(50), nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
+    class Settings:
+        name = "key_usage_logs"
+        indexes = [
+            "organization_key_id",
+            "user_id",
+            "created_at",
+            ("organization_key_id", "created_at")  # Compound index
+        ]
+
+
+class OrganizationInvitation(Document):
+    """Organization invitations for new members."""
     
-    # Relationships
-    organization_key = relationship("OrganizationKey", back_populates="usage_logs")
-    user = relationship("User")
+    organization_id: PydanticObjectId
+    email: str
+    role: str = "member"
+    token: str
+    created_by: PydanticObjectId
+    expires_at: datetime
+    is_used: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    used_at: Optional[datetime] = None
+    
+    class Settings:
+        name = "organization_invitations"
+        indexes = [
+            "organization_id",
+            "email",
+            "token",
+            "expires_at"
+        ]

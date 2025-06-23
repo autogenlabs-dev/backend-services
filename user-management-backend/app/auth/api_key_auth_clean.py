@@ -11,9 +11,9 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, Tuple, List
 from fastapi import HTTPException, status, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
-from sqlalchemy import select, and_
-from app.database import get_db
+from typing import Any # Added Any import
+from beanie import PydanticObjectId # Added PydanticObjectId import
+from app.database import get_database # Changed from get_db to get_database
 from app.models.user import User, ApiKey
 from pydantic import BaseModel
 
@@ -64,25 +64,15 @@ class ApiKeyService:
         """Get first 8 characters for display purposes"""
         return api_key[:8] if len(api_key) >= 8 else api_key
 
-    def create_api_key(
+    async def create_api_key( # Added async
         self,
-        user_id: str,
+        user_id: PydanticObjectId, # Changed type hint from str to PydanticObjectId
         name: str,
-        db: Session,
+        db: Any, # Changed type hint from Session to Any
         description: Optional[str] = None,
         expires_in_days: Optional[int] = None
     ) -> ApiKeyCreateResponse:
         """Create a new API key for a user"""
-        
-        # Convert string user_id to UUID if needed
-        if isinstance(user_id, str):
-            try:
-                user_id = uuid.UUID(user_id)
-            except (ValueError, TypeError):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid user ID format"
-                )
         
         # Generate the API key
         api_key = self.generate_api_key()
@@ -105,9 +95,7 @@ class ApiKeyService:
             created_at=datetime.utcnow()
         )
         
-        db.add(api_key_obj)
-        db.commit()
-        db.refresh(api_key_obj)
+        await api_key_obj.insert() # Use Beanie's insert method
         
         return ApiKeyCreateResponse(
             id=str(api_key_obj.id),
@@ -118,10 +106,10 @@ class ApiKeyService:
             expires_at=expires_at
         )
     
-    def validate_api_key(
+    async def validate_api_key( # Added async
         self,
         api_key: str,
-        db: Session
+        db: Any # Changed type hint from Session to Any
     ) -> Optional[Tuple[User, ApiKey]]:
         """
         Validate API key and return associated user and key object
@@ -133,22 +121,20 @@ class ApiKeyService:
             # Hash the provided key
             key_hash = self.hash_api_key(api_key)
             
-            # Find the API key record
-            result = db.execute(
-                select(ApiKey, User).join(User).where(
-                    and_(
-                        ApiKey.key_hash == key_hash,
-                        ApiKey.is_active == True,
-                        User.is_active == True
-                    )
-                )
+            # Find the API key record using Beanie
+            api_key_obj = await ApiKey.find_one(
+                ApiKey.key_hash == key_hash,
+                ApiKey.is_active == True
             )
             
-            row = result.first()
-            if not row:
+            if not api_key_obj:
                 return None
             
-            api_key_obj, user = row
+            # Get the associated user
+            user = await User.get(api_key_obj.user_id)
+            
+            if not user or not user.is_active:
+                return None
             
             # Check if key has expired
             if api_key_obj.expires_at and api_key_obj.expires_at < datetime.utcnow():
@@ -159,7 +145,7 @@ class ApiKeyService:
             
             # Update last used timestamp
             api_key_obj.last_used_at = datetime.utcnow()
-            db.commit()
+            await api_key_obj.save() # Use Beanie's save method
             
             return user, api_key_obj
             
@@ -167,33 +153,18 @@ class ApiKeyService:
             print(f"API key validation error: {e}")
             return None
     
-    def list_user_api_keys(
+    async def list_user_api_keys( # Added async
         self,
-        user_id: str,
-        db: Session
+        user_id: PydanticObjectId, # Changed type hint from str to PydanticObjectId
+        db: Any # Changed type hint from Session to Any
     ) -> List[ApiKeyResponse]:
         """List all API keys for a user (without the actual key values)"""
         
-        # Convert string user_id to UUID if needed
-        if isinstance(user_id, str):
-            try:
-                user_id = uuid.UUID(user_id)
-            except (ValueError, TypeError):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid user ID format"
-                )
-        
-        result = db.execute(
-            select(ApiKey).where(
-                and_(
-                    ApiKey.user_id == user_id,
-                    ApiKey.is_active == True
-                )
-            ).order_by(ApiKey.created_at.desc())
-        )
-        
-        api_keys = result.scalars().all()
+        # List all API keys for a user using Beanie
+        api_keys = await ApiKey.find(
+            ApiKey.user_id == user_id,
+            ApiKey.is_active == True
+        ).sort(-ApiKey.created_at).to_list()
         
         return [
             ApiKeyResponse(
@@ -208,29 +179,23 @@ class ApiKeyService:
             for key in api_keys
         ]
     
-    def revoke_api_key(
+    async def revoke_api_key( # Added async
         self,
-        key_id: str,
-        user_id: str,
-        db: Session
+        key_id: PydanticObjectId, # Changed type hint from str to PydanticObjectId
+        user_id: PydanticObjectId, # Changed type hint from str to PydanticObjectId
+        db: Any # Changed type hint from Session to Any
     ) -> bool:
         """Revoke (deactivate) an API key"""
         
-        result = db.execute(
-            select(ApiKey).where(
-                and_(
-                    ApiKey.id == key_id,
-                    ApiKey.user_id == user_id
-                )
-            )
+        api_key = await ApiKey.find_one(
+            ApiKey.id == key_id,
+            ApiKey.user_id == user_id
         )
-        
-        api_key = result.scalar_one_or_none()
         if not api_key:
             return False
         
         api_key.is_active = False
-        db.commit()
+        await api_key.save() # Use Beanie's save method
         return True
 
 # Global service instance
@@ -245,7 +210,7 @@ class ApiKeyAuth:
     async def __call__(
         self,
         request: Request,
-        db: Session = Depends(get_db)
+        db: Any = Depends(get_database) # Changed type hint from Session to Any, and get_db to get_database
     ) -> Optional[Tuple[User, ApiKey]]:
         """
         Extract and validate API key from request

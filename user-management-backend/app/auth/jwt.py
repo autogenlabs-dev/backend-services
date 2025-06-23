@@ -12,7 +12,7 @@ from sqlalchemy import select
 import uuid
 
 from ..config import settings
-from ..database import get_db
+from ..database import get_database # Changed from get_db to get_database
 from ..models.user import User
 
 # Password hashing context
@@ -66,7 +66,7 @@ def get_password_hash(password: str) -> str:
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
+    db: Any = Depends(get_database) # Changed type hint from Session to Any, and get_db to get_database
 ) -> User:
     """Get the current authenticated user from the JWT token."""
     credentials_exception = HTTPException(
@@ -90,8 +90,8 @@ async def get_current_user(
         except (ValueError, TypeError):
             raise credentials_exception
               # Get user from database
-        result = db.execute(select(User).where(User.id == user_id))
-        user = result.scalar_one_or_none()
+        # MongoDB: Find user by ID
+        user = await User.get(user_id) # Use Beanie's get method
         
         if user is None:
             raise credentials_exception
