@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from typing import List, Optional, Dict, Any
-from uuid import UUID
+from beanie.odm.fields import PydanticObjectId
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -43,12 +43,20 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     password: Optional[str] = Field(None, min_length=8, description="New password")
     is_active: Optional[bool] = None
+    name: Optional[str] = Field(None, max_length=100, description="Display name")
+    full_name: Optional[str] = Field(None, max_length=100, description="User's full name")
+    first_name: Optional[str] = Field(None, max_length=50, description="First name")
+    last_name: Optional[str] = Field(None, max_length=50, description="Last name")
+    role: Optional[str] = Field(None, description="User role (user, developer, admin)")
 
 
 class UserResponse(UserBase):
-    id: UUID
+    id: PydanticObjectId
     name: Optional[str] = None
     full_name: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    role: str = "user"
     subscription: Optional[str] = "free"
     tokens_remaining: Optional[int] = 10000
     tokens_used: Optional[int] = 0
@@ -64,7 +72,7 @@ class UserResponse(UserBase):
 
 # OAuth schemas
 class OAuthProviderResponse(BaseModel):
-    id: UUID
+    id: PydanticObjectId
     name: str
     display_name: str
     is_active: bool
@@ -74,8 +82,8 @@ class OAuthProviderResponse(BaseModel):
 
 
 class UserOAuthAccountResponse(BaseModel):
-    id: UUID
-    provider_id: UUID
+    id: PydanticObjectId
+    provider_id: PydanticObjectId
     provider_user_id: str
     email: str
     connected_at: datetime
@@ -88,7 +96,7 @@ class UserOAuthAccountResponse(BaseModel):
 
 # Subscription schemas
 class SubscriptionPlanResponse(BaseModel):
-    id: UUID
+    id: PydanticObjectId
     name: str
     display_name: str
     monthly_tokens: int
@@ -101,8 +109,8 @@ class SubscriptionPlanResponse(BaseModel):
 
 
 class UserSubscriptionResponse(BaseModel):
-    id: UUID
-    plan_id: UUID
+    id: PydanticObjectId
+    plan_id: PydanticObjectId
     status: str
     current_period_start: Optional[datetime]
     current_period_end: Optional[datetime]
@@ -116,7 +124,7 @@ class UserSubscriptionResponse(BaseModel):
 
 # Token usage schemas
 class TokenUsageLogResponse(BaseModel):
-    id: UUID
+    id: PydanticObjectId
     provider: str
     model_name: str
     tokens_used: int
@@ -152,7 +160,7 @@ class ApiKeyCreate(BaseModel):
 
 
 class ApiKeyResponse(BaseModel):
-    id: UUID
+    id: PydanticObjectId
     name: str
     key_preview: str
     created_at: datetime
