@@ -150,6 +150,16 @@ async def update_user_last_login(db: AsyncIOMotorDatabase, user_id: PydanticObje
         await user.save()
 
 
+async def update_user_last_logout(db: AsyncIOMotorDatabase, user_id: PydanticObjectId) -> None:
+    """Update user's last logout timestamp."""
+    user = await get_user_by_id(db, user_id)
+    if user:
+        # Add last_logout_at field if it doesn't exist in the model
+        user.last_logout_at = datetime.now(timezone.utc)
+        user.updated_at = datetime.now(timezone.utc)
+        await user.save()
+
+
 async def get_or_create_user_by_oauth(
     db: AsyncIOMotorDatabase,
     provider_name: str,

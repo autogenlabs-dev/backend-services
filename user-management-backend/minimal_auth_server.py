@@ -6,6 +6,13 @@ A simplified server to test authentication flow only.
 
 import asyncio
 import sys
+import warnings
+
+# Suppress dependency warnings for cleaner output
+warnings.filterwarnings("ignore", category=UserWarning, module="razorpay")
+warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
+warnings.filterwarnings("ignore", message=".*pkg_resources.*")
+warnings.filterwarnings("ignore", message=".*model_.*")
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -23,9 +30,42 @@ from app.models.organization import Organization
 from app.models.template import Template, TemplateLike, TemplateDownload, TemplateView, TemplateComment, TemplateCategory
 from app.models.component import Component
 from app.config import settings
+from contextlib import asynccontextmanager
+
+# Database client
+client = None
+db = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events."""
+    # Startup
+    global client, db
+    try:
+        print("🔄 Connecting to database...")
+        client = AsyncIOMotorClient(settings.database_url)
+        db = client.user_management_db
+        
+        print("🔄 Initializing Beanie...")
+        # Initialize Beanie
+        await init_beanie(database=db, document_models=[User, Organization, Template, TemplateLike, TemplateDownload, TemplateView, TemplateComment, TemplateCategory, Component])
+        print("✅ Database connected and initialized")
+    except Exception as e:
+        print(f"❌ Database initialization error: {e}")
+        print("⚠️ Continuing without database (some features may not work)")
+    
+    yield
+    
+    # Shutdown
+    if client:
+        try:
+            client.close()
+            print("🔌 Database connection closed")
+        except Exception as e:
+            print(f"⚠️ Error closing database: {e}")
 
 # Create FastAPI app
-app = FastAPI(title="Minimal Auth Test Server")
+app = FastAPI(title="Minimal Auth Test Server", lifespan=lifespan)
 
 # Add CORS
 app.add_middleware(
@@ -35,28 +75,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Database client
-client = None
-db = None
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database connection on startup."""
-    global client, db
-    client = AsyncIOMotorClient(settings.database_url)
-    db = client.user_management_db
-    
-    # Initialize Beanie
-    await init_beanie(database=db, document_models=[User, Organization, Template, TemplateLike, TemplateDownload, TemplateView, TemplateComment, TemplateCategory, Component])
-    print("✅ Database connected and initialized")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Close database connection on shutdown."""
-    if client:
-        client.close()
-        print("🔌 Database connection closed")
 
 # Schemas
 class LoginRequest(BaseModel):
@@ -172,35 +190,47 @@ from typing import List, Optional
 
 class ComponentCreateRequest(BaseModel):
     title: str
-    description: str
     category: str
-    tags: List[str] = []
     type: str
     language: str
     difficulty_level: str
     plan_type: str
     pricing_inr: int = 0
     pricing_usd: int = 0
+    short_description: str
+    full_description: str
+    preview_images: List[str] = []
+    git_repo_url: Optional[str] = None
+    live_demo_url: Optional[str] = None
+    dependencies: List[str] = []
+    tags: List[str] = []
+    developer_name: str
+    developer_experience: str
     is_available_for_dev: bool = True
     featured: bool = False
-    popular: bool = False
     code: Optional[str] = None
     readme_content: Optional[str] = None
 
 class ComponentUpdateRequest(BaseModel):
     title: Optional[str] = None
-    description: Optional[str] = None
     category: Optional[str] = None
-    tags: Optional[List[str]] = None
     type: Optional[str] = None
     language: Optional[str] = None
     difficulty_level: Optional[str] = None
     plan_type: Optional[str] = None
     pricing_inr: Optional[int] = None
     pricing_usd: Optional[int] = None
+    short_description: Optional[str] = None
+    full_description: Optional[str] = None
+    preview_images: Optional[List[str]] = None
+    git_repo_url: Optional[str] = None
+    live_demo_url: Optional[str] = None
+    dependencies: Optional[List[str]] = None
+    tags: Optional[List[str]] = None
+    developer_name: Optional[str] = None
+    developer_experience: Optional[str] = None
     is_available_for_dev: Optional[bool] = None
     featured: Optional[bool] = None
-    popular: Optional[bool] = None
     code: Optional[str] = None
     readme_content: Optional[str] = None
 
@@ -464,6 +494,36 @@ async def refresh_tokens(refresh_data: dict):
         raise HTTPException(status_code=401, detail="Refresh token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+@app.post("/auth/logout")
+async def logout(authorization: str = Header(None)):
+    """Logout user and invalidate tokens."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
+    
+    token = authorization.replace("Bearer ", "")
+    
+    try:
+        user = await get_current_user(token)
+        
+        # Update last logout time
+        user.last_logout_at = datetime.utcnow()
+        user.updated_at = datetime.utcnow()
+        await user.save()
+        
+        return {
+            "success": True,
+            "message": "Successfully logged out",
+            "user_id": str(user.id)
+        }
+        
+    except Exception as e:
+        print(f"Logout error: {e}")
+        # Even if there's an error, we should still return success for logout
+        return {
+            "success": True,
+            "message": "Successfully logged out"
+        }
 
 # Additional endpoints to make the API more comprehensive
 @app.get("/auth/providers")
@@ -1341,14 +1401,26 @@ async def verify_payment(request: dict, authorization: str = Header(None)):
 # --- COMPONENT MANAGEMENT ENDPOINTS ---
 @app.post("/components")
 async def create_component(component_data: ComponentCreateRequest, authorization: str = Header(None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
-    token = authorization.replace("Bearer ", "")
-    user = await get_current_user(token)
+    # Make authentication optional - allow anonymous component creation
+    user_id = None
+    
+    # Try to get user if token is provided
+    if authorization and authorization.startswith("Bearer "):
+        try:
+            token = authorization.replace("Bearer ", "")
+            user = await get_current_user(token)
+            user_id = str(user.id)
+            print(f"Creating component for authenticated user: {user_id}")
+        except Exception as e:
+            print(f"Authentication failed, but allowing anonymous creation: {e}")
+            # Don't raise error, just continue without user_id
+    else:
+        print("No authorization provided, creating component anonymously")
+    
     try:
         component = Component(
             **component_data.dict(),
-            user_id=str(user.id),
+            user_id=user_id,  # Can be None for anonymous components
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
         )
@@ -1474,3 +1546,24 @@ async def get_user_components(authorization: str = Header(None), skip: int = 0, 
     except Exception as e:
         print(f"User components retrieval error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve user components: {str(e)}")
+
+# Main execution
+if __name__ == "__main__":
+    import uvicorn
+    print("🚀 Starting Minimal Auth Test Server...")
+    print("📍 Server will be available at: http://localhost:8000")
+    print("📖 API docs will be available at: http://localhost:8000/docs")
+    print("🔧 Press Ctrl+C to stop the server")
+    
+    try:
+        uvicorn.run(
+            app,
+            host="0.0.0.0",
+            port=8000,
+            reload=False,  # Disable reload to avoid issues
+            log_level="info"
+        )
+    except KeyboardInterrupt:
+        print("\n🛑 Server stopped by user")
+    except Exception as e:
+        print(f"❌ Server startup error: {e}")
