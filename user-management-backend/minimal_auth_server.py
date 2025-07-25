@@ -1474,3 +1474,18 @@ async def get_user_components(authorization: str = Header(None), skip: int = 0, 
     except Exception as e:
         print(f"User components retrieval error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve user components: {str(e)}")
+
+# Server startup
+if __name__ == "__main__":
+    import uvicorn
+    print("🚀 Starting User Management Backend Server...")
+    print("📡 Server will be available at: http://localhost:8000")
+    print("📖 API Documentation: http://localhost:8000/docs")
+    print("🔧 Health Check: http://localhost:8000/health")
+    uvicorn.run(
+        "minimal_auth_server:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info"
+    )
