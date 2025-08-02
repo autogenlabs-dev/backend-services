@@ -51,31 +51,62 @@ log/
 .env.local
 .env.development
 .env.production
+.env.*
 
-# Pytest cache
-.pytest_cache/
-.coverage
-htmlcov/
-coverage.xml
-*.cover
-
-# Alembic migration backups
-alembic/versions/__pycache__/
-
-# JWT tokens and secrets for testing
+# Security files - AWS Keys, Certificates, etc.
 *.pem
 *.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+autogen.pem
+autogen*.pem
+*.ppk
+id_rsa*
+id_dsa*
+id_ecdsa*
+id_ed25519*
 
-# Docker volumes
-docker-volumes/
+# AWS Configuration
+.aws/
+aws-credentials.json
+credentials
+config
 
-# Redis data
-dump.rdb
+# SSH Keys
+ssh_keys/
+.ssh/
 
-# API keys and secrets
+# API Keys and Secrets
 *.secret
-*.key
+*.token
 secrets/
+api-keys/
+credentials/
+
+# JWT tokens and secrets for testing
+jwt_secret*
+refresh_secret*
+
+# Docker and Kubernetes secrets
+docker-secrets/
+k8s-secrets/
+secrets.yaml
+*-secret.yaml
+
+# Database dumps and backups
+*.sql
+*.dump
+backup/
+backups/
+*.backup
+
+# CI/CD sensitive files
+deploy-keys/
+github-deploy-key*
+deployment-config.*
 
 # Documentation builds
 docs/_build/
