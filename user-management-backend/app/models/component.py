@@ -24,7 +24,7 @@ class Component(Document):
     featured: bool = False
     code: Optional[str] = None
     readme_content: Optional[str] = None
-    user_id: str
+    user_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -32,4 +32,10 @@ class Component(Document):
         name = "components"
 
     def to_dict(self):
-        return self.dict()
+        data = self.dict()
+        # Convert ObjectId to string for frontend compatibility
+        if 'id' in data:
+            data['id'] = str(data['id'])
+        if '_id' in data:
+            data['_id'] = str(data['_id'])
+        return data

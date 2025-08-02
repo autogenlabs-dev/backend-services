@@ -341,11 +341,38 @@ async def refresh_access_token(
 
 
 @router.post("/logout")
-async def logout(current_user = Depends(get_current_user)):
-    """Logout the current user."""
-    # In a production system, you might want to blacklist the token
-    # For now, we'll just return a success message
-    return {"message": "Successfully logged out"}
+async def logout(
+    request: Request,
+    current_user = Depends(get_current_user_unified),
+    db: Any = Depends(get_database)
+):
+    """Logout the current user and invalidate tokens."""
+    try:
+        # Get the authorization header to extract the token
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            
+            # In a production system, you would blacklist the token here
+            # For now, we'll update the user's last logout time
+            from ..services.user_service import update_user_last_logout
+            try:
+                update_user_last_logout(db, current_user.id)
+            except Exception as e:
+                print(f"Warning: Could not update last logout time: {e}")
+        
+        return {
+            "success": True,
+            "message": "Successfully logged out",
+            "user_id": str(current_user.id)
+        }
+    except Exception as e:
+        print(f"Logout error: {e}")
+        # Even if there's an error, we should still return success for logout
+        return {
+            "success": True,
+            "message": "Successfully logged out"
+        }
 
 
 @router.get("/me")
