@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     )
     
     # Database
-    database_url: str = "mongodb://localhost:27017/user_management_db"
+    database_url: str = "mongodb://127.0.0.1:27017/user_management_db"
     redis_url: str = "redis://localhost:6379"
     
     # Redis Configuration
