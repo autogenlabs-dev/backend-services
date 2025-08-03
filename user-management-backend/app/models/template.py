@@ -20,9 +20,9 @@ class Template(Document):
     likes: int = 0
     short_description: str
     full_description: str
-    preview_images: List[str] = Field(default_factory=list)
+    preview_images: List[str] = Field(default_factory=list)  # Optional - using live_demo_url for preview
     git_repo_url: Optional[str] = None
-    live_demo_url: Optional[str] = None
+    live_demo_url: Optional[str] = None  # Main source for preview generation
     dependencies: List[str] = Field(default_factory=list)
     tags: List[str] = Field(default_factory=list)
     developer_name: str
@@ -81,9 +81,9 @@ class Template(Document):
             "likes": self.likes,
             "short_description": self.short_description,
             "full_description": self.full_description,
-            "preview_images": self.preview_images,
+            "preview_images": self.preview_images,  # Usually empty - using live_demo_url for preview
             "git_repo_url": self.git_repo_url,
-            "live_demo_url": self.live_demo_url,
+            "live_demo_url": self.live_demo_url,  # Main source for preview generation
             "dependencies": self.dependencies,
             "tags": self.tags,
             "developer_name": self.developer_name,

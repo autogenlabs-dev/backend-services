@@ -24,9 +24,9 @@ class TemplateCreateRequest(BaseModel):
     pricing_usd: int = 0
     short_description: str
     full_description: str
-    preview_images: List[str] = []
+    preview_images: List[str] = []  # Optional - using live_demo_url for preview
     git_repo_url: Optional[str] = None
-    live_demo_url: Optional[str] = None
+    live_demo_url: Optional[str] = None  # Main source for preview generation
     dependencies: List[str] = []
     tags: List[str] = []
     developer_name: str
@@ -69,6 +69,7 @@ async def create_template(
     """Create a new template."""
     try:
         # Create template document
+        # Note: preview_images will be empty - using live_demo_url for preview generation
         template = Template(
             title=request.title,
             category=request.category,
@@ -80,9 +81,9 @@ async def create_template(
             pricing_usd=request.pricing_usd,
             short_description=request.short_description,
             full_description=request.full_description,
-            preview_images=request.preview_images,
+            preview_images=request.preview_images,  # Will be empty, using live_demo_url instead
             git_repo_url=request.git_repo_url,
-            live_demo_url=request.live_demo_url,
+            live_demo_url=request.live_demo_url,  # Main source for preview
             dependencies=request.dependencies,
             tags=request.tags,
             developer_name=request.developer_name,

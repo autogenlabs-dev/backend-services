@@ -94,12 +94,9 @@ async def seed_templates():
             "likes": 89,
             "short_description": "A sleek, responsive navigation bar with dropdowns and mobile menu.",
             "full_description": "This modern navigation component features a clean design with dropdown menus, mobile hamburger menu, and smooth animations. Perfect for any modern web application.",
-            "preview_images": [
-                "https://images.unsplash.com/photo-1551650975-87deedd944c3?w=400",
-                "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400"
-            ],
+            "preview_images": [],  # Empty - using live_demo_url for preview generation
             "git_repo_url": "https://github.com/example/modern-navbar",
-            "live_demo_url": "https://modern-navbar-demo.vercel.app",
+            "live_demo_url": "https://nextjs.org",  # Real working URL for preview testing
             "dependencies": ["react", "@tailwindcss/core", "framer-motion"],
             "tags": ["navigation", "responsive", "typescript", "tailwind"],
             "developer_name": "Alex Johnson",
@@ -126,12 +123,9 @@ async def seed_templates():
             "likes": 156,
             "short_description": "Complete dashboard layout with sidebar, header, and content areas.",
             "full_description": "A comprehensive dashboard layout component featuring a collapsible sidebar, header with search and notifications, and flexible content area. Includes dark mode support and responsive design.",
-            "preview_images": [
-                "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400",
-                "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400"
-            ],
+            "preview_images": [],  # Empty - using live_demo_url for preview generation
             "git_repo_url": "https://github.com/example/dashboard-layout",
-            "live_demo_url": "https://dashboard-layout-demo.vercel.app",
+            "live_demo_url": "https://tailwindcss.com",  # Real working URL for preview testing
             "dependencies": ["react", "tailwindcss", "lucide-react"],
             "tags": ["dashboard", "layout", "sidebar", "responsive"],
             "developer_name": "Sarah Chen",
@@ -158,11 +152,9 @@ async def seed_templates():
             "likes": 203,
             "short_description": "Beautiful contact form with validation and email integration.",
             "full_description": "A clean, modern contact form component with built-in validation, error handling, and email integration. Features smooth animations and accessibility support.",
-            "preview_images": [
-                "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400"
-            ],
+            "preview_images": [],  # Empty - using live_demo_url for preview generation
             "git_repo_url": "https://github.com/example/contact-form",
-            "live_demo_url": "https://contact-form-demo.vercel.app",
+            "live_demo_url": "https://react.dev",  # Real working URL for preview testing
             "dependencies": ["react", "react-hook-form", "zod", "@tailwindcss/forms"],
             "tags": ["form", "validation", "typescript", "accessibility"],
             "developer_name": "Mike Rodriguez",
