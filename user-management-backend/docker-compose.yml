@@ -8,14 +8,19 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=mongodb://mongodb:27017/user_management_db
-      - JWT_SECRET_KEY=your-production-secret-key-change-this
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-production-secret-key-change-this}
       - DEBUG=False
-      - A4F_API_KEY=your-a4f-api-key
+      - A4F_API_KEY=${A4F_API_KEY:-your-a4f-api-key}
+      - REDIS_URL=redis://redis:6379
     depends_on:
       - mongodb
-    volumes:
-      - ./.env:/app/.env:ro
+      - redis
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # MongoDB Database
   mongodb:

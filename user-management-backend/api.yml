@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-management-api
+  labels:
+    app: user-management-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-management-api
+  template:
+    metadata:
+      labels:
+        app: user-management-api
+    spec:
+      containers:
+      - name: api
+        image: user-management-api:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DATABASE_URL
+          value: "mongodb://mongodb-service:27017/user_management_db"
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: api-secrets
+              key: jwt-secret
+        - name: DEBUG
+          value: "False"
+        - name: A4F_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: api-secrets
+              key: a4f-api-key
+        volumeMounts:
+        - name: env-file
+          mountPath: /app/.env
+          subPath: .env
+          readOnly: true
+      volumes:
+      - name: env-file
+        configMap:
+          name: api-env-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-management-api-service
+spec:
+  selector:
+    app: user-management-api
+  ports:
+  - port: 8000
+    targetPort: 8000
+  type: LoadBalancer

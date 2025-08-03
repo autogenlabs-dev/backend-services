@@ -1,17 +1,22 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 import os
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="ignore"  # This will ignore extra environment variables
+    )
+    
     # Database
-    database_url: str = "mongodb://localhost:27017/user_management_db" # Changed to MongoDB
+    database_url: str = "mongodb://localhost:27017/user_management_db"
     redis_url: str = "redis://localhost:6379"
     
     # Redis Configuration
     redis_host: str = "localhost"
     redis_port: int = 6379
-    redis_password: str = ""  # Empty for local development
+    redis_password: str = ""
     
     # JWT
     jwt_secret_key: str = "your-super-secret-jwt-key-change-in-production"
@@ -32,13 +37,18 @@ class Settings(BaseSettings):
     app_name: str = "User Management Backend"
     debug: bool = True
     api_v1_str: str = "/api"
+    project_name: str = "User Management API"
+    environment: str = "development"
+    host: str = "0.0.0.0"
+    port: int = 8000
     
     # CORS
     backend_cors_origins: List[str] = ["http://localhost:3000", "http://localhost:8080"]
     
     # OAuth
     oauth_providers: List[str] = ["openrouter", "glama", "requesty", "aiml"]
-    # OAuth Client Credentials (add your actual credentials to .env file)
+    
+    # OAuth Client Credentials
     openrouter_client_id: str = "your_openrouter_client_id"
     openrouter_client_secret: str = "your_openrouter_client_secret"
     glama_client_id: str = "your_glama_client_id"
@@ -62,9 +72,6 @@ class Settings(BaseSettings):
     default_rate_limit_per_minute: int = 60
     pro_rate_limit_per_minute: int = 300
     enterprise_rate_limit_per_minute: int = 1000
-    
-    class Config:
-        env_file = ".env"
 
 
 settings = Settings()

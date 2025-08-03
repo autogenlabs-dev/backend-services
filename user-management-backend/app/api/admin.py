@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, desc, and_, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
-from ..database import get_db
+from ..database import get_database as get_db
 from ..auth.dependencies import get_current_user
 from ..models.user import User, TokenUsageLog, SubscriptionPlan, UserSubscription
 from ..services.stripe_service import StripeService

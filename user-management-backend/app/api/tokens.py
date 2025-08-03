@@ -35,20 +35,20 @@ async def get_token_usage(
     return logs
 
 @router.post("/reserve")
-def reserve_tokens(
+async def reserve_tokens(
     amount: int,
     provider: str,
     model_name: str,
     request_type: str,
     current_user: User = Depends(get_current_user_unified),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     """Reserve tokens for a request (check availability without consuming)."""
     token_service = TokenService(db)
-    return token_service.reserve_tokens(current_user, amount, provider, model_name, request_type)
+    return await token_service.reserve_tokens(current_user, amount, provider, model_name, request_type)
 
 @router.post("/consume")
-def consume_tokens(
+async def consume_tokens(
     amount: int,
     provider: str,
     model_name: str,
@@ -57,7 +57,7 @@ def consume_tokens(
     output_tokens: Optional[int] = None,
     request_metadata: Optional[Dict[str, Any]] = None,
     current_user: User = Depends(get_current_user_unified),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     """Consume tokens and log usage with cost calculation."""
     token_service = TokenService(db)
@@ -69,21 +69,21 @@ def consume_tokens(
             provider, model_name, input_tokens, output_tokens
         )
     
-    return token_service.consume_tokens(
+    return await token_service.consume_tokens(
         current_user, amount, provider, model_name, request_type, cost_usd, request_metadata
     )
 
 @router.get("/limits")
-def get_token_limits(current_user: User = Depends(get_current_user_unified), db: Session = Depends(get_db)):
+async def get_token_limits(current_user: User = Depends(get_current_user_unified), db: AsyncIOMotorDatabase = Depends(get_database)):
     """Get user's rate limits based on subscription plan."""
     token_service = TokenService(db)
-    return token_service.get_rate_limits(current_user)
+    return await token_service.get_rate_limits(current_user)
 
 @router.get("/stats")
-def get_usage_stats(
+async def get_usage_stats(
     days: int = Query(30, ge=1, le=365, description="Number of days to analyze"),
     current_user: User = Depends(get_current_user_unified),
-    db: Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     """Get detailed usage statistics for the user."""
     token_service = TokenService(db)

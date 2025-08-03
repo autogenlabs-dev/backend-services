@@ -1,0 +1,60 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [ main, mongo-db ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+    
+    - name: Build Docker image
+      run: |
+        cd user-management-backend
+        docker build -t user-management-api:latest .
+        docker save user-management-api:latest | gzip > user-management-api.tar.gz
+    
+    - name: Copy files to EC2
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ec2-user
+        key: ${{ secrets.EC2_SSH_KEY }}
+        source: "user-management-backend/user-management-api.tar.gz,user-management-backend/api.yml,user-management-backend/docker-compose.yml"
+        target: "/home/ec2-user/"
+        strip_components: 1
+    
+    - name: Deploy to EC2
+      uses: appleboy/ssh-action@v0.1.8
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ec2-user
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          # Load Docker image
+          gunzip -c user-management-api.tar.gz | docker load
+          
+          # Stop existing containers
+          docker-compose down || true
+          
+          # Start new containers
+          docker-compose up -d
+          
+          # Clean up
+          rm -f user-management-api.tar.gz
+          
+          # Show status
+          docker ps

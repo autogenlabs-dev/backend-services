@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from ..database import get_db
+from ..database import get_database
 from ..auth.dependencies import get_current_user
 from ..auth.unified_auth import get_current_user_unified
 from ..models.user import User
@@ -47,7 +48,7 @@ class EmbeddingsRequest(BaseModel):
 
 
 # Global proxy service instance (will be initialized per request)
-async def get_llm_proxy_service(db: Session = Depends(get_db)):
+async def get_llm_proxy_service(db: AsyncIOMotorDatabase = Depends(get_database)):
     """Get LLM proxy service instance."""
     service = LLMProxyService(db)
     try:
