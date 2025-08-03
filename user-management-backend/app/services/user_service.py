@@ -118,13 +118,27 @@ async def update_user(db: AsyncIOMotorDatabase, user_id: PydanticObjectId, user_
             raise ValueError("Email already in use by another user")
         user.email = update_fields['email']
 
-    # Update other fields
+    # Handle first_name and last_name to construct full_name
+    first_name = update_fields.get('first_name')
+    last_name = update_fields.get('last_name')
+    
+    if first_name is not None or last_name is not None:
+        # If either first_name or last_name is provided, update full_name
+        current_first = first_name if first_name is not None else (user.full_name.split(' ')[0] if user.full_name else '')
+        current_last = last_name if last_name is not None else (' '.join(user.full_name.split(' ')[1:]) if user.full_name and len(user.full_name.split(' ')) > 1 else '')
+        user.full_name = f"{current_first} {current_last}".strip()
+        
+        # Also update the name field with the full name
+        if user.full_name:
+            user.name = user.full_name    # Update other fields
     for field, value in update_fields.items():
-        if field != 'email': # Already handled email
+        if field not in ['email', 'first_name', 'last_name']: # Skip already handled fields
              setattr(user, field, value)
 
     user.updated_at = datetime.now(timezone.utc)
-    await user.save() # Use Beanie's save method
+    
+    # Save the updated user
+    await user.save()
     return user
 
 
@@ -133,6 +147,16 @@ async def update_user_last_login(db: AsyncIOMotorDatabase, user_id: PydanticObje
     user = await get_user_by_id(db, user_id)
     if user:
         user.last_login_at = datetime.now(timezone.utc)
+        await user.save()
+
+
+async def update_user_last_logout(db: AsyncIOMotorDatabase, user_id: PydanticObjectId) -> None:
+    """Update user's last logout timestamp."""
+    user = await get_user_by_id(db, user_id)
+    if user:
+        # Add last_logout_at field if it doesn't exist in the model
+        user.last_logout_at = datetime.now(timezone.utc)
+        user.updated_at = datetime.now(timezone.utc)
         await user.save()
 
 

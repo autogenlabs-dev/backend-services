@@ -6,7 +6,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from .config import settings
 from .auth.oauth import register_oauth_clients
 from .middleware.rate_limiting import rate_limit_middleware, add_rate_limit_headers
-from .api import auth, users, subscriptions, tokens, llm, admin, api_keys
+from .api import auth, users, subscriptions, tokens, llm, admin, api_keys, payments, templates
 from typing import Callable, Dict, Any
 import time
 import uvicorn
@@ -97,6 +97,8 @@ app.include_router(tokens.router)
 app.include_router(llm.router)
 app.include_router(admin.router)
 app.include_router(api_keys.router)
+app.include_router(payments.router)
+app.include_router(templates.router)
 
 # Import and include sub-users router
 try:

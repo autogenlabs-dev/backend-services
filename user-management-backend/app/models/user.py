@@ -20,6 +20,7 @@ class User(Document):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     is_active: bool = True
     last_login_at: Optional[datetime] = None
+    last_logout_at: Optional[datetime] = None
     role: str = "user"  # user, developer, admin, superadmin
     
     # Sub-user management fields (references to other users by ID)

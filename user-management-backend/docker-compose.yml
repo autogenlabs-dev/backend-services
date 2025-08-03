@@ -1,28 +1,51 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:15
-    environment:
-      POSTGRES_DB: user_management
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+  # User Management Backend API
+  api:
+    build: .
     ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=mongodb://mongodb:27017/user_management_db
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-production-secret-key-change-this}
+      - DEBUG=False
+      - A4F_API_KEY=${A4F_API_KEY:-your-a4f-api-key}
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - mongodb
+      - redis
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
+  # MongoDB Database
+  mongodb:
+    image: mongo:8.0
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=user_management_db
+    volumes:
+      - mongodb_data:/data/db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis (Optional - for rate limiting and caching)
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -30,5 +53,9 @@ services:
       retries: 3
 
 volumes:
-  postgres_data:
+  mongodb_data:
   redis_data:
+
+networks:
+  default:
+    name: user_management_network
