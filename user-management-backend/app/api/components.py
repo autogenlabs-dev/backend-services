@@ -22,7 +22,7 @@ async def create_component(
     try:
         component = Component(
             **request.dict(),
-            user_id=str(current_user.id),
+            user_id=current_user.id,  # Keep as PydanticObjectId, not string
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
         )
@@ -57,6 +57,46 @@ async def get_all_components(
     # Add more filters as needed
     components = await Component.find(query).skip(skip).limit(limit).to_list()
     return {"success": True, "components": [c.to_dict() for c in components]}
+
+@router.get("/my", response_model=Dict[str, Any])
+async def get_my_components(
+    current_user: User = Depends(get_current_user_unified),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(20, ge=1, le=100, description="Number of components per page")
+):
+    """Get components created by the current user."""
+    try:
+        # Build filter query for user's components
+        filter_query = {"user_id": current_user.id, "is_active": True}
+        
+        # Calculate skip value for pagination
+        skip = (page - 1) * limit
+        
+        # Get components with pagination
+        components = await Component.find(filter_query).skip(skip).limit(limit).to_list()
+        
+        # Get total count for pagination
+        total_count = await Component.find(filter_query).count()
+        
+        # Convert to dict format
+        components_data = [component.to_dict() for component in components]
+        
+        return {
+            "success": True,
+            "components": components_data,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total": total_count,
+                "pages": (total_count + limit - 1) // limit
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch user components: {str(e)}"
+        )
 
 @router.get("/{component_id}", response_model=Dict[str, Any])
 async def get_component(component_id: str):

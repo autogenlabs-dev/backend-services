@@ -87,5 +87,5 @@ class SubUserApiKeyCreate(BaseModel):
 class SubUserBulkOperation(BaseModel):
     """Schema for bulk operations on sub-users"""
     user_ids: List[str] = Field(min_items=1, max_items=50)
-    operation: str = Field(regex="^(activate|deactivate|delete|update_limits|update_permissions)$")
+    operation: str = Field(pattern="^(activate|deactivate|delete|update_limits|update_permissions)$")
     data: Optional[Dict[str, Any]] = None

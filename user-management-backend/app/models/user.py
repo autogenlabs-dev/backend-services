@@ -3,13 +3,22 @@ from typing import Optional, List, Dict, Any
 from pydantic import Field, EmailStr
 from beanie import Document, PydanticObjectId
 from beanie.odm.fields import Indexed # Import Indexed explicitly
+from enum import Enum
+
+class UserRole(str, Enum):
+    """User role enumeration"""
+    USER = "user"
+    DEVELOPER = "developer" 
+    ADMIN = "admin"
+    SUPERADMIN = "superadmin"
 
 class User(Document):
     """User model for MongoDB"""
-    email: Indexed(EmailStr) # Corrected Indexed usage
+    email: EmailStr = Field(index=True)
     password_hash: Optional[str] = None
     name: Optional[str] = None
     full_name: Optional[str] = None
+    username: Optional[str] = None  # Added username field
     stripe_customer_id: Optional[str] = None
     subscription: str = "free"  # free, pro, enterprise
     tokens_remaining: int = 10000
@@ -21,7 +30,14 @@ class User(Document):
     is_active: bool = True
     last_login_at: Optional[datetime] = None
     last_logout_at: Optional[datetime] = None
-    role: str = "user"  # user, developer, admin, superadmin
+    role: UserRole = UserRole.USER
+    
+    # Enhanced profile fields
+    bio: Optional[str] = None
+    website: Optional[str] = None
+    social_links: Optional[Dict[str, str]] = Field(default_factory=dict)
+    profile_image: Optional[str] = None
+    wallet_balance: float = 0.0
     
     # Sub-user management fields (references to other users by ID)
     parent_user_id: Optional[PydanticObjectId] = None
@@ -33,7 +49,10 @@ class User(Document):
         name = "users"
         indexes = [
             "email",
-            "parent_user_id"
+            "role",
+            "parent_user_id",
+            "created_at",
+            "is_active"
         ]
 
     def __repr__(self):
@@ -49,6 +68,27 @@ class User(Document):
         if isinstance(other, User):
             return self.email == other.email
         return False
+
+    def to_dict(self):
+        """Convert user to dictionary for API responses"""
+        return {
+            "id": str(self.id),
+            "email": self.email,
+            "name": self.name,
+            "full_name": self.full_name,
+            "username": self.username or self.name or self.email.split('@')[0],  # Fallback username
+            "role": self.role,
+            "is_active": self.is_active,
+            "subscription": self.subscription,
+            "tokens_remaining": self.tokens_remaining,
+            "tokens_used": self.tokens_used,
+            "created_at": self.created_at.isoformat(),
+            "last_login_at": self.last_login_at.isoformat() if self.last_login_at else None,
+            "bio": self.bio,
+            "website": self.website,
+            "wallet_balance": self.wallet_balance,
+            "profile_image": self.profile_image
+        }
 
 
 class OAuthProvider(Document):

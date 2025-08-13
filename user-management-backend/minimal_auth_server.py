@@ -13,22 +13,36 @@ warnings.filterwarnings("ignore", category=UserWarning, module="razorpay")
 warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 warnings.filterwarnings("ignore", message=".*pkg_resources.*")
 warnings.filterwarnings("ignore", message=".*model_.*")
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends, Header, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timedelta
 import bcrypt
 import jwt
 import razorpay
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
+import uuid
 
 # Import models
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.organization import Organization
 from app.models.template import Template, TemplateLike, TemplateDownload, TemplateView, TemplateComment, TemplateCategory
-from app.models.component import Component
+from app.models.component import Component, ContentStatus
+from app.models.developer_profile import DeveloperProfile
+from app.models.purchased_item import PurchasedItem
+from app.models.content_approval import ContentApproval
+from app.models.payment_transaction import PaymentTransaction
+from app.models.audit_log import AuditLog, ActionType, AuditSeverity
+from app.models.item_purchase import ItemPurchase, PurchaseStatus, ItemType
+from app.models.shopping_cart import ShoppingCart, CartItem, CartItemType
+from app.models.developer_earnings import DeveloperEarnings, PayoutRequest, PayoutStatus, PayoutMethod
+
+# Import middleware
+from app.middleware.auth import require_auth, require_role, require_admin, require_developer_or_admin, get_current_user_from_token
+from app.utils.email_service import email_service
+from app.services.access_control import ContentAccessService, AccessLevel
 from app.config import settings
 from contextlib import asynccontextmanager
 
@@ -47,8 +61,43 @@ async def lifespan(app: FastAPI):
         db = client.user_management_db
         
         print("🔄 Initializing Beanie...")
-        # Initialize Beanie
-        await init_beanie(database=db, document_models=[User, Organization, Template, TemplateLike, TemplateDownload, TemplateView, TemplateComment, TemplateCategory, Component])
+        # Initialize Beanie with all models
+        from app.models.template_interactions import TemplateCommentEnhanced, TemplateHelpfulVote
+        from app.models.component_interactions import (
+            ComponentLike, ComponentComment, ComponentView, 
+            ComponentDownload, ComponentHelpfulVote
+        )
+        
+        document_models = [
+            User, 
+            Organization, 
+            Template, 
+            TemplateLike, 
+            TemplateDownload, 
+            TemplateView, 
+            TemplateComment, 
+            TemplateCategory, 
+            Component,
+            DeveloperProfile,
+            PurchasedItem,
+            ContentApproval,
+            PaymentTransaction,
+            AuditLog,
+            # Enhanced interaction models
+            TemplateCommentEnhanced,
+            TemplateHelpfulVote,
+            ComponentLike,
+            ComponentComment,
+            ComponentView,
+            ComponentDownload,
+            ComponentHelpfulVote,
+            # Marketplace models
+            ItemPurchase,
+            ShoppingCart,
+            DeveloperEarnings,
+            PayoutRequest
+        ]
+        await init_beanie(database=db, document_models=document_models)
         print("✅ Database connected and initialized")
     except Exception as e:
         print(f"❌ Database initialization error: {e}")
@@ -110,8 +159,6 @@ class TemplateCreate(BaseModel):
     language: str
     difficulty_level: str
     plan_type: str
-    pricing_inr: int = 0
-    pricing_usd: int = 0
     short_description: str
     full_description: str
     preview_images: List[str] = []
@@ -134,8 +181,6 @@ class TemplateUpdate(BaseModel):
     language: Optional[str] = None
     difficulty_level: Optional[str] = None
     plan_type: Optional[str] = None
-    pricing_inr: Optional[int] = None
-    pricing_usd: Optional[int] = None
     short_description: Optional[str] = None
     full_description: Optional[str] = None
     preview_images: Optional[List[str]] = None
@@ -151,6 +196,13 @@ class TemplateUpdate(BaseModel):
     code: Optional[str] = None
     readme_content: Optional[str] = None
 
+class ApprovalActionRequest(BaseModel):
+    admin_notes: Optional[str] = None
+
+class RejectContentRequest(BaseModel):
+    rejection_reason: str
+    admin_notes: Optional[str] = None
+
 class TemplateResponse(BaseModel):
     id: str
     title: str
@@ -159,8 +211,6 @@ class TemplateResponse(BaseModel):
     language: str
     difficulty_level: str
     plan_type: str
-    pricing_inr: int
-    pricing_usd: int
     rating: float
     downloads: int
     views: int
@@ -195,8 +245,6 @@ class ComponentCreateRequest(BaseModel):
     language: str
     difficulty_level: str
     plan_type: str
-    pricing_inr: int = 0
-    pricing_usd: int = 0
     short_description: str
     full_description: str
     preview_images: List[str] = []
@@ -218,8 +266,6 @@ class ComponentUpdateRequest(BaseModel):
     language: Optional[str] = None
     difficulty_level: Optional[str] = None
     plan_type: Optional[str] = None
-    pricing_inr: Optional[int] = None
-    pricing_usd: Optional[int] = None
     short_description: Optional[str] = None
     full_description: Optional[str] = None
     preview_images: Optional[List[str]] = None
@@ -246,11 +292,13 @@ def verify_password(password: str, hashed: str) -> bool:
     """Verify password against hash."""
     return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
-def create_access_token(user_id: str) -> str:
+def create_access_token(user_id: str, user_email: str = None, user_role: str = None) -> str:
     """Create JWT access token."""
     from datetime import datetime, timedelta
     payload = {
         "sub": user_id,
+        "email": user_email,
+        "role": user_role,
         "exp": datetime.utcnow() + timedelta(minutes=30)  # 30 minutes
     }
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
@@ -359,7 +407,7 @@ async def login_json(login_data: LoginRequest):
         await user.save()
         
         # Create tokens
-        access_token = create_access_token(str(user.id))
+        access_token = create_access_token(str(user.id), user.email, user.role)
         refresh_token = create_refresh_token(str(user.id))
         
         # Return VS Code compatible response
@@ -371,6 +419,7 @@ async def login_json(login_data: LoginRequest):
                 "email": user.email,
                 "first_name": user.name.split()[0] if user.name else "",
                 "last_name": user.name.split()[-1] if user.name and len(user.name.split()) > 1 else "",
+                "role": user.role,  # Add role field
                 "subscription_tier": user.subscription,
                 "email_verified": True,
                 "monthly_usage": {
@@ -479,8 +528,13 @@ async def refresh_tokens(refresh_data: dict):
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid refresh token")
         
+        # Get user info for new token
+        user = await User.get(user_id)
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        
         # Create new tokens
-        access_token = create_access_token(user_id)
+        access_token = create_access_token(user_id, user.email, user.role)
         new_refresh_token = create_refresh_token(user_id)
         
         return {
@@ -662,6 +716,42 @@ async def get_user_usage(authorization: str = Header(None)):
             "reset_date": user.reset_date.isoformat() if user.reset_date else None,
             "usage_percentage": (user.tokens_used / user.monthly_limit) * 100 if user.monthly_limit > 0 else 0
         }
+    }
+
+@app.get("/user/dashboard")
+async def get_user_dashboard(authorization: str = Header(None)):
+    """Get enhanced user dashboard data."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
+    
+    token = authorization.replace("Bearer ", "")
+    user = await get_current_user(token)
+    
+    # Get user's templates and components count
+    try:
+        user_templates_count = await Template.find({"user_id": user.id, "is_active": True}).count()
+    except:
+        user_templates_count = 0
+    
+    try:
+        user_components_count = await Component.find({"user_id": user.id, "is_active": True}).count()
+    except:
+        user_components_count = 0
+    
+    return {
+        "user": user.to_dict(),
+        "dashboard_stats": {
+            "templates_created": user_templates_count,
+            "components_created": user_components_count,
+            "total_downloads": 0,  # TODO: Implement download tracking
+            "total_earnings": 0,   # TODO: Implement earnings calculation
+            "subscription_status": user.subscription,
+            "tokens_remaining": user.tokens_remaining,
+            "tokens_used": user.tokens_used,
+            "monthly_limit": user.monthly_limit
+        },
+        "recent_activity": [],  # TODO: Implement activity tracking
+        "notifications": []     # TODO: Implement notification system
     }
 
 @app.get("/subscriptions/plans")
@@ -884,16 +974,16 @@ async def get_payment_config(authorization: str = Header(None)):
 # =============================================================================
 
 @app.post("/templates", response_model=TemplateResponse)
-async def create_template(template_data: TemplateCreate, authorization: str = Header(None)):
-    """Create a new template."""
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
-    
-    token = authorization.replace("Bearer ", "")
-    user = await get_current_user(token)
-    
+async def create_template(
+    template_data: TemplateCreate, 
+    request: Request,
+    current_user: User = Depends(require_developer_or_admin)
+):
+    """Create a new template (Developer/Admin only)."""
     try:
-        # Create template
+        client_info = await get_client_info(request)
+        
+        # Create template with pending approval status
         template = Template(
             title=template_data.title,
             category=template_data.category,
@@ -901,8 +991,6 @@ async def create_template(template_data: TemplateCreate, authorization: str = He
             language=template_data.language,
             difficulty_level=template_data.difficulty_level,
             plan_type=template_data.plan_type,
-            pricing_inr=template_data.pricing_inr,
-            pricing_usd=template_data.pricing_usd,
             short_description=template_data.short_description,
             full_description=template_data.full_description,
             preview_images=template_data.preview_images,
@@ -917,11 +1005,38 @@ async def create_template(template_data: TemplateCreate, authorization: str = He
             popular=template_data.popular,
             code=template_data.code,
             readme_content=template_data.readme_content,
-            user_id=user.id
+            user_id=current_user.id,
+            approval_status=ContentStatus.PENDING_APPROVAL
         )
         
         # Save template to database
         await template.create()
+        
+        # Create approval record
+        approval = ContentApproval(
+            content_type="template",
+            content_id=str(template.id),
+            content_title=template.title,
+            submitted_by=str(current_user.id),
+            submitted_at=template.created_at,
+            status="pending_approval"  # Use valid enum value
+        )
+        await approval.create()
+        
+        # Log action
+        await AuditLog.log_action(
+            action_type=ActionType.USER_CREATED,  # Generic content creation
+            action_description=f"Developer {current_user.email} created template '{template.title}'",
+            actor_id=str(current_user.id),
+            actor_email=current_user.email,
+            actor_role=current_user.role,
+            actor_ip=client_info["ip"],
+            target_type="template",
+            target_id=str(template.id),
+            target_name=template.title,
+            endpoint=client_info["endpoint"],
+            user_agent=client_info["user_agent"]
+        )
         
         # Return the template using the to_dict method
         template_dict = template.to_dict()
@@ -938,6 +1053,7 @@ async def create_template(template_data: TemplateCreate, authorization: str = He
 
 @app.get("/templates")
 async def get_templates(
+    request: Request,
     skip: int = 0,
     limit: int = 100,
     category: Optional[str] = None,
@@ -945,13 +1061,29 @@ async def get_templates(
     plan_type: Optional[str] = None,
     featured: Optional[bool] = None,
     popular: Optional[bool] = None,
-    search: Optional[str] = None
+    search: Optional[str] = None,
+    show_my_content: Optional[bool] = False,  # New parameter for developers/admins
+    current_user: Optional[User] = Depends(get_current_user_from_token)
 ):
-    """Get all templates with optional filtering."""
+    """Get templates with role-based filtering."""
     try:
-        # Build query
+        # Build base query
         query = {"is_active": True}
         
+        # Content visibility logic based on user role and show_my_content parameter
+        if not current_user or current_user.role == UserRole.USER:
+            # Anonymous users and regular users see only approved content
+            query["approval_status"] = "approved"
+        elif current_user.role in [UserRole.DEVELOPER, UserRole.ADMIN]:
+            if show_my_content:
+                # Show only current user's content (all statuses)
+                query["user_id"] = current_user.id
+            else:
+                # Show only approved content from all users
+                query["approval_status"] = "approved"
+        # Superadmins see everything (no status filter)
+        
+        # Apply filters
         if category:
             query["category"] = category
         if type:
@@ -965,22 +1097,52 @@ async def get_templates(
         
         # Get templates
         if search:
-            # For search, use text search on title and description
-            templates = await Template.find(
-                {
-                    **query,
-                    "$or": [
-                        {"title": {"$regex": search, "$options": "i"}},
-                        {"short_description": {"$regex": search, "$options": "i"}},
-                        {"tags": {"$in": [search]}}
-                    ]
-                }
-            ).skip(skip).limit(limit).to_list()
+            templates = await Template.find({
+                **query,
+                "$or": [
+                    {"title": {"$regex": search, "$options": "i"}},
+                    {"short_description": {"$regex": search, "$options": "i"}},
+                    {"tags": {"$in": [search]}}
+                ]
+            }).skip(skip).limit(limit).to_list()
         else:
             templates = await Template.find(query).skip(skip).limit(limit).to_list()
         
-        # Convert to dict format
-        template_list = [template.to_dict() for template in templates]
+        # Apply access control and filter content
+        template_list = []
+        for template in templates:
+            # Get access level for this user and template
+            access_level, access_info = await ContentAccessService.get_content_access_level(current_user, template)
+            
+            # Get template data
+            template_data = template.to_dict()
+            
+            # Ensure ID is properly included as string
+            template_data["id"] = str(template.id)
+            
+            # Add approval info for non-approved templates
+            if hasattr(template, 'status') and template.status != "approved":
+                approval = await ContentApproval.find_one({
+                    "content_type": "template",
+                    "content_id": str(template.id)
+                })
+                if approval:
+                    template_data["approval_info"] = {
+                        "status": approval.status,
+                        "submitted_at": approval.submitted_at,
+                        "reviewed_at": approval.reviewed_at,
+                        "rejection_reason": approval.rejection_reason,
+                        "admin_notes": approval.admin_notes
+                    }
+            
+            # Filter content based on access level
+            filtered_data = ContentAccessService.filter_content_by_access_level(template_data, access_level)
+            
+            # Add access information
+            filtered_data["access_info"] = access_info
+            filtered_data["access_level"] = access_level
+            
+            template_list.append(filtered_data)
         
         # Get total count
         total_count = await Template.find(query).count()
@@ -989,7 +1151,16 @@ async def get_templates(
             "templates": template_list,
             "total": total_count,
             "skip": skip,
-            "limit": limit
+            "limit": limit,
+            "filters": {
+                "category": category,
+                "type": type,
+                "plan_type": plan_type,
+                "featured": featured,
+                "popular": popular,
+                "search": search,
+                "show_my_content": show_my_content
+            }
         }
         
     except Exception as e:
@@ -1059,25 +1230,60 @@ async def get_template_stats():
         }
 
 @app.get("/templates/user/my-templates")
-async def get_user_templates(authorization: str = Header(None), skip: int = 0, limit: int = 100):
-    """Get templates created by the current user."""
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
-    
-    token = authorization.replace("Bearer ", "")
-    user = await get_current_user(token)
-    
+async def get_user_templates(
+    request: Request,
+    current_user: User = Depends(require_auth),
+    skip: int = 0, 
+    limit: int = 100,
+    status_filter: Optional[str] = Query(None)  # "pending", "approved", "rejected", or None for all
+):
+    """Get templates created by the current user. Developers see all their content regardless of status."""
     try:
-        templates = await Template.find({"user_id": user.id, "is_active": True}).skip(skip).limit(limit).to_list()
-        template_list = [template.to_dict() for template in templates]
+        # Build query - users see all their own content regardless of approval status
+        query = {"user_id": current_user.id, "is_active": True}
         
-        total_count = await Template.find({"user_id": user.id, "is_active": True}).count()
+        # Apply status filter if provided
+        if status_filter:
+            query["status"] = status_filter
+        
+        templates = await Template.find(query).skip(skip).limit(limit).to_list()
+        template_list = []
+        
+        for template in templates:
+            template_dict = template.to_dict()
+            
+            # Add approval info for non-approved templates
+            if template.status != "approved":
+                approval = await ContentApproval.find_one({
+                    "content_type": "template",
+                    "content_id": str(template.id)
+                })
+                if approval:
+                    template_dict["approval_info"] = {
+                        "status": approval.status,
+                        "submitted_at": approval.submitted_at,
+                        "reviewed_at": approval.reviewed_at,
+                        "rejection_reason": approval.rejection_reason,
+                        "admin_notes": approval.admin_notes
+                    }
+            
+            template_list.append(template_dict)
+        
+        total_count = await Template.find(query).count()
+        
+        # Get status breakdown
+        status_counts = {}
+        for status in ["pending_approval", "approved", "rejected"]:
+            count = await Template.find({"user_id": current_user.id, "is_active": True, "status": status}).count()
+            status_counts[status] = count
         
         return {
             "templates": template_list,
             "total": total_count,
             "skip": skip,
-            "limit": limit
+            "limit": limit,
+            "status_breakdown": status_counts,
+            "filters": {"status": status_filter}
         }
         
     except Exception as e:
@@ -1085,23 +1291,48 @@ async def get_user_templates(authorization: str = Header(None), skip: int = 0, l
         raise HTTPException(status_code=500, detail=f"Failed to retrieve user templates: {str(e)}")
 
 @app.get("/templates/{template_id}", response_model=TemplateResponse)
-async def get_template(template_id: str):
-    """Get a specific template by ID."""
+async def get_template(
+    template_id: str,
+    current_user: Optional[User] = Depends(get_current_user_from_token)
+):
+    """Get a specific template by ID with access control."""
     try:
         template = await Template.get(template_id)
         
         if not template or not template.is_active:
             raise HTTPException(status_code=404, detail="Template not found")
         
-        # Increment view count
-        template.views += 1
-        await template.save()
+        # Check access level
+        access_level, access_info = await ContentAccessService.get_content_access_level(current_user, template)
         
-        return TemplateResponse(**template.to_dict())
+        # Increment view count only for legitimate views
+        if access_level != AccessLevel.NO_ACCESS:
+            template.views += 1
+            await template.save()
+            
+            # Track user access if authenticated
+            if current_user:
+                await ContentAccessService.increment_download_count(
+                    current_user, template_id, "template"
+                )
         
+        # Get template data and apply access control
+        template_data = template.to_dict()
+        
+        # Ensure ID is properly included as string
+        template_data["id"] = str(template.id)
+        
+        filtered_data = ContentAccessService.filter_content_by_access_level(template_data, access_level)
+        
+        # Add access information
+        filtered_data["access_info"] = access_info
+        filtered_data["access_level"] = access_level
+        
+        return TemplateResponse(**filtered_data)
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        if "not found" in str(e).lower():
-            raise HTTPException(status_code=404, detail="Template not found")
         print(f"Template retrieval error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve template: {str(e)}")
 
@@ -1400,32 +1631,53 @@ async def verify_payment(request: dict, authorization: str = Header(None)):
 
 # --- COMPONENT MANAGEMENT ENDPOINTS ---
 @app.post("/components")
-async def create_component(component_data: ComponentCreateRequest, authorization: str = Header(None)):
-    # Make authentication optional - allow anonymous component creation
-    user_id = None
-    
-    # Try to get user if token is provided
-    if authorization and authorization.startswith("Bearer "):
-        try:
-            token = authorization.replace("Bearer ", "")
-            user = await get_current_user(token)
-            user_id = str(user.id)
-            print(f"Creating component for authenticated user: {user_id}")
-        except Exception as e:
-            print(f"Authentication failed, but allowing anonymous creation: {e}")
-            # Don't raise error, just continue without user_id
-    else:
-        print("No authorization provided, creating component anonymously")
-    
+async def create_component(
+    component_data: ComponentCreateRequest, 
+    request: Request,
+    current_user: User = Depends(require_developer_or_admin)
+):
+    """Create a new component (Developer/Admin only)."""
     try:
+        client_info = await get_client_info(request)
+        
         component = Component(
             **component_data.dict(),
-            user_id=user_id,  # Can be None for anonymous components
+            user_id=current_user.id,  # Store as PydanticObjectId, not string
+            approval_status=ContentStatus.PENDING_APPROVAL,  # Use approval_status field
+            submitted_for_approval_at=datetime.utcnow(),
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
         )
         await component.create()
+        
+        # Create approval record
+        approval = ContentApproval(
+            content_type="component",
+            content_id=str(component.id),
+            content_title=component.title,
+            submitted_by=str(current_user.id),
+            submitted_at=component.created_at,
+            status="pending_approval"  # Use valid enum value
+        )
+        await approval.create()
+        
+        # Log action
+        await AuditLog.log_action(
+            action_type=ActionType.USER_CREATED,  # Generic content creation
+            action_description=f"Developer {current_user.email} created component '{component.title}'",
+            actor_id=str(current_user.id),
+            actor_email=current_user.email,
+            actor_role=current_user.role,
+            actor_ip=client_info["ip"],
+            target_type="component",
+            target_id=str(component.id),
+            target_name=component.title,
+            endpoint=client_info["endpoint"],
+            user_agent=client_info["user_agent"]
+        )
+        
         return component.to_dict()
+        
     except Exception as e:
         print(f"Component creation error: {e}")
         import traceback; traceback.print_exc()
@@ -1433,6 +1685,7 @@ async def create_component(component_data: ComponentCreateRequest, authorization
 
 @app.get("/components")
 async def get_components(
+    request: Request,
     skip: int = 0,
     limit: int = 100,
     category: Optional[str] = None,
@@ -1440,15 +1693,33 @@ async def get_components(
     plan_type: Optional[str] = None,
     featured: Optional[bool] = None,
     popular: Optional[bool] = None,
-    search: Optional[str] = None
+    search: Optional[str] = None,
+    show_my_content: Optional[bool] = False,  # New parameter for developers/admins
+    current_user: Optional[User] = Depends(get_current_user_from_token)
 ):
+    """Get components with role-based filtering."""
     try:
         query = {"is_active": True} if hasattr(Component, 'is_active') else {}
+        
+        # Content visibility logic based on user role and show_my_content parameter
+        if not current_user or current_user.role == UserRole.USER:
+            # Anonymous users and regular users see only approved content
+            query["approval_status"] = "approved"
+        elif current_user.role in [UserRole.DEVELOPER, UserRole.ADMIN]:
+            if show_my_content:
+                # Show only current user's content (all statuses)
+                query["user_id"] = str(current_user.id)
+            else:
+                # Show only approved content from all users
+                query["approval_status"] = "approved"
+        # Superadmins see everything (no status filter)
+        
         if category: query["category"] = category
         if type: query["type"] = type
         if plan_type: query["plan_type"] = plan_type
         if featured is not None: query["featured"] = featured
         if popular is not None: query["popular"] = popular
+        
         if search:
             components = await Component.find({
                 **query,
@@ -1460,9 +1731,52 @@ async def get_components(
             }).skip(skip).limit(limit).to_list()
         else:
             components = await Component.find(query).skip(skip).limit(limit).to_list()
-        component_list = [c.to_dict() for c in components]
+        
+        # Convert components to dict format
+        component_list = []
+        for component in components:
+            component_data = component.to_dict()
+            
+            # Ensure ID is properly included as string
+            component_data["id"] = str(component.id)
+            
+            # Add approval info for non-approved components
+            if hasattr(component, 'status') and component.status != "approved":
+                approval = await ContentApproval.find_one({
+                    "content_type": "component",
+                    "content_id": str(component.id)
+                })
+                if approval:
+                    component_data["approval_info"] = {
+                        "status": approval.status,
+                        "submitted_at": approval.submitted_at,
+                        "reviewed_at": approval.reviewed_at,
+                        "rejection_reason": approval.rejection_reason,
+                        "admin_notes": approval.admin_notes
+                    }
+            
+            # Add basic access info
+            component_data["access_level"] = "full_access"
+            component_data["access_info"] = {"can_view": True, "can_download": True}
+            component_list.append(component_data)
+            
         total_count = await Component.find(query).count()
-        return {"components": component_list, "total": total_count, "skip": skip, "limit": limit}
+        
+        return {
+            "components": component_list, 
+            "total": total_count, 
+            "skip": skip, 
+            "limit": limit,
+            "filters": {
+                "category": category,
+                "type": type,
+                "plan_type": plan_type,
+                "featured": featured,
+                "popular": popular,
+                "search": search,
+                "show_my_content": show_my_content
+            }
+        }
     except Exception as e:
         print(f"Component retrieval error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve components: {str(e)}")
@@ -1530,22 +1844,1258 @@ async def delete_component(component_id: str, authorization: str = Header(None))
         raise HTTPException(status_code=500, detail=f"Failed to delete component: {str(e)}")
 
 @app.get("/components/user/my-components")
-async def get_user_components(authorization: str = Header(None), skip: int = 0, limit: int = 100):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
-    token = authorization.replace("Bearer ", "")
-    user = await get_current_user(token)
+async def get_user_components(
+    request: Request,
+    current_user: User = Depends(require_auth),
+    skip: int = 0, 
+    limit: int = 100,
+    status_filter: Optional[str] = Query(None)  # "pending", "approved", "rejected", or None for all
+):
+    """Get components created by the current user. Developers see all their content regardless of status."""
+    print("🚀 ENTERED get_user_components function!")
     try:
-        query = {"user_id": str(user.id)}
+        # Debug logging
+        print(f"🔍 get_user_components called by user: {current_user.email} (ID: {current_user.id})")
+        
+        # Build query - users see all their own content regardless of approval status
+        # Check both PydanticObjectId and string formats for backward compatibility
+        query = {
+            "$or": [
+                {"user_id": current_user.id},  # New format: PydanticObjectId
+                {"user_id": str(current_user.id)}  # Old format: string
+            ]
+        }
+        # Keep is_active filter since Component model has this field
         if hasattr(Component, 'is_active'):
             query["is_active"] = True
+        
+        # Apply status filter if provided
+        if status_filter:
+            query["approval_status"] = status_filter  # Use approval_status instead of status
+            
+        print(f"🔍 Query: {query}")
+        
+        # Check total components for this user without pagination (both formats)
+        total_user_components = await Component.find({
+            "$or": [
+                {"user_id": current_user.id},
+                {"user_id": str(current_user.id)}
+            ]
+        }).count()
+        print(f"🔍 Total components for user {current_user.id}: {total_user_components}")
+        
+        # Check all components in database
+        all_components = await Component.find({}).to_list()
+        print(f"🔍 All components in database: {len(all_components)}")
+        for comp in all_components:
+            print(f"  - Component '{comp.title}' by user_id: {getattr(comp, 'user_id', 'NO_USER_ID')} (status: {getattr(comp, 'status', 'NO_STATUS')})")
+            
         components = await Component.find(query).skip(skip).limit(limit).to_list()
-        component_list = [c.to_dict() for c in components]
+        print(f"🔍 Found {len(components)} components matching query")
+        
+        component_list = []
+        
+        for component in components:
+            component_dict = component.to_dict()
+            
+            # Add approval info for non-approved components
+            if hasattr(component, 'status') and component.status != "approved":
+                approval = await ContentApproval.find_one({
+                    "content_type": "component",
+                    "content_id": str(component.id)
+                })
+                if approval:
+                    component_dict["approval_info"] = {
+                        "status": approval.status,
+                        "submitted_at": approval.submitted_at,
+                        "reviewed_at": approval.reviewed_at,
+                        "rejection_reason": approval.rejection_reason,
+                        "admin_notes": approval.admin_notes
+                    }
+            
+            component_list.append(component_dict)
+        
         total_count = await Component.find(query).count()
-        return {"components": component_list, "total": total_count, "skip": skip, "limit": limit}
+        
+        # Get status breakdown
+        status_counts = {}
+        for status in ["pending_approval", "approved", "rejected"]:
+            status_query = {
+                "$or": [
+                    {"user_id": current_user.id},
+                    {"user_id": str(current_user.id)}
+                ],
+                "approval_status": status  # Use approval_status instead of status
+            }
+            if hasattr(Component, 'is_active'):
+                status_query["is_active"] = True
+            count = await Component.find(status_query).count()
+            status_counts[status] = count
+        
+        return {
+            "components": component_list, 
+            "total": total_count, 
+            "skip": skip, 
+            "limit": limit,
+            "status_breakdown": status_counts,
+            "filters": {"status": status_filter}
+        }
+        
     except Exception as e:
         print(f"User components retrieval error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve user components: {str(e)}")
+
+# ==================== CONTENT APPROVAL ENDPOINTS ====================
+
+@app.get("/admin/approvals")
+async def get_pending_approvals(
+    request: Request,
+    current_user: User = Depends(require_admin),
+    content_type: Optional[str] = Query(None),  # "template" or "component"
+    status: Optional[str] = Query("pending_approval"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, le=200)
+):
+    """Get pending approvals (Admin only)."""
+    try:
+        client_info = await get_client_info(request)
+        
+        # Build query
+        query = {}
+        if content_type:
+            query["content_type"] = content_type
+        if status:
+            query["status"] = status
+            
+        # Get approvals
+        approvals = await ContentApproval.find(query).skip(skip).limit(limit).sort("-submitted_at").to_list()
+        total_count = await ContentApproval.find(query).count()
+        
+        # Enhance with content details
+        approval_list = []
+        for approval in approvals:
+            approval_dict = approval.to_dict()
+            
+            # Get content details
+            if approval.content_type == "template":
+                content = await Template.get(approval.content_id)
+            elif approval.content_type == "component":
+                content = await Component.get(approval.content_id)
+            else:
+                content = None
+                
+            if content:
+                approval_dict["content_details"] = {
+                    "title": content.title,
+                    "category": getattr(content, 'category', None),
+                    "type": getattr(content, 'type', None),
+                    "plan_type": getattr(content, 'plan_type', 'Free'),
+                    "preview_images": getattr(content, 'preview_images', []),
+                    "short_description": getattr(content, 'short_description', None)
+                }
+                
+                # Get submitter details
+                submitter = await User.get(approval.submitted_by)
+                if submitter:
+                    approval_dict["submitter_details"] = {
+                        "name": submitter.name or submitter.email.split('@')[0],
+                        "email": submitter.email,
+                        "role": submitter.role
+                    }
+            
+            approval_list.append(approval_dict)
+        
+        return {
+            "approvals": approval_list,
+            "total": total_count,
+            "skip": skip,
+            "limit": limit,
+            "filters": {
+                "content_type": content_type,
+                "status": status
+            }
+        }
+        
+    except Exception as e:
+        print(f"Get approvals error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get approvals: {str(e)}")
+
+@app.post("/admin/approvals/{approval_id}/approve")
+async def approve_content(
+    approval_id: str,
+    request: Request,
+    approval_data: ApprovalActionRequest,
+    current_user: User = Depends(require_admin)
+):
+    """Approve content (Admin only)."""
+    try:
+        client_info = await get_client_info(request)
+        
+        # Get approval record
+        approval = await ContentApproval.get(approval_id)
+        if not approval:
+            raise HTTPException(status_code=404, detail="Approval not found")
+            
+        if approval.status != "pending_approval":
+            raise HTTPException(status_code=400, detail="Content already reviewed")
+        
+        # Update approval record
+        approval.status = "approved"
+        approval.reviewed_by = str(current_user.id)
+        approval.reviewed_at = datetime.utcnow()
+        approval.admin_notes = approval_data.admin_notes
+        await approval.save()
+        
+        # Update content status
+        if approval.content_type == "template":
+            content = await Template.get(approval.content_id)
+            if content:
+                content.status = "approved"
+                content.approved_at = datetime.utcnow()
+                await content.save()
+        elif approval.content_type == "component":
+            content = await Component.get(approval.content_id)
+            if content:
+                content.status = "approved"
+                content.approved_at = datetime.utcnow()
+                await content.save()
+        
+        # Log action
+        await AuditLog.log_action(
+            action_type=ActionType.SETTINGS_UPDATED,
+            action_description=f"Admin {current_user.email} approved {approval.content_type} '{approval.content_title}'",
+            actor_id=str(current_user.id),
+            actor_email=current_user.email,
+            actor_role=current_user.role,
+            actor_ip=client_info["ip"],
+            target_type=approval.content_type,
+            target_id=approval.content_id,
+            target_name=approval.content_title,
+            endpoint=client_info["endpoint"],
+            user_agent=client_info["user_agent"]
+        )
+        
+        return {"success": True, "message": "Content approved successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Approve content error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to approve content: {str(e)}")
+
+@app.post("/admin/approvals/{approval_id}/reject")
+async def reject_content(
+    approval_id: str,
+    request: Request,
+    rejection_data: RejectContentRequest,
+    current_user: User = Depends(require_admin)
+):
+    """Reject content (Admin only)."""
+    try:
+        client_info = await get_client_info(request)
+        
+        # Get approval record
+        approval = await ContentApproval.get(approval_id)
+        if not approval:
+            raise HTTPException(status_code=404, detail="Approval not found")
+            
+        if approval.status != "pending_approval":
+            raise HTTPException(status_code=400, detail="Content already reviewed")
+        
+        # Update approval record
+        approval.status = "rejected"
+        approval.reviewed_by = str(current_user.id)
+        approval.reviewed_at = datetime.utcnow()
+        approval.rejection_reason = rejection_data.rejection_reason
+        approval.admin_notes = rejection_data.admin_notes
+        await approval.save()
+        
+        # Update content status
+        if approval.content_type == "template":
+            content = await Template.get(approval.content_id)
+            if content:
+                content.status = "rejected"
+                await content.save()
+        elif approval.content_type == "component":
+            content = await Component.get(approval.content_id)
+            if content:
+                content.status = "rejected"
+                await content.save()
+        
+        # Log action
+        await AuditLog.log_action(
+            action_type=ActionType.SETTINGS_UPDATED,
+            action_description=f"Admin {current_user.email} rejected {approval.content_type} '{approval.content_title}': {rejection_data.rejection_reason}",
+            actor_id=str(current_user.id),
+            actor_email=current_user.email,
+            actor_role=current_user.role,
+            actor_ip=client_info["ip"],
+            target_type=approval.content_type,
+            target_id=approval.content_id,
+            target_name=approval.content_title,
+            endpoint=client_info["endpoint"],
+            user_agent=client_info["user_agent"]
+        )
+        
+        return {"success": True, "message": "Content rejected successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Reject content error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to reject content: {str(e)}")
+
+# ==================== ADMIN ENDPOINTS ====================
+
+# Helper function to extract client info for audit logging
+async def get_client_info(request: Request) -> Dict[str, Any]:
+    """Extract client information for audit logging."""
+    return {
+        "ip": request.client.host if request.client else None,
+        "user_agent": request.headers.get("user-agent"),
+        "endpoint": str(request.url),
+        "method": request.method
+    }
+
+# Admin Schemas
+class ContentApprovalRequest(BaseModel):
+    action: str  # "approve" or "reject"
+    reason: Optional[str] = None
+    admin_notes: Optional[str] = None
+
+class UserManagementRequest(BaseModel):
+    action: str  # "activate", "deactivate", "change_role"
+    role: Optional[UserRole] = None
+    reason: Optional[str] = None
+
+# Admin User Management Endpoints
+@app.get("/admin/users")
+async def admin_get_users(
+    request: Request,
+    current_user: User = Depends(require_admin),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, le=100),
+    role: Optional[UserRole] = Query(None),
+    search: Optional[str] = Query(None),
+    active_only: bool = Query(True)
+):
+    """Get all users with pagination and filtering (Admin only)."""
+    try:
+        client_info = await get_client_info(request)
+        
+        # Build query
+        query = {}
+        if role:
+            query["role"] = role
+        if active_only:
+            query["is_active"] = True
+        if search:
+            query["$or"] = [
+                {"email": {"$regex": search, "$options": "i"}},
+                {"first_name": {"$regex": search, "$options": "i"}},
+                {"last_name": {"$regex": search, "$options": "i"}}
+            ]
+        
+        # Get users
+        users = await User.find(query).skip(skip).limit(limit).to_list()
+        total_count = await User.find(query).count()
+        
+        # Format response
+        user_list = []
+        for user in users:
+            user_dict = user.to_dict()
+            # Remove sensitive data
+            user_dict.pop("password_hash", None)
+            user_dict.pop("refresh_token", None)
+            user_list.append(user_dict)
+        
+        # Log admin action
+        await AuditLog.log_action(
+            action_type=ActionType.USER_CREATED,  # Generic user action
+            action_description=f"Admin {current_user.email} viewed user list",
+            actor_id=str(current_user.id),
+            actor_email=current_user.email,
+            actor_role=current_user.role,
+            actor_ip=client_info["ip"],
+            endpoint=client_info["endpoint"],
+            user_agent=client_info["user_agent"],
+            metadata={"query": query, "total_results": total_count}
+        )
+        
+        return {
+            "users": user_list,
+            "total": total_count,
+            "skip": skip,
+            "limit": limit,
+            "filters": {"role": role, "search": search, "active_only": active_only}
+        }
+        
+    except Exception as e:
+        print(f"Admin get users error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve users: {str(e)}")
+
+@app.get("/admin/developers")
+async def admin_get_developers(
+    request: Request,
+    current_user: User = Depends(require_admin),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, le=100),
+    verified_only: bool = Query(False)
+):
+    """Get all developers with earnings data (Admin only)."""
+    try:
+        client_info = await get_client_info(request)
+        
+        # Get developers
+        query = {"role": UserRole.DEVELOPER}
+        if verified_only:
+            query["is_active"] = True
+            
+        developers = await User.find(query).skip(skip).limit(limit).to_list()
+        total_count = await User.find(query).count()
+        
+        # Enrich with developer profile and earnings data
+        developer_list = []
+        for dev in developers:
+            dev_dict = dev.to_dict()
+            dev_dict.pop("password_hash", None)
+            dev_dict.pop("refresh_token", None)
+            
+            # Get developer profile
+            dev_profile = await DeveloperProfile.find_one({"user_id": str(dev.id)})
+            if dev_profile:
+                dev_dict["developer_profile"] = dev_profile.to_dict()
+            
+            # Get earnings data
+            earnings = await PaymentTransaction.find({
+                "recipient_id": str(dev.id),
+                "transaction_type": "payout",
+                "status": "completed"
+            }).to_list()
+            
+            total_earnings = sum(transaction.amount for transaction in earnings)
+            dev_dict["total_earnings"] = total_earnings
+            dev_dict["payout_count"] = len(earnings)
+            
+            # Get content count
+            template_count = await Template.find({"user_id": str(dev.id)}).count()
+            component_count = await Component.find({"user_id": str(dev.id)}).count()
+            dev_dict["content_stats"] = {
+                "templates": template_count,
+                "components": component_count,
+                "total": template_count + component_count
+            }
+            
+            developer_list.append(dev_dict)
+        
+        # Log admin action
+        await AuditLog.log_action(
+            action_type=ActionType.DEVELOPER_APPROVED,  # Generic developer action
+            action_description=f"Admin {current_user.email} viewed developer list",
+            actor_id=str(current_user.id),
+            actor_email=current_user.email,
+            actor_role=current_user.role,
+            actor_ip=client_info["ip"],
+            endpoint=client_info["endpoint"],
+            user_agent=client_info["user_agent"],
+            metadata={"total_results": total_count, "verified_only": verified_only}
+        )
+        
+        return {
+            "developers": developer_list,
+            "total": total_count,
+            "skip": skip,
+            "limit": limit,
+            "filters": {"verified_only": verified_only}
+        }
+        
+    except Exception as e:
+        print(f"Admin get developers error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve developers: {str(e)}")
+
+@app.get("/admin/content")
+async def admin_get_content(
+    request: Request,
+    limit: int = Query(100, description="Maximum number of items to return"),
+    skip: int = Query(0, description="Number of items to skip"),
+    content_type: Optional[str] = Query(None, description="Filter by content type: template or component"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+    current_user: User = Depends(require_admin)
+):
+    """Get all content (templates and components) for admin review"""
+    try:
+        content_items = []
+        
+        # Get templates
+        if not content_type or content_type == "template":
+            templates = await Template.find().skip(skip if not content_type else 0).limit(limit if not content_type else limit//2).to_list()
+            for template in templates:
+                # Get developer info
+                developer = await User.get(template.user_id)
+                
+                template_dict = {
+                    "id": str(template.id),
+                    "title": template.title,
+                    "description": template.short_description,
+                    "category": template.category,
+                    "status": getattr(template, 'approval_status', 'approved'),
+                    "plan_type": getattr(template, 'plan_type', 'Free'),
+                    "developer_name": developer.name if developer else "Unknown",
+                    "developer_email": developer.email if developer else "Unknown",
+                    "created_at": template.created_at.isoformat(),
+                    "download_count": template.downloads,
+                    "like_count": template.likes,
+                    "average_rating": getattr(template, 'average_rating', 0),
+                    "content_type": "template"
+                }
+                content_items.append(template_dict)
+        
+        # Get components  
+        if not content_type or content_type == "component":
+            components = await Component.find().skip(skip if not content_type else 0).limit(limit if not content_type else limit//2).to_list()
+            for component in components:
+                # Get developer info
+                developer = await User.get(component.user_id)
+                
+                component_dict = {
+                    "id": str(component.id),
+                    "title": component.title,
+                    "description": component.short_description,
+                    "category": component.category,
+                    "status": getattr(component, 'approval_status', 'approved'),
+                    "plan_type": getattr(component, 'plan_type', 'Free'),
+                    "developer_name": developer.name if developer else "Unknown",
+                    "developer_email": developer.email if developer else "Unknown",
+                    "created_at": component.created_at.isoformat(),
+                    "download_count": getattr(component, 'downloads', 0),
+                    "like_count": getattr(component, 'likes', 0),
+                    "average_rating": getattr(component, 'average_rating', 0),
+                    "content_type": "component"
+                }
+                content_items.append(component_dict)
+        
+        # Filter by status if provided
+        if status:
+            content_items = [item for item in content_items if item['status'] == status]
+        
+        # Sort by creation date (newest first)
+        content_items.sort(key=lambda x: x['created_at'], reverse=True)
+        
+        return {
+            "content": content_items[:limit],
+            "total": len(content_items),
+            "limit": limit,
+            "skip": skip
+        }
+        
+    except Exception as e:
+        print(f"Admin get content error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve content: {str(e)}")
+
+@app.get("/admin/content/pending")
+async def admin_get_pending_content(
+    request: Request,
+    current_user: User = Depends(require_admin),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, le=100),
+    content_type: Optional[str] = Query(None)  # "template" or "component"
+):
+    """Get content waiting for approval (Admin only)."""
+    try:
+        client_info = await get_client_info(request)
+        
+        pending_content = []
+        
+        # Get pending templates
+        if not content_type or content_type == "template":
+            pending_templates = await Template.find({"approval_status": "pending_approval"}).skip(skip if not content_type else 0).limit(limit if not content_type else 1000).to_list()
+            
+            for template in pending_templates:
+                template_dict = template.to_dict()
+                template_dict["content_type"] = "template"
+                
+                # Get approval record
+                approval = await ContentApproval.find_one({
+                    "content_type": "template",
+                    "content_id": str(template.id)
+                })
+                if approval:
+                    template_dict["approval_info"] = approval.to_dict()
+                
+                # Get author info
+                author = await User.find_one({"_id": template.user_id})
+                if author:
+                    template_dict["author"] = {
+                        "id": str(author.id),
+                        "email": author.email,
+                        "name": f"{author.first_name} {author.last_name}"
+                    }
+                
+                pending_content.append(template_dict)
+        
+        # Get pending components
+        if not content_type or content_type == "component":
+            pending_components = await Component.find({"approval_status": "pending_approval"}).skip(skip if not content_type else 0).limit(limit if not content_type else 1000).to_list()
+            
+            for component in pending_components:
+                component_dict = component.to_dict()
+                component_dict["content_type"] = "component"
+                
+                # Get approval record
+                approval = await ContentApproval.find_one({
+                    "content_type": "component",
+                    "content_id": str(component.id)
+                })
+                if approval:
+                    component_dict["approval_info"] = approval.to_dict()
+                
+                # Get author info
+                author = await User.find_one({"_id": component.user_id})
+                if author:
+                    component_dict["author"] = {
+                        "id": str(author.id),
+                        "email": author.email,
+                        "name": f"{author.first_name} {author.last_name}"
+                    }
+                
+                pending_content.append(component_dict)
+        
+        # Sort by submission date
+        pending_content.sort(key=lambda x: x.get("created_at", datetime.min), reverse=True)
+        
+        # Apply pagination if filtering by content type
+        if content_type:
+            total_count = len(pending_content)
+            pending_content = pending_content[skip:skip + limit]
+        else:
+            total_count = len(pending_content)
+        
+        # Log admin action
+        await AuditLog.log_action(
+            action_type=ActionType.CONTENT_APPROVED,  # Generic content action
+            action_description=f"Admin {current_user.email} viewed pending content",
+            actor_id=str(current_user.id),
+            actor_email=current_user.email,
+            actor_role=current_user.role,
+            actor_ip=client_info["ip"],
+            endpoint=client_info["endpoint"],
+            user_agent=client_info["user_agent"],
+            metadata={"content_type": content_type, "total_results": total_count}
+        )
+        
+        return {
+            "pending_content": pending_content,
+            "total": total_count,
+            "skip": skip,
+            "limit": limit,
+            "filters": {"content_type": content_type}
+        }
+        
+    except Exception as e:
+        print(f"Admin get pending content error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve pending content: {str(e)}")
+
+@app.post("/admin/content/approve/{content_id}")
+async def admin_approve_content(
+    content_id: str,
+    request: Request,
+    approval_request: ContentApprovalRequest,
+    current_user: User = Depends(require_admin)
+):
+    """Approve content (Admin only)."""
+    try:
+        client_info = await get_client_info(request)
+        
+        if approval_request.action not in ["approve", "reject"]:
+            raise HTTPException(status_code=400, detail="Action must be 'approve' or 'reject'")
+        
+        # Find the content (template or component)
+        content = None
+        content_type = None
+        
+        try:
+            # Convert string ID to ObjectId for MongoDB query
+            from bson import ObjectId
+            object_id = ObjectId(content_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid content ID format")
+        
+        template = await Template.find_one({"_id": object_id})
+        if template:
+            content = template
+            content_type = "template"
+        else:
+            component = await Component.find_one({"_id": object_id})
+            if component:
+                content = component
+                content_type = "component"
+        
+        if not content:
+            raise HTTPException(status_code=404, detail="Content not found")
+        
+        # Update content status
+        if approval_request.action == "approve":
+            content.approval_status = "approved"
+            content.approved_at = datetime.utcnow()
+            content.approved_by = current_user.id  # This should be PydanticObjectId, not string
+        else:
+            content.approval_status = "rejected"
+            content.rejection_reason = approval_request.reason or "No reason provided"
+        
+        await content.save()
+        
+        # Create or update approval record
+        approval = await ContentApproval.find_one({
+            "content_type": content_type,
+            "content_id": object_id  # Use object_id instead of content_id string
+        })
+        
+        if not approval:
+            approval = ContentApproval(
+                content_type=content_type,
+                content_id=object_id,  # Use object_id instead of content_id string
+                content_title=content.title,
+                submitted_by=content.user_id,
+                submitted_at=content.created_at
+            )
+        
+        approval.status = "approved" if approval_request.action == "approve" else "rejected"
+        approval.reviewed_by = current_user.id  # Should be PydanticObjectId, not string
+        approval.reviewed_at = datetime.utcnow()
+        approval.approval_notes = approval_request.admin_notes or ""  # Use approval_notes instead of admin_notes
+        
+        if approval_request.action == "reject":
+            approval.rejection_reason = approval_request.reason or "No reason provided"
+        
+        await approval.save()
+        
+        # Get author for notification
+        author = await User.find_one({"_id": content.user_id})
+        
+        # Log admin action
+        action_type = ActionType.CONTENT_APPROVED if approval_request.action == "approve" else ActionType.CONTENT_REJECTED
+        await AuditLog.log_action(
+            action_type=action_type,
+            action_description=f"Admin {current_user.email} {approval_request.action}d {content_type} '{content.title}'",
+            actor_id=str(current_user.id),
+            actor_email=current_user.email,
+            actor_role=current_user.role,
+            actor_ip=client_info["ip"],
+            target_type=content_type,
+            target_id=content_id,
+            target_name=content.title,
+            endpoint=client_info["endpoint"],
+            user_agent=client_info["user_agent"],
+            metadata={
+                "action": approval_request.action,
+                "reason": approval_request.reason,
+                "admin_notes": approval_request.admin_notes,
+                "author_email": author.email if author else None
+            }
+        )
+        
+        # Send email notification to author
+        if author:
+            await email_service.send_content_approval_notification(
+                user=author,
+                content_type=content_type,
+                content_title=content.title,
+                action=approval_request.action,
+                reason=approval_request.reason,
+                admin_notes=approval_request.admin_notes
+            )
+        
+        return {
+            "message": f"Content {approval_request.action}d successfully",
+            "content_id": content_id,
+            "content_type": content_type,
+            "status": content.status,
+            "approval_id": str(approval.id)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Admin approve content error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to {approval_request.action} content: {str(e)}")
+
+@app.get("/admin/analytics")
+async def admin_get_analytics(
+    request: Request,
+    current_user: User = Depends(require_admin),
+    days: int = Query(30, ge=1, le=365)
+):
+    """Get platform analytics (Admin only)."""
+    try:
+        client_info = await get_client_info(request)
+        
+        # Calculate date range
+        end_date = datetime.utcnow()
+        start_date = end_date.replace(day=1) if days >= 30 else end_date - timedelta(days=days)
+        
+        # User metrics
+        total_users = await User.find().count()
+        active_users = await User.find({"is_active": True}).count()
+        users_by_role = {}
+        for role in UserRole:
+            count = await User.find({"role": role}).count()
+            users_by_role[role] = count
+        
+        # Recent user growth
+        recent_users = await User.find({
+            "created_at": {"$gte": start_date}
+        }).count()
+        
+        # Content metrics
+        total_templates = await Template.find().count()
+        total_components = await Component.find().count()
+        approved_templates = await Template.find({"approval_status": "approved"}).count()
+        approved_components = await Component.find({"approval_status": "approved"}).count()
+        pending_templates = await Template.find({"approval_status": "pending_approval"}).count()
+        pending_components = await Component.find({"approval_status": "pending_approval"}).count()
+        
+        # Recent content submissions
+        recent_templates = await Template.find({
+            "created_at": {"$gte": start_date}
+        }).count()
+        recent_components = await Component.find({
+            "created_at": {"$gte": start_date}
+        }).count()
+        
+        # Revenue metrics (basic)
+        total_transactions = await PaymentTransaction.find({
+            "status": "completed"
+        }).count()
+        
+        # Get revenue by summing completed transactions
+        completed_transactions = await PaymentTransaction.find({
+            "status": "completed",
+            "transaction_type": "purchase"
+        }).to_list()
+        
+        total_revenue = sum(transaction.amount for transaction in completed_transactions)
+        
+        recent_transactions = await PaymentTransaction.find({
+            "status": "completed",
+            "transaction_type": "purchase",
+            "created_at": {"$gte": start_date}
+        }).to_list()
+        
+        recent_revenue = sum(transaction.amount for transaction in recent_transactions)
+        
+        # Developer performance (top 10)
+        developers = await User.find({"role": UserRole.DEVELOPER}).to_list()
+        developer_performance = []
+        
+        for dev in developers[:10]:  # Limit to top 10 for performance
+            template_count = await Template.find({"user_id": str(dev.id), "status": "approved"}).count()
+            component_count = await Component.find({"user_id": str(dev.id), "status": "approved"}).count()
+            
+            # Get earnings
+            earnings = await PaymentTransaction.find({
+                "recipient_id": str(dev.id),
+                "status": "completed",
+                "transaction_type": "payout"
+            }).to_list()
+            
+            total_earnings = sum(transaction.amount for transaction in earnings)
+            
+            if template_count > 0 or component_count > 0 or total_earnings > 0:
+                developer_performance.append({
+                    "developer_id": str(dev.id),
+                    "name": f"{dev.first_name} {dev.last_name}",
+                    "email": dev.email,
+                    "templates": template_count,
+                    "components": component_count,
+                    "total_content": template_count + component_count,
+                    "earnings": total_earnings
+                })
+        
+        # Sort by total content + earnings
+        developer_performance.sort(
+            key=lambda x: x["total_content"] * 10 + x["earnings"] / 1000,
+            reverse=True
+        )
+        
+        # Approval metrics
+        total_approvals = await ContentApproval.find().count()
+        pending_approvals = await ContentApproval.find({"status": "pending"}).count()
+        approved_count = await ContentApproval.find({"status": "approved"}).count()
+        rejected_count = await ContentApproval.find({"status": "rejected"}).count()
+        
+        analytics_data = {
+            "period": {
+                "days": days,
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat()
+            },
+            "users": {
+                "total": total_users,
+                "active": active_users,
+                "recent_signups": recent_users,
+                "by_role": users_by_role
+            },
+            "content": {
+                "templates": {
+                    "total": total_templates,
+                    "approved": approved_templates,
+                    "pending": pending_templates,
+                    "recent": recent_templates
+                },
+                "components": {
+                    "total": total_components,
+                    "approved": approved_components,
+                    "pending": pending_components,
+                    "recent": recent_components
+                },
+                "totals": {
+                    "all_content": total_templates + total_components,
+                    "approved_content": approved_templates + approved_components,
+                    "pending_content": pending_templates + pending_components
+                }
+            },
+            "revenue": {
+                "total_revenue": total_revenue,
+                "recent_revenue": recent_revenue,
+                "total_transactions": total_transactions,
+                "recent_transactions": len(recent_transactions)
+            },
+            "approvals": {
+                "total": total_approvals,
+                "pending": pending_approvals,
+                "approved": approved_count,
+                "rejected": rejected_count,
+                "approval_rate": round((approved_count / max(total_approvals, 1)) * 100, 2)
+            },
+            "top_developers": developer_performance[:10]
+        }
+        
+        # Log admin action
+        await AuditLog.log_action(
+            action_type=ActionType.SETTINGS_UPDATED,  # Generic admin action
+            action_description=f"Admin {current_user.email} viewed analytics dashboard",
+            actor_id=str(current_user.id),
+            actor_email=current_user.email,
+            actor_role=current_user.role,
+            actor_ip=client_info["ip"],
+            endpoint=client_info["endpoint"],
+            user_agent=client_info["user_agent"],
+            metadata={"days": days, "total_users": total_users, "total_content": total_templates + total_components}
+        )
+        
+        return analytics_data
+        
+    except Exception as e:
+        print(f"Admin analytics error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve analytics: {str(e)}")
+
+# Admin Audit Log Endpoint
+@app.get("/admin/audit-logs")
+async def admin_get_audit_logs(
+    request: Request,
+    current_user: User = Depends(require_admin),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, le=500),
+    action_type: Optional[ActionType] = Query(None),
+    actor_email: Optional[str] = Query(None),
+    severity: Optional[AuditSeverity] = Query(None),
+    days: int = Query(7, ge=1, le=90)
+):
+    """Get audit logs (Admin only)."""
+    try:
+        client_info = await get_client_info(request)
+        
+        # Build query
+        query = {}
+        
+        # Date filter
+        start_date = datetime.utcnow() - timedelta(days=days)
+        query["timestamp"] = {"$gte": start_date}
+        
+        if action_type:
+            query["action_type"] = action_type
+        if actor_email:
+            query["actor_email"] = {"$regex": actor_email, "$options": "i"}
+        if severity:
+            query["severity"] = severity
+        
+        # Get logs
+        logs = await AuditLog.find(query).skip(skip).limit(limit).sort("-timestamp").to_list()
+        total_count = await AuditLog.find(query).count()
+        
+        # Format response
+        log_list = [log.to_dict() for log in logs]
+        
+        # Log this admin action
+        await AuditLog.log_action(
+            action_type=ActionType.SETTINGS_UPDATED,  # Generic admin action
+            action_description=f"Admin {current_user.email} viewed audit logs",
+            actor_id=str(current_user.id),
+            actor_email=current_user.email,
+            actor_role=current_user.role,
+            actor_ip=client_info["ip"],
+            endpoint=client_info["endpoint"],
+            user_agent=client_info["user_agent"],
+            metadata={"filters": query, "total_results": total_count}
+        )
+        
+        return {
+            "audit_logs": log_list,
+            "total": total_count,
+            "skip": skip,
+            "limit": limit,
+            "filters": {
+                "action_type": action_type,
+                "actor_email": actor_email,
+                "severity": severity,
+                "days": days
+            }
+        }
+        
+    except Exception as e:
+        print(f"Admin audit logs error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve audit logs: {str(e)}")
+
+# User Management Endpoints
+@app.put("/admin/users/{user_id}")
+async def admin_update_user(
+    user_id: str,
+    user_update: dict,
+    request: Request,
+    current_user: User = Depends(require_admin)
+):
+    """Update user details (Admin only)."""
+    try:
+        client_info = await get_client_info(request)
+        
+        # Find the user
+        user = await User.get(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Update allowed fields
+        update_data = {}
+        if "name" in user_update:
+            update_data["name"] = user_update["name"]
+        if "first_name" in user_update:
+            update_data["first_name"] = user_update["first_name"]
+        if "last_name" in user_update:
+            update_data["last_name"] = user_update["last_name"]
+        if "email" in user_update:
+            # Check if email already exists
+            existing_user = await User.find_one({"email": user_update["email"]})
+            if existing_user and str(existing_user.id) != user_id:
+                raise HTTPException(status_code=400, detail="Email already exists")
+            update_data["email"] = user_update["email"]
+        if "role" in user_update:
+            update_data["role"] = UserRole(user_update["role"])
+        if "is_active" in user_update:
+            update_data["is_active"] = user_update["is_active"]
+        
+        # Apply updates
+        for key, value in update_data.items():
+            setattr(user, key, value)
+        
+        user.updated_at = datetime.utcnow()
+        await user.save()
+        
+        # Log admin action
+        await AuditLog.log_action(
+            action_type=ActionType.USER_CREATED,  # Generic user action
+            action_description=f"Admin {current_user.email} updated user {user.email}",
+            actor_id=str(current_user.id),
+            actor_email=current_user.email,
+            actor_role=current_user.role,
+            actor_ip=client_info["ip"],
+            endpoint=client_info["endpoint"],
+            user_agent=client_info["user_agent"],
+            metadata={"updated_fields": list(update_data.keys()), "target_user_id": user_id}
+        )
+        
+        # Return updated user
+        user_dict = user.to_dict()
+        user_dict.pop("password_hash", None)
+        user_dict.pop("refresh_token", None)
+        
+        return {
+            "message": "User updated successfully",
+            "user": user_dict
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Admin update user error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update user: {str(e)}")
+
+@app.post("/admin/users/{user_id}/manage")
+async def admin_manage_user(
+    user_id: str,
+    action_data: dict,
+    request: Request,
+    current_user: User = Depends(require_admin)
+):
+    """Manage user (activate, deactivate, suspend) (Admin only)."""
+    try:
+        client_info = await get_client_info(request)
+        
+        # Find the user
+        user = await User.get(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        action = action_data.get("action")
+        if not action:
+            raise HTTPException(status_code=400, detail="Action is required")
+        
+        # Perform the action
+        if action == "activate":
+            user.is_active = True
+            message = f"User {user.email} activated successfully"
+        elif action == "deactivate":
+            user.is_active = False
+            message = f"User {user.email} deactivated successfully"
+        elif action == "suspend":
+            user.is_active = False
+            message = f"User {user.email} suspended successfully"
+        elif action == "change_role":
+            new_role = action_data.get("role")
+            if not new_role:
+                raise HTTPException(status_code=400, detail="Role is required for role change")
+            user.role = UserRole(new_role)
+            message = f"User {user.email} role changed to {new_role}"
+        else:
+            raise HTTPException(status_code=400, detail="Invalid action")
+        
+        user.updated_at = datetime.utcnow()
+        await user.save()
+        
+        # Log admin action
+        await AuditLog.log_action(
+            action_type=ActionType.USER_CREATED,  # Generic user action
+            action_description=f"Admin {current_user.email} performed {action} on user {user.email}",
+            actor_id=str(current_user.id),
+            actor_email=current_user.email,
+            actor_role=current_user.role,
+            actor_ip=client_info["ip"],
+            endpoint=client_info["endpoint"],
+            user_agent=client_info["user_agent"],
+            metadata={"action": action, "target_user_id": user_id, "reason": action_data.get("reason")}
+        )
+        
+        return {
+            "message": message,
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "role": user.role,
+                "is_active": user.is_active
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Admin manage user error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to manage user: {str(e)}")
+
+@app.delete("/admin/users/{user_id}")
+async def admin_delete_user(
+    user_id: str,
+    request: Request,
+    current_user: User = Depends(require_admin)
+):
+    """Delete user permanently (Admin only) - Use with caution."""
+    try:
+        client_info = await get_client_info(request)
+        
+        # Find the user
+        user = await User.get(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Prevent deletion of other admins (safety measure)
+        if user.role in [UserRole.ADMIN, UserRole.SUPERADMIN] and str(user.id) != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Cannot delete other admin users")
+        
+        # Store user info for logging
+        deleted_user_email = user.email
+        
+        # Log admin action before deletion
+        await AuditLog.log_action(
+            action_type=ActionType.USER_DELETED,
+            action_description=f"Admin {current_user.email} deleted user {deleted_user_email}",
+            actor_id=str(current_user.id),
+            actor_email=current_user.email,
+            actor_role=current_user.role,
+            actor_ip=client_info["ip"],
+            endpoint=client_info["endpoint"],
+            user_agent=client_info["user_agent"],
+            metadata={"deleted_user_id": user_id, "deleted_user_email": deleted_user_email}
+        )
+        
+        # Delete the user
+        await user.delete()
+        
+        return {
+            "message": f"User {deleted_user_email} deleted successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Admin delete user error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete user: {str(e)}")
+
+# ==================== END ADMIN ENDPOINTS ====================
+
+# ==================== ADMIN API ROUTER ====================
+# Note: Admin routes are defined directly in main server to avoid conflicts
+# Include admin API router for admin dashboard
+# try:
+#     from app.api.admin import router as admin_api_router
+#     app.include_router(admin_api_router, tags=["Admin API"])
+#     print("✅ Admin API router included")
+# except Exception as e:
+#     print(f"⚠️ Could not include admin API router: {e}")
+print("ℹ️ Admin routes are defined directly in main server")
+
+# ==================== MARKETPLACE ENDPOINTS ====================
+# Include payment endpoints
+from app.endpoints.payments import router as payment_router
+app.include_router(payment_router, tags=["Payments"])
+
+# Include developer earnings endpoints  
+from app.endpoints.developer_earnings import router as earnings_router
+app.include_router(earnings_router, tags=["Developer Earnings"])
+
+# Include user dashboard endpoints
+from app.endpoints.user_dashboard import router as dashboard_router
+app.include_router(dashboard_router, tags=["User Dashboard"])
+
+# Include components API endpoints
+try:
+    from app.api.components import router as components_router
+    app.include_router(components_router, tags=["Components"])
+    print("✅ Components API router included")
+except Exception as e:
+    print(f"⚠️ Could not include components API router: {e}")
+
+# ==================== INTERACTION ENDPOINTS ====================
+
+# Template interaction endpoints
+# from app.endpoints.template_interactions import router as template_interactions_router
+# app.include_router(template_interactions_router, tags=["Template Interactions"])
+
+# Component interaction endpoints  
+# from app.endpoints.component_interactions import router as component_interactions_router
+# app.include_router(component_interactions_router, tags=["Component Interactions"])
+
+# Admin moderation endpoints
+from app.endpoints.admin_moderation import router as admin_moderation_router
+app.include_router(admin_moderation_router, tags=["Admin Moderation"])
+
+# ==================== END INTERACTION ENDPOINTS ====================
 
 # Main execution
 if __name__ == "__main__":

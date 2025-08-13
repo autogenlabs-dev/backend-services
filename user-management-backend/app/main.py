@@ -100,6 +100,15 @@ app.include_router(api_keys.router)
 app.include_router(payments.router)
 app.include_router(templates.router)
 
+# Import interaction routers
+try:
+    from .endpoints import template_interactions, component_interactions, admin_moderation
+    app.include_router(template_interactions.router, prefix="/api", tags=["Template Interactions"])
+    app.include_router(component_interactions.router, prefix="/api", tags=["Component Interactions"])
+    app.include_router(admin_moderation.router, prefix="/api", tags=["Admin Moderation"])
+except ImportError as e:
+    print(f"Warning: Could not import interaction routers: {e}")
+
 # Import and include sub-users router
 try:
     from .api import sub_users, sub_user_dashboard

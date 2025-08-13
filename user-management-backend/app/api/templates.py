@@ -183,7 +183,7 @@ async def get_my_templates(
     """Get templates created by the current user. Updated route."""
     try:
         # Build filter query for user's templates
-        filter_query = {"created_by": current_user.id, "is_active": True}
+        filter_query = {"user_id": current_user.id, "is_active": True}
         
         # Calculate skip value for pagination
         skip = (page - 1) * limit
@@ -273,6 +273,10 @@ async def get_favorite_templates(
 async def get_template_by_id(template_id: str):
     """Get a specific template by ID."""
     try:
+        # Skip validation for special routes
+        if template_id in ['my', 'favorites', 'categories', 'stats']:
+            raise HTTPException(status_code=404, detail="Route not found")
+        
         # Convert string ID to ObjectId
         if not PydanticObjectId.is_valid(template_id):
             raise HTTPException(status_code=400, detail="Invalid template ID")

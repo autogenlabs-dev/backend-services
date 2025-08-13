@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     )
     
     # Database
-    database_url: str = "mongodb://127.0.0.1:27017/user_management_db"
+    database_url: str = "mongodb+srv://autogencodebuilder:DataOnline@autogen.jf0j0.mongodb.net/user_management_db?retryWrites=true&w=majority&connectTimeoutMS=60000&socketTimeoutMS=60000"
     redis_url: str = "redis://localhost:6379"
     
     # Redis Configuration

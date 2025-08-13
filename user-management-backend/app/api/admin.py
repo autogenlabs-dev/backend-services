@@ -1,29 +1,327 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, desc, and_, text
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session
-from ..database import get_database as get_db
-from ..auth.dependencies import get_current_user
-from ..models.user import User, TokenUsageLog, SubscriptionPlan, UserSubscription
-from ..services.stripe_service import StripeService
-from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Any
-import json
+from datetime import datetime, timedelta
+from beanie import PydanticObjectId
+from ..auth.unified_auth import get_current_user_unified
+from ..models.user import User, UserRole
+from ..models.template import Template
+from ..models.component import Component
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["Admin"], include_in_schema=True)
 
-def require_admin(current_user: User = Depends(get_current_user)):
-    # RBAC: allow admin and superadmin roles (admin has all access)
-    if getattr(current_user, "role", "user") not in ("admin", "superadmin"):
+def require_admin(current_user: User = Depends(get_current_user_unified)):
+    """Require admin role for access"""
+    if current_user.role not in [UserRole.ADMIN, UserRole.SUPERADMIN]:
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 
 @router.get("/users")
-def list_all_users(db: Session = Depends(get_db), admin: User = Depends(require_admin)) -> List[dict]:
-    users = db.query(User).all()
-    return [
-        {"id": str(u.id), "email": u.email, "is_active": u.is_active, "created_at": u.created_at} for u in users
-    ]
+async def get_users(
+    limit: int = Query(100, description="Maximum number of users to return"),
+    skip: int = Query(0, description="Number of users to skip"),
+    admin: User = Depends(require_admin)
+):
+    """Get all users with pagination"""
+    try:
+        # Get users with pagination
+        users = await User.find().skip(skip).limit(limit).to_list()
+        
+        # Convert to dict format expected by frontend
+        users_data = []
+        for user in users:
+            user_dict = {
+                "id": str(user.id),
+                "name": user.name or user.full_name or "Unknown",
+                "email": user.email,
+                "role": user.role,
+                "status": "active" if user.is_active else "inactive",
+                "created_at": user.created_at.isoformat(),
+                "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
+                "subscription": user.subscription,
+                "tokens_remaining": user.tokens_remaining,
+                "wallet_balance": user.wallet_balance
+            }
+            users_data.append(user_dict)
+        
+        # Get total count
+        total_count = await User.find().count()
+        
+        return {
+            "users": users_data,
+            "total": total_count,
+            "limit": limit,
+            "skip": skip
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to retrieve users: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve users: {str(e)}")
+
+@router.get("/content")
+async def get_content(
+    limit: int = Query(100, description="Maximum number of items to return"),
+    skip: int = Query(0, description="Number of items to skip"),
+    content_type: Optional[str] = Query(None, description="Filter by content type: template or component"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+    admin: User = Depends(require_admin)
+):
+    """Get all content (templates and components) for admin review"""
+    try:
+        content_items = []
+        
+        # Get templates
+        if not content_type or content_type == "template":
+            # Build template query
+            template_query = {}
+            if status:
+                template_query["approval_status"] = status
+            
+            templates = await Template.find(template_query).skip(skip if not content_type else 0).limit(limit if not content_type else limit//2).to_list()
+            for template in templates:
+                # Get developer info
+                developer = await User.get(template.user_id)
+                
+                template_dict = {
+                    "id": str(template.id),
+                    "title": template.title,
+                    "description": template.short_description,  
+                    "category": template.category,
+                    "status": template.approval_status,  # Use approval_status mapped to status
+                    "price_inr": template.pricing_inr,  
+                    "developer_name": developer.name if developer else "Unknown",
+                    "developer_email": developer.email if developer else "Unknown",
+                    "created_at": template.created_at.isoformat(),
+                    "download_count": template.downloads,
+                    "like_count": template.likes,
+                    "average_rating": template.average_rating,
+                    "content_type": "template"
+                }
+                content_items.append(template_dict)
+        
+        # Get components  
+        if not content_type or content_type == "component":
+            # Build component query
+            component_query = {}
+            if status:
+                component_query["approval_status"] = status
+                
+            components = await Component.find(component_query).skip(skip if not content_type else 0).limit(limit if not content_type else limit//2).to_list()
+            for component in components:
+                # Get developer info
+                developer = await User.get(component.user_id)
+                
+                component_dict = {
+                    "id": str(component.id),
+                    "title": component.title,
+                    "description": component.short_description,  
+                    "category": component.category,
+                    "status": component.approval_status,  # Use approval_status mapped to status
+                    "price_inr": component.pricing_inr,  
+                    "developer_name": developer.name if developer else "Unknown",
+                    "developer_email": developer.email if developer else "Unknown",
+                    "created_at": component.created_at.isoformat(),
+                    "download_count": component.downloads,
+                    "like_count": component.likes,
+                    "average_rating": component.average_rating,
+                    "content_type": "component"
+                }
+                content_items.append(component_dict)
+        
+        # Don't filter by status here if we want all content - filtering is done in queries above
+        # Sort by creation date (newest first)
+        content_items.sort(key=lambda x: x['created_at'], reverse=True)
+        
+        # Apply pagination manually if we fetched all content
+        if not status:
+            content_items = content_items[skip:skip + limit]
+        
+        return {
+            "content": content_items,
+            "total": len(content_items),
+            "limit": limit,
+            "skip": skip
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to retrieve content: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve content: {str(e)}")
+
+@router.get("/analytics")
+async def get_analytics(admin: User = Depends(require_admin)):
+    """Get platform analytics for admin dashboard"""
+    try:
+        # Get user statistics
+        total_users = await User.find().count()
+        active_users = await User.find(User.is_active == True).count()
+        admin_users = await User.find(User.role == UserRole.ADMIN).count()
+        developer_users = await User.find(User.role == UserRole.DEVELOPER).count()
+        regular_users = await User.find(User.role == UserRole.USER).count()
+        
+        # Get content statistics
+        total_templates = await Template.find().count()
+        total_components = await Component.find().count()
+        total_content = total_templates + total_components
+        
+        # Get pending content count
+        pending_templates = await Template.find(Template.approval_status == "pending_approval").count()
+        pending_components = await Component.find(Component.approval_status == "pending_approval").count()
+        pending_content = pending_templates + pending_components
+        
+        # Calculate platform revenue (mock data for now)
+        platform_revenue_inr = 50000  # This should be calculated from actual transactions
+        
+        # Get recent activity (mock data for now)
+        recent_activity = [
+            {
+                "description": "New user registered",
+                "timestamp": (datetime.now() - timedelta(hours=2)).isoformat()
+            },
+            {
+                "description": "Template uploaded for review",
+                "timestamp": (datetime.now() - timedelta(hours=5)).isoformat()
+            },
+            {
+                "description": "Purchase completed",
+                "timestamp": (datetime.now() - timedelta(hours=8)).isoformat()
+            }
+        ]
+        
+        return {
+            "total_users": total_users,
+            "active_users": active_users,
+            "total_content": total_content,
+            "platform_revenue_inr": platform_revenue_inr,
+            "pending_content": pending_content,  # Use calculated pending content
+            "user_reports": 0,     # This should be calculated from reports
+            "user_growth": 15.2,   # Mock percentage growth
+            "content_growth": 8.7, # Mock percentage growth  
+            "revenue_growth": 23.1, # Mock percentage growth
+            "recent_activity": recent_activity,
+            "user_breakdown": {
+                "admin": admin_users,
+                "developer": developer_users,
+                "user": regular_users
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to retrieve analytics: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve analytics: {str(e)}")
+
+@router.post("/content/{content_id}/approve")
+async def approve_content(
+    content_id: str,
+    content_type: str = Query(..., description="Type of content: template or component"),
+    approval_data: dict = None,
+    admin: User = Depends(require_admin)
+):
+    """Approve a template or component"""
+    try:
+        if content_type == "template":
+            template = await Template.get(PydanticObjectId(content_id))
+            if not template:
+                raise HTTPException(status_code=404, detail="Template not found")
+            
+            # Update template approval_status (correct field name)
+            if hasattr(template, 'approval_status'):
+                template.approval_status = "approved"
+                template.updated_at = datetime.utcnow()
+                await template.save()
+            
+            return {"message": "Template approved successfully"}
+            
+        elif content_type == "component":
+            component = await Component.get(PydanticObjectId(content_id))
+            if not component:
+                raise HTTPException(status_code=404, detail="Component not found")
+            
+            # Update component approval_status (correct field name)
+            if hasattr(component, 'approval_status'):
+                component.approval_status = "approved"
+                component.updated_at = datetime.utcnow()
+                await component.save()
+            
+            return {"message": "Component approved successfully"}
+        
+        else:
+            raise HTTPException(status_code=400, detail="Invalid content type")
+            
+    except Exception as e:
+        logger.error(f"Failed to approve content: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to approve content: {str(e)}")
+
+@router.post("/users/{user_id}/manage")
+async def manage_user(
+    user_id: str,
+    action_data: dict,
+    admin: User = Depends(require_admin)
+):
+    """Manage user (suspend, activate, etc.)"""
+    try:
+        user = await User.get(PydanticObjectId(user_id))
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        action = action_data.get("action")
+        
+        if action == "suspend":
+            user.is_active = False
+        elif action == "activate":
+            user.is_active = True
+        elif action == "delete":
+            # Soft delete - just deactivate
+            user.is_active = False
+        else:
+            raise HTTPException(status_code=400, detail="Invalid action")
+        
+        user.updated_at = datetime.now()
+        await user.save()
+        
+        return {"message": f"User {action}d successfully"}
+        
+    except Exception as e:
+        logger.error(f"Failed to manage user: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to manage user: {str(e)}")
+
+@router.put("/users/{user_id}")
+async def update_user(
+    user_id: str,
+    update_data: dict,
+    admin: User = Depends(require_admin)
+):
+    """Update user details (name, email, role, status)"""
+    try:
+        user = await User.get(PydanticObjectId(user_id))
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Update allowed fields
+        if "name" in update_data:
+            user.name = update_data["name"]
+        if "email" in update_data:
+            user.email = update_data["email"]
+        if "role" in update_data:
+            user.role = update_data["role"]
+        if "is_active" in update_data:
+            user.is_active = update_data["is_active"]
+        
+        user.updated_at = datetime.now()
+        await user.save()
+        
+        return {"message": "User updated successfully", "user": {
+            "id": str(user.id),
+            "name": user.name,
+            "email": user.email,
+            "role": user.role,
+            "is_active": user.is_active
+        }}
+        
+    except Exception as e:
+        logger.error(f"Failed to update user: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update user: {str(e)}")
 
 @router.get("/usage-stats")
 async def usage_stats(

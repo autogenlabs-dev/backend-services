@@ -3,6 +3,15 @@ from typing import Optional, List, Dict, Any
 from pydantic import Field
 from beanie import Document, PydanticObjectId
 from beanie.odm.fields import Indexed
+from enum import Enum
+
+class ContentStatus(str, Enum):
+    """Content status enumeration"""
+    DRAFT = "draft"
+    PENDING_APPROVAL = "pending_approval"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    ARCHIVED = "archived"
 
 class Template(Document):
     """Template model for MongoDB"""
@@ -11,9 +20,7 @@ class Template(Document):
     type: str  # React, Vue, Angular, HTML/CSS, Svelte, Flutter
     language: str  # TypeScript, JavaScript, etc.
     difficulty_level: str  # Easy, Medium, Tough
-    plan_type: str  # Free, Paid
-    pricing_inr: int = 0
-    pricing_usd: int = 0
+    plan_type: str  # Free, Premium
     rating: float = 0.0
     downloads: int = 0
     views: int = 0
@@ -38,6 +45,30 @@ class Template(Document):
     code: Optional[str] = None  # The actual code content
     readme_content: Optional[str] = None  # README/documentation content
     
+    # Approval Workflow
+    approval_status: ContentStatus = ContentStatus.PENDING_APPROVAL
+    submitted_for_approval_at: Optional[datetime] = None
+    approved_at: Optional[datetime] = None
+    approved_by: Optional[PydanticObjectId] = None
+    rejection_reason: Optional[str] = None
+    
+    # Purchase and Interaction Tracking
+    is_purchasable: bool = True
+    purchase_count: int = 0
+    average_rating: float = 0.0
+    total_ratings: int = 0
+    comments_count: int = 0
+    last_comment_at: Optional[datetime] = None
+    
+    # Rating Distribution
+    rating_distribution: Dict[str, int] = Field(default_factory=lambda: {
+        "5_star": 0,
+        "4_star": 0,
+        "3_star": 0,
+        "2_star": 0,
+        "1_star": 0
+    })
+    
     # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -50,11 +81,15 @@ class Template(Document):
             [("category", 1)],
             [("type", 1)],
             [("plan_type", 1)],
+            [("approval_status", 1)],
             [("featured", 1)],
             [("popular", 1)],
             [("created_at", -1)],
             [("category", 1), ("type", 1)],
-            [("featured", 1), ("popular", 1)]
+            [("featured", 1), ("popular", 1)],
+            [("approval_status", 1), ("created_at", -1)],
+            [("average_rating", -1)],
+            [("purchase_count", -1)]
         ]
 
     def __repr__(self):
@@ -63,41 +98,34 @@ class Template(Document):
     def __str__(self):
         return self.title
 
+    @property
+    def status(self):
+        """Compatibility property for frontend"""
+        return self.approval_status
+
     def to_dict(self):
         """Convert template to dictionary for API responses (snake_case format)"""
-        return {
-            "id": str(self.id),
-            "title": self.title,
-            "category": self.category,
-            "type": self.type,
-            "language": self.language,
-            "difficulty_level": self.difficulty_level,
-            "plan_type": self.plan_type,
-            "pricing_inr": self.pricing_inr,
-            "pricing_usd": self.pricing_usd,
-            "rating": self.rating,
-            "downloads": self.downloads,
-            "views": self.views,
-            "likes": self.likes,
-            "short_description": self.short_description,
-            "full_description": self.full_description,
-            "preview_images": self.preview_images,  # Usually empty - using live_demo_url for preview
-            "git_repo_url": self.git_repo_url,
-            "live_demo_url": self.live_demo_url,  # Main source for preview generation
-            "dependencies": self.dependencies,
-            "tags": self.tags,
-            "developer_name": self.developer_name,
-            "developer_experience": self.developer_experience,
-            "is_available_for_dev": self.is_available_for_dev,
-            "featured": self.featured,
-            "popular": self.popular,
-            "code": self.code,
-            "readme_content": self.readme_content,
-            "created_at": self.created_at.isoformat(),
-            "updated_at": self.updated_at.isoformat(),
-            "is_active": self.is_active,
-            "user_id": str(self.user_id)
-        }
+        data = super().to_dict() if hasattr(super(), 'to_dict') else self.__dict__.copy()
+        data["status"] = self.approval_status
+        data["approval_status"] = self.approval_status
+        
+        # Convert ObjectId fields to strings
+        if hasattr(self, 'id'):
+            data["id"] = str(self.id)
+        if hasattr(self, 'user_id') and self.user_id:
+            data["user_id"] = str(self.user_id)
+            
+        # Convert datetime fields to ISO strings
+        if hasattr(self, 'created_at') and self.created_at:
+            data["created_at"] = self.created_at.isoformat() if hasattr(self.created_at, 'isoformat') else str(self.created_at)
+        if hasattr(self, 'updated_at') and self.updated_at:
+            data["updated_at"] = self.updated_at.isoformat() if hasattr(self.updated_at, 'isoformat') else str(self.updated_at)
+        if hasattr(self, 'submitted_for_approval_at') and self.submitted_for_approval_at:
+            data["submitted_for_approval_at"] = self.submitted_for_approval_at.isoformat() if hasattr(self.submitted_for_approval_at, 'isoformat') else str(self.submitted_for_approval_at)
+        if hasattr(self, 'approved_at') and self.approved_at:
+            data["approved_at"] = self.approved_at.isoformat() if hasattr(self.approved_at, 'isoformat') else str(self.approved_at)
+            
+        return data
 
 
 class TemplateLike(Document):
