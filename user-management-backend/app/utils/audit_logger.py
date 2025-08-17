@@ -42,22 +42,25 @@ async def log_audit_event(
             action_type = action
         
         # Convert severity string to AuditSeverity enum
-        severity_enum = AuditSeverity.INFO
+        severity_enum = AuditSeverity.MEDIUM  # Fixed: Use MEDIUM instead of INFO
         try:
             severity_enum = AuditSeverity(severity.lower())
         except ValueError:
-            pass  # Default to INFO if invalid severity
+            pass  # Default to MEDIUM if invalid severity
         
         # Create audit log entry
+        # Use valid ActionType for comments - map to CONTENT_APPROVED 
+        valid_action_type = ActionType.CONTENT_APPROVED if "CREATE" in action.upper() else ActionType.CONTENT_APPROVED
+        
         audit_log = AuditLog(
-            user_id=user_id,
-            action=action_type,
-            resource_type=resource_type,
-            resource_id=resource_id,
-            details=details or {},
+            action_type=valid_action_type,  # Use valid enum value
+            action_description=f"{action} performed by user {user_id} on {resource_type} {resource_id}",  # Required field
             severity=severity_enum,
-            ip_address=ip_address,
-            user_agent=user_agent,
+            actor_id=user_id,
+            actor_ip=ip_address,
+            target_type=resource_type,
+            target_id=resource_id,
+            metadata=details or {},
             timestamp=datetime.utcnow()
         )
         

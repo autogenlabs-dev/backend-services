@@ -25,14 +25,14 @@ class ModerationAction(str, Enum):
 # Template Comment Schemas
 class TemplateCommentCreate(BaseModel):
     """Create template comment request"""
-    content: str = Field(..., min_length=10, max_length=2000, description="Comment content")
+    content: str = Field(..., min_length=1, max_length=2000, description="Comment content")
     rating: Optional[int] = Field(None, ge=1, le=5, description="Rating 1-5 stars")
     parent_comment_id: Optional[str] = Field(None, description="Parent comment for replies")
 
 
 class TemplateCommentUpdate(BaseModel):
     """Update template comment request"""
-    content: Optional[str] = Field(None, min_length=10, max_length=2000)
+    content: Optional[str] = Field(None, min_length=1, max_length=2000)
     rating: Optional[int] = Field(None, ge=1, le=5)
 
 
@@ -82,14 +82,14 @@ class TemplateHelpfulVoteResponse(BaseModel):
 # Component Comment Schemas
 class ComponentCommentCreate(BaseModel):
     """Create component comment request"""
-    content: str = Field(..., min_length=10, max_length=2000, description="Comment content")
+    content: str = Field(..., min_length=1, max_length=2000, description="Comment content")
     rating: Optional[int] = Field(None, ge=1, le=5, description="Rating 1-5 stars")
     parent_comment_id: Optional[str] = Field(None, description="Parent comment for replies")
 
 
 class ComponentCommentUpdate(BaseModel):
     """Update component comment request"""
-    content: Optional[str] = Field(None, min_length=10, max_length=2000)
+    content: Optional[str] = Field(None, min_length=1, max_length=2000)
     rating: Optional[int] = Field(None, ge=1, le=5)
 
 

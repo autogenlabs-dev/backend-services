@@ -80,14 +80,14 @@ class TemplateHelpfulVote(Document):
 # Pydantic models for requests/responses
 class TemplateCommentCreate(BaseModel):
     """Request model for creating template comments."""
-    comment: str = Field(min_length=1, max_length=2000)
+    content: str = Field(min_length=1, max_length=2000)
     rating: Optional[int] = Field(None, ge=1, le=5)
     parent_comment_id: Optional[str] = None
 
 
 class TemplateCommentUpdate(BaseModel):
     """Request model for updating template comments."""
-    comment: Optional[str] = Field(None, min_length=1, max_length=2000)
+    content: Optional[str] = Field(None, min_length=1, max_length=2000)
     rating: Optional[int] = Field(None, ge=1, le=5)
 
 

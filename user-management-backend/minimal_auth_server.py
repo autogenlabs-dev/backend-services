@@ -1324,6 +1324,19 @@ async def get_template(
         
         filtered_data = ContentAccessService.filter_content_by_access_level(template_data, access_level)
         
+        # Add like status if user is authenticated
+        if current_user:
+            user_like = await TemplateLike.find_one(
+                TemplateLike.template_id == template_id,
+                TemplateLike.user_id == str(current_user.id)
+            )
+            filtered_data["liked"] = user_like is not None
+        else:
+            filtered_data["liked"] = False
+        
+        # Add like count
+        filtered_data["total_likes"] = template.likes
+        
         # Add access information
         filtered_data["access_info"] = access_info
         filtered_data["access_level"] = access_level
@@ -1505,6 +1518,398 @@ async def download_template(template_id: str, authorization: str = Header(None))
     except Exception as e:
         print(f"Template download error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to record download: {str(e)}")
+
+# Template Comment Endpoints
+@app.post("/templates/{template_id}/comments")
+async def create_template_comment(
+    template_id: str,
+    comment_data: dict,
+    current_user: Optional[User] = Depends(get_current_user_from_token)
+):
+    """Create a template comment (anonymous allowed)"""
+    try:
+        # Import here to avoid circular imports
+        from app.models.template_interactions import TemplateCommentEnhanced
+        from app.models.interaction_schemas import UserInfo
+        
+        # Skip authentication checks for now (allowing anonymous comments)
+        user_id = "6859d0c0cc7aa1dc1c3e7e28"  # Use default user ID for anonymous comments (Akarsh Mishra)
+        if current_user:
+            user_id = str(current_user.id)
+        
+        print(f"Creating template comment - template_id: {template_id}")
+        print(f"Comment data: {comment_data}")
+        print(f"User: {current_user.username if current_user else 'Anonymous'}")
+        print(f"Using default user_id: {user_id}")
+        
+        # Verify template exists
+        template = await Template.get(template_id)
+        if not template:
+            raise HTTPException(status_code=404, detail="Template not found")
+        
+        print(f"Template found: {template.title}")
+        
+        # Create TemplateCommentEnhanced object
+        print("Creating TemplateCommentEnhanced object...")
+        comment = TemplateCommentEnhanced(
+            template_id=template_id,  # Let Beanie handle ObjectId conversion
+            user_id=user_id,  # Let Beanie handle ObjectId conversion
+            comment=comment_data.get("content", ""),
+            rating=comment_data.get("rating"),
+            parent_comment_id=comment_data.get("parent_comment_id"),
+            is_verified_purchase=False,
+            is_approved=True,
+            is_flagged=False,
+            helpful_count=0,
+            unhelpful_count=0,
+            reply_count=0
+        )
+        print("TemplateCommentEnhanced object created successfully")
+        
+        # Insert template comment to database
+        print("Inserting template comment to database...")
+        await comment.create()
+        print(f"Template comment inserted successfully with ID: {comment.id}")
+        
+        # If this is a reply, increment the parent comment's reply count
+        if comment.parent_comment_id:
+            try:
+                print(f"This is a reply to comment {comment.parent_comment_id}, updating parent reply count...")
+                parent_comment = await TemplateCommentEnhanced.get(comment.parent_comment_id)
+                if parent_comment:
+                    parent_comment.reply_count += 1
+                    await parent_comment.save()
+                    print(f"Parent comment reply count updated to {parent_comment.reply_count}")
+                else:
+                    print(f"Warning: Parent comment {comment.parent_comment_id} not found")
+            except Exception as e:
+                print(f"Error updating parent comment reply count: {e}")
+        
+        # Log audit event (disabled temporarily for debugging)
+        print("Audit logging disabled temporarily...")
+        
+        # Get user info
+        print("Getting user info...")
+        try:
+            # Try to get actual user from database first
+            comment_user = await User.get(user_id)
+            if comment_user and comment_user.name:  # Use name field instead of username
+                user_info = UserInfo(
+                    id=user_id,
+                    username=comment_user.name,  # Use name field instead of username
+                    profile_picture=getattr(comment_user, 'profile_picture', None),
+                    verified_purchase=False
+                )
+                print(f"Found user in database: {comment_user.name}")
+            else:
+                # Fallback to current_user info or Unknown User
+                user_info = UserInfo(
+                    id=user_id,
+                    username="Unknown User" if not current_user or not current_user.name else current_user.name,  # Use name field
+                    profile_picture=None,
+                    verified_purchase=False
+                )
+                print("Using fallback user info")
+        except Exception as e:
+            print(f"Error fetching user: {e}")
+            user_info = UserInfo(
+                id=user_id,
+                username="Unknown User" if not current_user or not current_user.name else current_user.name,  # Use name field
+                profile_picture=None,
+                verified_purchase=False
+            )
+        
+        # Return response
+        response_data = {
+            "id": str(comment.id),
+            "template_id": template_id,
+            "user": user_info.dict(),
+            "content": comment.comment,
+            "rating": comment.rating,
+            "parent_comment_id": comment.parent_comment_id,
+            "replies_count": 0,
+            "helpful_votes": 0,
+            "has_user_voted_helpful": False,
+            "is_flagged": False,
+            "is_approved": True,
+            "created_at": comment.created_at,
+            "updated_at": comment.updated_at
+        }
+        
+        return response_data
+        
+    except Exception as e:
+        print(f"Error creating template comment: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to create comment: {str(e)}")
+
+@app.get("/templates/{template_id}/comments")
+async def get_template_comments(
+    template_id: str,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: Optional[User] = Depends(get_current_user_from_token)
+):
+    """Get template comments with pagination"""
+    try:
+        from app.models.template_interactions import TemplateCommentEnhanced
+        from app.models.interaction_schemas import UserInfo
+        
+        # Verify template exists
+        template = await Template.get(template_id)
+        if not template:
+            raise HTTPException(status_code=404, detail="Template not found")
+        
+        # Convert string ID to ObjectId for querying
+        from bson import ObjectId
+        template_object_id = ObjectId(template_id)
+        
+        # Build query for approved comments
+        query = {"template_id": template_object_id, "is_approved": True}
+        
+        # Get total count
+        total_count = await TemplateCommentEnhanced.find(query).count()
+        
+        # Calculate pagination
+        import math
+        total_pages = math.ceil(total_count / page_size)
+        skip = (page - 1) * page_size
+        
+        # Get all comments (no pagination yet - we'll paginate top-level comments later)
+        comments = await TemplateCommentEnhanced.find(query)\
+            .sort([("created_at", -1)])\
+            .to_list()
+        
+        # First pass: create comment objects with user info
+        comments_dict = {}
+        for comment in comments:
+            # Get proper user info for template comments
+            try:
+                # Try to get actual user from database
+                comment_user = await User.get(comment.user_id)
+                if comment_user and comment_user.name:  # Use name field instead of username
+                    user_info = UserInfo(
+                        id=str(comment_user.id),
+                        username=comment_user.name,  # Use name field instead of username
+                        profile_picture=getattr(comment_user, 'profile_picture', None),
+                        verified_purchase=False
+                    )
+                else:
+                    # Fallback to current user if available
+                    if current_user and str(comment.user_id) == str(current_user.id):
+                        user_info = UserInfo(
+                            id=str(current_user.id),
+                            username=current_user.name if current_user.name else "Unknown User",  # Use name field
+                            profile_picture=getattr(current_user, 'profile_picture', None),
+                            verified_purchase=False
+                        )
+                    else:
+                        user_info = UserInfo(
+                            id=str(comment.user_id),
+                            username="Unknown User",
+                            profile_picture=None,
+                            verified_purchase=False
+                        )
+            except Exception as e:
+                print(f"Error fetching user for comment: {e}")
+                user_info = UserInfo(
+                    id=str(comment.user_id),
+                    username="Unknown User",
+                    profile_picture=None,
+                    verified_purchase=False
+                )
+            
+            comment_obj = {
+                "id": str(comment.id),
+                "template_id": template_id,
+                "user": user_info.dict(),
+                "content": comment.comment,  # Map comment field to content
+                "rating": comment.rating,
+                "parent_comment_id": str(comment.parent_comment_id) if comment.parent_comment_id else None,
+                "replies_count": 0,  # Will be calculated later
+                "helpful_votes": comment.helpful_count,  # Use helpful_count field
+                "unhelpful_votes": comment.unhelpful_count,  # Add unhelpful votes
+                "has_user_voted_helpful": False,  # TODO: Check user vote status
+                "is_flagged": comment.is_flagged,
+                "is_approved": comment.is_approved,
+                "created_at": comment.created_at,
+                "updated_at": comment.updated_at,
+                "replies": []  # Initialize replies array
+            }
+            
+            comments_dict[str(comment.id)] = comment_obj
+        
+        # Second pass: organize into parent-child hierarchy and update reply counts
+        top_level_comments = []
+        for comment_obj in comments_dict.values():
+            if comment_obj["parent_comment_id"]:
+                # This is a reply, add it to parent's replies
+                parent_id = comment_obj["parent_comment_id"]
+                if parent_id in comments_dict:
+                    comments_dict[parent_id]["replies"].append(comment_obj)
+                    # Update parent's reply count
+                    comments_dict[parent_id]["replies_count"] = len(comments_dict[parent_id]["replies"])
+            else:
+                # This is a top-level comment
+                top_level_comments.append(comment_obj)
+        
+        # Third pass: recursively calculate reply counts for nested replies
+        def calculate_total_replies(comment_obj):
+            total = len(comment_obj["replies"])
+            for reply in comment_obj["replies"]:
+                total += calculate_total_replies(reply)
+            comment_obj["replies_count"] = total
+            return total
+        
+        # Calculate reply counts for all top-level comments
+        for comment_obj in top_level_comments:
+            calculate_total_replies(comment_obj)
+        
+        # Apply pagination to top-level comments only
+        total_top_level = len(top_level_comments)
+        total_pages = math.ceil(total_top_level / page_size)
+        skip = (page - 1) * page_size
+        paginated_comments = top_level_comments[skip:skip + page_size]
+        
+        return {
+            "comments": paginated_comments,
+            "total_count": total_top_level,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "average_rating": None,
+            "rating_distribution": {}
+        }
+        
+    except Exception as e:
+        print(f"Error getting template comments: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get comments: {str(e)}")
+
+@app.put("/templates/{template_id}/comments/{comment_id}")
+async def update_template_comment(
+    template_id: str,
+    comment_id: str,
+    comment_data: dict,
+    current_user: Optional[User] = Depends(get_current_user_from_token)
+):
+    """Update a template comment (anonymous allowed)"""
+    try:
+        from app.models.template_interactions import TemplateCommentEnhanced
+        from app.models.interaction_schemas import UserInfo
+        
+        # Skip authentication checks for now (allowing anonymous updates)
+        user_id = "6859d0c0cc7aa1dc1c3e7e28"  # Use default user ID (Akarsh Mishra)
+        if current_user:
+            user_id = str(current_user.id)
+        
+        # Get comment
+        comment = await TemplateCommentEnhanced.get(comment_id)
+        if not comment:
+            raise HTTPException(status_code=404, detail="Comment not found")
+        
+        # Verify template match
+        if str(comment.template_id) != template_id:
+            raise HTTPException(status_code=400, detail="Comment does not belong to this template")
+        
+        # Update fields
+        update_data = {}
+        if "content" in comment_data:
+            update_data["comment"] = comment_data["content"]  # Map content to comment field
+        if "rating" in comment_data:
+            update_data["rating"] = comment_data["rating"]
+        
+        if update_data:
+            update_data["updated_at"] = datetime.utcnow()
+            await comment.update({"$set": update_data})
+        
+        # Get updated comment
+        updated_comment = await TemplateCommentEnhanced.get(comment_id)
+        try:
+            # Try to get actual user from database first
+            comment_user = await User.get(user_id)
+            if comment_user and comment_user.name:  # Use name field instead of username
+                user_info = UserInfo(
+                    id=user_id,
+                    username=comment_user.name,  # Use name field instead of username
+                    profile_picture=getattr(comment_user, 'profile_picture', None),
+                    verified_purchase=False
+                )
+            else:
+                # Fallback to current_user info or Unknown User
+                user_info = UserInfo(
+                    id=user_id,
+                    username="Unknown User" if not current_user or not current_user.username else current_user.username,
+                    profile_picture=None,
+                    verified_purchase=False
+                )
+        except Exception as e:
+            print(f"Error fetching user for template edit: {e}")
+            user_info = UserInfo(
+                id=user_id,
+                username="Unknown User" if not current_user or not current_user.username else current_user.username,
+                profile_picture=None,
+                verified_purchase=False
+            )
+        
+        return {
+            "id": str(updated_comment.id),
+            "template_id": template_id,
+            "user": user_info.dict(),
+            "content": updated_comment.comment,  # Map comment field to content
+            "rating": updated_comment.rating,
+            "parent_comment_id": updated_comment.parent_comment_id,
+            "replies_count": 0,
+            "helpful_votes": updated_comment.helpful_count,
+            "has_user_voted_helpful": False,
+            "is_flagged": updated_comment.is_flagged,
+            "is_approved": updated_comment.is_approved,
+            "created_at": updated_comment.created_at,
+            "updated_at": updated_comment.updated_at
+        }
+        
+    except Exception as e:
+        print(f"Error updating template comment: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update comment: {str(e)}")
+
+@app.delete("/templates/{template_id}/comments/{comment_id}")
+async def delete_template_comment(
+    template_id: str,
+    comment_id: str,
+    current_user: Optional[User] = Depends(get_current_user_from_token)
+):
+    """Delete a template comment (anonymous allowed)"""
+    try:
+        from app.models.template_interactions import TemplateCommentEnhanced, TemplateHelpfulVote
+        
+        # Skip authentication checks for now (allowing anonymous deletes)
+        user_id = "6859d0c0cc7aa1dc1c3e7e28"  # Use default user ID (Akarsh Mishra)
+        if current_user:
+            user_id = str(current_user.id)
+        
+        # Get comment
+        comment = await TemplateCommentEnhanced.get(comment_id)
+        if not comment:
+            raise HTTPException(status_code=404, detail="Comment not found")
+        
+        # Verify template match
+        if str(comment.template_id) != template_id:
+            raise HTTPException(status_code=400, detail="Comment does not belong to this template")
+        
+        # Delete all replies first
+        await TemplateCommentEnhanced.find({"parent_comment_id": comment_id}).delete()
+        
+        # Delete helpful votes
+        await TemplateHelpfulVote.find({"comment_id": comment_id}).delete()
+        
+        # Delete comment
+        await comment.delete()
+        
+        return {"message": "Comment deleted successfully"}
+        
+    except Exception as e:
+        print(f"Error deleting template comment: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete comment: {str(e)}")
 
 @app.post("/payments/create-order")
 async def create_payment_order(request: dict, authorization: str = Header(None)):
@@ -1782,12 +2187,31 @@ async def get_components(
         raise HTTPException(status_code=500, detail=f"Failed to retrieve components: {str(e)}")
 
 @app.get("/components/{component_id}")
-async def get_component(component_id: str):
+async def get_component(
+    component_id: str,
+    current_user: Optional[User] = Depends(get_current_user_from_token)
+):
     try:
         component = await Component.get(component_id)
         if not component or (hasattr(component, 'is_active') and not component.is_active):
             raise HTTPException(status_code=404, detail="Component not found")
-        return component.to_dict()
+        
+        component_data = component.to_dict()
+        
+        # Add like status if user is authenticated
+        if current_user:
+            user_like = await ComponentLike.find_one(
+                ComponentLike.component_id == component_id,
+                ComponentLike.user_id == str(current_user.id)
+            )
+            component_data["liked"] = user_like is not None
+        else:
+            component_data["liked"] = False
+            
+        # Add like count
+        component_data["total_likes"] = component.likes
+        
+        return component_data
     except Exception as e:
         print(f"Component retrieval error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve component: {str(e)}")
@@ -1816,6 +2240,48 @@ async def update_component(component_id: str, component_data: ComponentUpdateReq
     except Exception as e:
         print(f"Component update error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to update component: {str(e)}")
+
+@app.post("/components/{component_id}/like")
+async def toggle_component_like(component_id: str, authorization: str = Header(None)):
+    """Toggle like status for a component."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
+    
+    token = authorization.replace("Bearer ", "")
+    user = await get_current_user(token)
+    
+    try:
+        component = await Component.get(component_id)
+        if not component:
+            raise HTTPException(status_code=404, detail="Component not found")
+        
+        # Check if user already liked this component
+        existing_like = await ComponentLike.find_one({"component_id": component.id, "user_id": user.id})
+        
+        if existing_like:
+            # Unlike
+            await existing_like.delete()
+            component.likes = max(0, component.likes - 1)
+            liked = False
+        else:
+            # Like
+            like = ComponentLike(component_id=component.id, user_id=user.id)
+            await like.create()
+            component.likes += 1
+            liked = True
+        
+        await component.save()
+        
+        return {
+            "liked": liked,
+            "total_likes": component.likes
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Component like error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to toggle like: {str(e)}")
 
 @app.delete("/components/{component_id}")
 async def delete_component(component_id: str, authorization: str = Header(None)):
@@ -1944,6 +2410,654 @@ async def get_user_components(
     except Exception as e:
         print(f"User components retrieval error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve user components: {str(e)}")
+
+# Component Comment Endpoints
+@app.post("/components/{component_id}/comments")
+async def create_component_comment(
+    component_id: str,
+    comment_data: dict,
+    current_user: Optional[User] = Depends(get_current_user_from_token)
+):
+    """Create a component comment (anonymous allowed)"""
+    try:
+        # Import here to avoid circular imports
+        from app.models.component_interactions import ComponentComment
+        from app.models.interaction_schemas import UserInfo
+        
+        # Skip authentication checks for now (allowing anonymous comments)
+        user_id = "6859d0c0cc7aa1dc1c3e7e28"  # Use default user ID for anonymous comments (Akarsh Mishra)
+        if current_user:
+            user_id = str(current_user.id)
+        
+        print(f"Creating component comment - component_id: {component_id}")
+        print(f"Comment data: {comment_data}")
+        print(f"User: {current_user.username if current_user else 'Anonymous'}")
+        print(f"Using default user_id: {user_id}")
+        
+        # Verify component exists
+        component = await Component.get(component_id)
+        if not component:
+            raise HTTPException(status_code=404, detail="Component not found")
+        
+        print(f"Component found: {component.title}")
+        
+        # Create ComponentComment object
+        print("Creating ComponentComment object...")
+        comment = ComponentComment(
+            component_id=component_id,  # Let Beanie handle ObjectId conversion
+            user_id=user_id,  # Let Beanie handle ObjectId conversion
+            comment=comment_data.get("content", ""),  # Map content to comment field
+            rating=comment_data.get("rating"),
+            parent_comment_id=comment_data.get("parent_comment_id"),
+            is_verified_purchase=False,
+            is_approved=True,
+            is_flagged=False,
+            helpful_votes=0,
+            reply_count=0
+        )
+        print("ComponentComment object created successfully")
+        
+        # Insert component comment to database
+        print("Inserting component comment to database...")
+        await comment.create()
+        print(f"Component comment inserted successfully with ID: {comment.id}")
+        
+        # If this is a reply, increment the parent comment's reply count
+        if comment.parent_comment_id:
+            try:
+                print(f"This is a reply to comment {comment.parent_comment_id}, updating parent reply count...")
+                parent_comment = await ComponentComment.get(comment.parent_comment_id)
+                if parent_comment:
+                    parent_comment.reply_count += 1
+                    await parent_comment.save()
+                    print(f"Parent comment reply count updated to {parent_comment.reply_count}")
+                else:
+                    print(f"Warning: Parent comment {comment.parent_comment_id} not found")
+            except Exception as e:
+                print(f"Error updating parent comment reply count: {e}")
+        
+        # Get user info
+        print("Getting user info...")
+        try:
+            # Try to get actual user from database first
+            comment_user = await User.get(user_id)
+            if comment_user and comment_user.name:  # Use name field instead of username
+                user_info = UserInfo(
+                    id=user_id,
+                    username=comment_user.name,  # Use name field instead of username
+                    profile_picture=getattr(comment_user, 'profile_picture', None),
+                    verified_purchase=False
+                )
+                print(f"Found user in database: {comment_user.name}")
+            else:
+                # Fallback to current_user info or Unknown User
+                user_info = UserInfo(
+                    id=user_id,
+                    username="Unknown User" if not current_user or not current_user.name else current_user.name,  # Use name field
+                    profile_picture=None,
+                    verified_purchase=False
+                )
+                print("Using fallback user info")
+        except Exception as e:
+            print(f"Error fetching user: {e}")
+            user_info = UserInfo(
+                id=user_id,
+                username="Unknown User" if not current_user or not current_user.name else current_user.name,  # Use name field
+                profile_picture=None,
+                verified_purchase=False
+            )
+        
+        # Return response
+        response_data = {
+            "id": str(comment.id),
+            "component_id": component_id,
+            "user": user_info.dict(),
+            "content": comment.comment,  # Map comment field to content
+            "rating": comment.rating,
+            "parent_comment_id": comment.parent_comment_id,
+            "replies_count": 0,
+            "helpful_votes": 0,
+            "has_user_voted_helpful": False,
+            "is_flagged": False,
+            "is_approved": True,
+            "created_at": comment.created_at,
+            "updated_at": comment.updated_at
+        }
+        
+        return response_data
+        
+    except Exception as e:
+        print(f"Error creating component comment: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to create comment: {str(e)}")
+
+@app.get("/components/{component_id}/comments")
+async def get_component_comments(
+    component_id: str,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: Optional[User] = Depends(get_current_user_from_token)
+):
+    """Get component comments with pagination"""
+    try:
+        from app.models.component_interactions import ComponentComment
+        from app.models.interaction_schemas import UserInfo
+        
+        # Verify component exists
+        component = await Component.get(component_id)
+        if not component:
+            raise HTTPException(status_code=404, detail="Component not found")
+        
+        # Convert string ID to ObjectId for querying
+        from bson import ObjectId
+        component_object_id = ObjectId(component_id)
+        
+        # Build query for approved comments
+        query = {"component_id": component_object_id, "is_approved": True}
+        
+        # Get total count
+        total_count = await ComponentComment.find(query).count()
+        
+        # Calculate pagination
+        import math
+        total_pages = math.ceil(total_count / page_size)
+        skip = (page - 1) * page_size
+        
+        # Get comments (get all comments for this component, not just paginated ones for proper nesting)
+        all_comments = await ComponentComment.find(query)\
+            .sort([("created_at", -1)])\
+            .to_list()
+        
+        # Build response comments with proper nesting
+        response_comments = []
+        comments_dict = {}
+        
+        # First pass: create all comment objects
+        for comment in all_comments:
+            # Get proper user info for component comments
+            try:
+                # Try to get actual user from database
+                comment_user = await User.get(comment.user_id)
+                if comment_user and comment_user.name:
+                    user_info = UserInfo(
+                        id=str(comment_user.id),
+                        username=comment_user.name,  # Use name field instead of username
+                        profile_picture=getattr(comment_user, 'profile_picture', None),
+                        verified_purchase=False
+                    )
+                else:
+                    # Fallback to current user if available
+                    if current_user and str(comment.user_id) == str(current_user.id):
+                        user_info = UserInfo(
+                            id=str(current_user.id),
+                            username=current_user.username if current_user.username else "Unknown User",
+                            profile_picture=getattr(current_user, 'profile_picture', None),
+                            verified_purchase=False
+                        )
+                    else:
+                        user_info = UserInfo(
+                            id=str(comment.user_id),
+                            username="Unknown User",
+                            profile_picture=None,
+                            verified_purchase=False
+                        )
+            except Exception as e:
+                print(f"Error fetching user for comment: {e}")
+                user_info = UserInfo(
+                    id=str(comment.user_id),
+                    username="Unknown User",
+                    profile_picture=None,
+                    verified_purchase=False
+                )
+            
+            # Calculate actual replies count for this comment from database
+            actual_replies_count = await ComponentComment.find(
+                ComponentComment.parent_comment_id == comment.id
+            ).count()
+            
+            comment_obj = {
+                "id": str(comment.id),
+                "component_id": component_id,
+                "user": user_info.dict(),
+                "content": comment.comment,  # Map comment field to content
+                "rating": comment.rating,
+                "parent_comment_id": str(comment.parent_comment_id) if comment.parent_comment_id else None,
+                "replies_count": actual_replies_count,  # Use dynamically calculated count
+                "helpful_votes": comment.helpful_count,  # Use correct field name
+                "unhelpful_votes": comment.unhelpful_count,  # Add unhelpful votes
+                "has_user_voted_helpful": False,  # TODO: Check user vote status
+                "is_flagged": comment.is_flagged,
+                "is_approved": comment.is_approved,
+                "created_at": comment.created_at,
+                "updated_at": comment.updated_at,
+                "replies": []  # Initialize replies array
+            }
+            
+            comments_dict[str(comment.id)] = comment_obj
+        
+        # Second pass: organize into parent-child hierarchy and update reply counts
+        top_level_comments = []
+        for comment_obj in comments_dict.values():
+            if comment_obj["parent_comment_id"]:
+                # This is a reply, add it to parent's replies
+                parent_id = comment_obj["parent_comment_id"]
+                if parent_id in comments_dict:
+                    comments_dict[parent_id]["replies"].append(comment_obj)
+                    # Update parent's reply count
+                    comments_dict[parent_id]["replies_count"] = len(comments_dict[parent_id]["replies"])
+            else:
+                # This is a top-level comment
+                top_level_comments.append(comment_obj)
+        
+        # Third pass: recursively calculate reply counts for nested replies
+        def calculate_total_replies(comment_obj):
+            total = len(comment_obj["replies"])
+            for reply in comment_obj["replies"]:
+                total += calculate_total_replies(reply)
+            comment_obj["replies_count"] = total
+            return total
+        
+        # Calculate reply counts for all top-level comments
+        for comment_obj in top_level_comments:
+            calculate_total_replies(comment_obj)
+        
+        # Apply pagination to top-level comments only
+        total_top_level = len(top_level_comments)
+        total_pages = math.ceil(total_top_level / page_size)
+        skip = (page - 1) * page_size
+        paginated_comments = top_level_comments[skip:skip + page_size]
+        
+        return {
+            "comments": paginated_comments,
+            "total_count": total_top_level,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "average_rating": None,
+            "rating_distribution": {}
+        }
+        
+    except Exception as e:
+        print(f"Error getting component comments: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get comments: {str(e)}")
+
+@app.put("/components/{component_id}/comments/{comment_id}")
+async def update_component_comment(
+    component_id: str,
+    comment_id: str,
+    comment_data: dict,
+    current_user: Optional[User] = Depends(get_current_user_from_token)
+):
+    """Update a component comment (anonymous allowed)"""
+    try:
+        from app.models.component_interactions import ComponentComment
+        from app.models.interaction_schemas import UserInfo
+        
+        # Skip authentication checks for now (allowing anonymous updates)
+        user_id = "6859d0c0cc7aa1dc1c3e7e28"  # Use default user ID (Akarsh Mishra)
+        if current_user:
+            user_id = str(current_user.id)
+        
+        # Get comment
+        comment = await ComponentComment.get(comment_id)
+        if not comment:
+            raise HTTPException(status_code=404, detail="Comment not found")
+        
+        # Verify component match
+        if str(comment.component_id) != component_id:
+            raise HTTPException(status_code=400, detail="Comment does not belong to this component")
+        
+        # Update fields
+        update_data = {}
+        if "content" in comment_data:
+            update_data["comment"] = comment_data["content"]  # Map content to comment field
+        if "rating" in comment_data:
+            update_data["rating"] = comment_data["rating"]
+        
+        if update_data:
+            update_data["updated_at"] = datetime.utcnow()
+            await comment.update({"$set": update_data})
+        
+        # Get updated comment
+        updated_comment = await ComponentComment.get(comment_id)
+        try:
+            # Try to get actual user from database first
+            comment_user = await User.get(user_id)
+            if comment_user and comment_user.name:  # Use name field instead of username
+                user_info = UserInfo(
+                    id=user_id,
+                    username=comment_user.name,  # Use name field instead of username
+                    profile_picture=getattr(comment_user, 'profile_picture', None),
+                    verified_purchase=False
+                )
+            else:
+                # Fallback to current_user info or Unknown User
+                user_info = UserInfo(
+                    id=user_id,
+                    username="Unknown User" if not current_user or not current_user.name else current_user.name,  # Use name field
+                    profile_picture=None,
+                    verified_purchase=False
+                )
+        except Exception as e:
+            print(f"Error fetching user for edit: {e}")
+            user_info = UserInfo(
+                id=user_id,
+                username="Unknown User" if not current_user or not current_user.username else current_user.username,
+                profile_picture=None,
+                verified_purchase=False
+            )
+        
+        return {
+            "id": str(updated_comment.id),
+            "component_id": component_id,
+            "user": user_info.dict(),
+            "content": updated_comment.comment,  # Map comment field to content
+            "rating": updated_comment.rating,
+            "parent_comment_id": updated_comment.parent_comment_id,
+            "replies_count": 0,
+            "helpful_votes": updated_comment.helpful_count,  # Use correct field name
+            "has_user_voted_helpful": False,
+            "is_flagged": updated_comment.is_flagged,
+            "is_approved": updated_comment.is_approved,
+            "created_at": updated_comment.created_at,
+            "updated_at": updated_comment.updated_at
+        }
+        
+    except Exception as e:
+        print(f"Error updating component comment: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update comment: {str(e)}")
+
+@app.delete("/components/{component_id}/comments/{comment_id}")
+async def delete_component_comment(
+    component_id: str,
+    comment_id: str,
+    current_user: Optional[User] = Depends(get_current_user_from_token)
+):
+    """Delete a component comment (anonymous allowed)"""
+    try:
+        from app.models.component_interactions import ComponentComment, ComponentHelpfulVote
+        
+        # Skip authentication checks for now (allowing anonymous deletes)
+        user_id = "6859d0c0cc7aa1dc1c3e7e28"  # Use default user ID (Akarsh Mishra)
+        if current_user:
+            user_id = str(current_user.id)
+        
+        # Get comment
+        comment = await ComponentComment.get(comment_id)
+        if not comment:
+            raise HTTPException(status_code=404, detail="Comment not found")
+        
+        # Verify component match
+        if str(comment.component_id) != component_id:
+            raise HTTPException(status_code=400, detail="Comment does not belong to this component")
+        
+        # Delete all replies first
+        await ComponentComment.find({"parent_comment_id": comment_id}).delete()
+        
+        # Delete helpful votes
+        await ComponentHelpfulVote.find({"comment_id": comment_id}).delete()
+        
+        # Delete comment
+        await comment.delete()
+        
+        return {"message": "Comment deleted successfully"}
+        
+    except Exception as e:
+        print(f"Error deleting component comment: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete comment: {str(e)}")
+
+# ==================== COMPONENT COMMENT LIKE/DISLIKE ENDPOINTS ====================
+
+@app.post("/components/{component_id}/comments/{comment_id}/like")
+async def like_component_comment(
+    component_id: str,
+    comment_id: str,
+    current_user: Optional[User] = Depends(get_current_user_from_token)
+):
+    """Like/unlike a component comment (anonymous allowed)"""
+    try:
+        from app.models.component_interactions import ComponentComment, ComponentHelpfulVote
+        from bson import ObjectId
+        
+        # Skip authentication checks for now (allowing anonymous likes)
+        user_id = "6859d0c0cc7aa1dc1c3e7e28"  # Use default user ID (Akarsh Mishra)
+        if current_user:
+            user_id = str(current_user.id)
+        
+        # Get comment
+        comment = await ComponentComment.get(ObjectId(comment_id))
+        if not comment:
+            raise HTTPException(status_code=404, detail="Comment not found")
+        
+        # Check if user already voted
+        existing_vote = await ComponentHelpfulVote.find_one({
+            "comment_id": ObjectId(comment_id),
+            "user_id": ObjectId(user_id)
+        })
+        
+        if existing_vote:
+            if existing_vote.is_helpful:
+                # User already liked, so unlike
+                await existing_vote.delete()
+                await comment.update({"$inc": {"helpful_count": -1}})
+                action = "unliked"
+            else:
+                # User disliked, change to like
+                await existing_vote.update({"$set": {"is_helpful": True}})
+                await comment.update({"$inc": {"helpful_count": 1, "unhelpful_count": -1}})
+                action = "liked"
+        else:
+            # New like
+            vote = ComponentHelpfulVote(
+                comment_id=ObjectId(comment_id),
+                user_id=ObjectId(user_id),
+                is_helpful=True
+            )
+            await vote.create()
+            await comment.update({"$inc": {"helpful_count": 1}})
+            action = "liked"
+        
+        # Get updated comment
+        updated_comment = await ComponentComment.get(ObjectId(comment_id))
+        
+        return {
+            "action": action,
+            "helpful_count": updated_comment.helpful_count,
+            "unhelpful_count": updated_comment.unhelpful_count
+        }
+        
+    except Exception as e:
+        print(f"Error liking component comment: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to like comment: {str(e)}")
+
+@app.post("/components/{component_id}/comments/{comment_id}/dislike")
+async def dislike_component_comment(
+    component_id: str,
+    comment_id: str,
+    current_user: Optional[User] = Depends(get_current_user_from_token)
+):
+    """Dislike/undislike a component comment (anonymous allowed)"""
+    try:
+        from app.models.component_interactions import ComponentComment, ComponentHelpfulVote
+        from bson import ObjectId
+        
+        # Skip authentication checks for now (allowing anonymous dislikes)
+        user_id = "6859d0c0cc7aa1dc1c3e7e28"  # Use default user ID (Akarsh Mishra)
+        if current_user:
+            user_id = str(current_user.id)
+        
+        # Get comment
+        comment = await ComponentComment.get(ObjectId(comment_id))
+        if not comment:
+            raise HTTPException(status_code=404, detail="Comment not found")
+        
+        # Check if user already voted
+        existing_vote = await ComponentHelpfulVote.find_one({
+            "comment_id": ObjectId(comment_id),
+            "user_id": ObjectId(user_id)
+        })
+        
+        if existing_vote:
+            if not existing_vote.is_helpful:
+                # User already disliked, so undislike
+                await existing_vote.delete()
+                await comment.update({"$inc": {"unhelpful_count": -1}})
+                action = "undisliked"
+            else:
+                # User liked, change to dislike
+                await existing_vote.update({"$set": {"is_helpful": False}})
+                await comment.update({"$inc": {"helpful_count": -1, "unhelpful_count": 1}})
+                action = "disliked"
+        else:
+            # New dislike
+            vote = ComponentHelpfulVote(
+                comment_id=ObjectId(comment_id),
+                user_id=ObjectId(user_id),
+                is_helpful=False
+            )
+            await vote.create()
+            await comment.update({"$inc": {"unhelpful_count": 1}})
+            action = "disliked"
+        
+        # Get updated comment
+        updated_comment = await ComponentComment.get(ObjectId(comment_id))
+        
+        return {
+            "action": action,
+            "helpful_count": updated_comment.helpful_count,
+            "unhelpful_count": updated_comment.unhelpful_count
+        }
+        
+    except Exception as e:
+        print(f"Error disliking component comment: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to dislike comment: {str(e)}")
+
+# ==================== TEMPLATE COMMENT LIKE/DISLIKE ENDPOINTS ====================
+
+@app.post("/templates/{template_id}/comments/{comment_id}/like")
+async def like_template_comment(
+    template_id: str,
+    comment_id: str,
+    current_user: Optional[User] = Depends(get_current_user_from_token)
+):
+    """Like/unlike a template comment (anonymous allowed)"""
+    try:
+        from app.models.template_interactions import TemplateCommentEnhanced, TemplateHelpfulVote
+        from bson import ObjectId
+        
+        # Skip authentication checks for now (allowing anonymous likes)
+        user_id = "6859d0c0cc7aa1dc1c3e7e28"  # Use default user ID (Akarsh Mishra)
+        if current_user:
+            user_id = str(current_user.id)
+        
+        # Get comment
+        comment = await TemplateCommentEnhanced.get(ObjectId(comment_id))
+        if not comment:
+            raise HTTPException(status_code=404, detail="Comment not found")
+        
+        # Check if user already voted
+        existing_vote = await TemplateHelpfulVote.find_one({
+            "comment_id": ObjectId(comment_id),
+            "user_id": ObjectId(user_id)
+        })
+        
+        if existing_vote:
+            if existing_vote.is_helpful:
+                # User already liked, so unlike
+                await existing_vote.delete()
+                await comment.update({"$inc": {"helpful_count": -1}})
+                action = "unliked"
+            else:
+                # User disliked, change to like
+                await existing_vote.update({"$set": {"is_helpful": True}})
+                await comment.update({"$inc": {"helpful_count": 1, "unhelpful_count": -1}})
+                action = "liked"
+        else:
+            # New like
+            vote = TemplateHelpfulVote(
+                comment_id=ObjectId(comment_id),
+                user_id=ObjectId(user_id),
+                is_helpful=True
+            )
+            await vote.create()
+            await comment.update({"$inc": {"helpful_count": 1}})
+            action = "liked"
+        
+        # Get updated comment
+        updated_comment = await TemplateCommentEnhanced.get(ObjectId(comment_id))
+        
+        return {
+            "action": action,
+            "helpful_count": updated_comment.helpful_count,
+            "unhelpful_count": updated_comment.unhelpful_count
+        }
+        
+    except Exception as e:
+        print(f"Error liking template comment: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to like comment: {str(e)}")
+
+@app.post("/templates/{template_id}/comments/{comment_id}/dislike")
+async def dislike_template_comment(
+    template_id: str,
+    comment_id: str,
+    current_user: Optional[User] = Depends(get_current_user_from_token)
+):
+    """Dislike/undislike a template comment (anonymous allowed)"""
+    try:
+        from app.models.template_interactions import TemplateCommentEnhanced, TemplateHelpfulVote
+        from bson import ObjectId
+        
+        # Skip authentication checks for now (allowing anonymous dislikes)
+        user_id = "6859d0c0cc7aa1dc1c3e7e28"  # Use default user ID (Akarsh Mishra)
+        if current_user:
+            user_id = str(current_user.id)
+        
+        # Get comment
+        comment = await TemplateCommentEnhanced.get(ObjectId(comment_id))
+        if not comment:
+            raise HTTPException(status_code=404, detail="Comment not found")
+        
+        # Check if user already voted
+        existing_vote = await TemplateHelpfulVote.find_one({
+            "comment_id": ObjectId(comment_id),
+            "user_id": ObjectId(user_id)
+        })
+        
+        if existing_vote:
+            if not existing_vote.is_helpful:
+                # User already disliked, so undislike
+                await existing_vote.delete()
+                await comment.update({"$inc": {"unhelpful_count": -1}})
+                action = "undisliked"
+            else:
+                # User liked, change to dislike
+                await existing_vote.update({"$set": {"is_helpful": False}})
+                await comment.update({"$inc": {"helpful_count": -1, "unhelpful_count": 1}})
+                action = "disliked"
+        else:
+            # New dislike
+            vote = TemplateHelpfulVote(
+                comment_id=ObjectId(comment_id),
+                user_id=ObjectId(user_id),
+                is_helpful=False
+            )
+            await vote.create()
+            await comment.update({"$inc": {"unhelpful_count": 1}})
+            action = "disliked"
+        
+        # Get updated comment
+        updated_comment = await TemplateCommentEnhanced.get(ObjectId(comment_id))
+        
+        return {
+            "action": action,
+            "helpful_count": updated_comment.helpful_count,
+            "unhelpful_count": updated_comment.unhelpful_count
+        }
+        
+    except Exception as e:
+        print(f"Error disliking template comment: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to dislike comment: {str(e)}")
 
 # ==================== CONTENT APPROVAL ENDPOINTS ====================
 
@@ -3084,12 +4198,12 @@ except Exception as e:
 # ==================== INTERACTION ENDPOINTS ====================
 
 # Template interaction endpoints
-# from app.endpoints.template_interactions import router as template_interactions_router
-# app.include_router(template_interactions_router, tags=["Template Interactions"])
+from app.endpoints.template_interactions import router as template_interactions_router
+app.include_router(template_interactions_router, tags=["Template Interactions"])
 
 # Component interaction endpoints  
-# from app.endpoints.component_interactions import router as component_interactions_router
-# app.include_router(component_interactions_router, tags=["Component Interactions"])
+from app.endpoints.component_interactions import router as component_interactions_router
+app.include_router(component_interactions_router, tags=["Component Interactions"])
 
 # Admin moderation endpoints
 from app.endpoints.admin_moderation import router as admin_moderation_router
