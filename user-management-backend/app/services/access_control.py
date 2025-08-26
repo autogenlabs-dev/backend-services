@@ -139,9 +139,9 @@ class ContentAccessService:
             filtered_data = {k: v for k, v in filtered_data.items() if k in allowed_fields}
         
         elif access_level == AccessLevel.LIMITED_ACCESS:
-            # Remove code, readme, and other premium content
+            # Remove code, readme, and other premium content but keep git_repo_url
             restricted_fields = [
-                "code", "readme_content", "git_repo_url", "dependencies"
+                "code", "readme_content", "dependencies"
             ]
             for field in restricted_fields:
                 if field in filtered_data:
@@ -150,8 +150,6 @@ class ContentAccessService:
                         filtered_data[field] = "// Code preview available after purchase\n// This template contains premium code content"
                     elif field == "readme_content":
                         filtered_data[field] = "Full documentation available after purchase"
-                    elif field == "git_repo_url":
-                        filtered_data[field] = None
                     elif field == "dependencies":
                         # Show only first 3 dependencies
                         if isinstance(filtered_data[field], list) and len(filtered_data[field]) > 3:

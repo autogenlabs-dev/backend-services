@@ -105,26 +105,40 @@ class Template(Document):
 
     def to_dict(self):
         """Convert template to dictionary for API responses (snake_case format)"""
-        data = super().to_dict() if hasattr(super(), 'to_dict') else self.__dict__.copy()
-        data["status"] = self.approval_status
-        data["approval_status"] = self.approval_status
-        
-        # Convert ObjectId fields to strings
-        if hasattr(self, 'id'):
-            data["id"] = str(self.id)
-        if hasattr(self, 'user_id') and self.user_id:
-            data["user_id"] = str(self.user_id)
-            
-        # Convert datetime fields to ISO strings
-        if hasattr(self, 'created_at') and self.created_at:
-            data["created_at"] = self.created_at.isoformat() if hasattr(self.created_at, 'isoformat') else str(self.created_at)
-        if hasattr(self, 'updated_at') and self.updated_at:
-            data["updated_at"] = self.updated_at.isoformat() if hasattr(self.updated_at, 'isoformat') else str(self.updated_at)
-        if hasattr(self, 'submitted_for_approval_at') and self.submitted_for_approval_at:
-            data["submitted_for_approval_at"] = self.submitted_for_approval_at.isoformat() if hasattr(self.submitted_for_approval_at, 'isoformat') else str(self.submitted_for_approval_at)
-        if hasattr(self, 'approved_at') and self.approved_at:
-            data["approved_at"] = self.approved_at.isoformat() if hasattr(self.approved_at, 'isoformat') else str(self.approved_at)
-            
+        # Manually create dict to ensure git_repo_url is included
+        data = {
+            'id': str(self.id) if self.id else None,
+            'title': self.title,
+            'category': self.category,
+            'type': self.type,
+            'language': self.language,
+            'difficulty_level': self.difficulty_level,
+            'plan_type': self.plan_type,
+            'rating': self.rating,
+            'downloads': self.downloads,
+            'views': self.views,
+            'likes': self.likes,
+            'short_description': self.short_description,
+            'full_description': self.full_description,
+            'preview_images': self.preview_images or [],
+            'git_repo_url': self.git_repo_url,  # Explicitly include this
+            'live_demo_url': self.live_demo_url,
+            'dependencies': self.dependencies or [],
+            'tags': self.tags or [],
+            'developer_name': self.developer_name,
+            'developer_experience': self.developer_experience,
+            'is_available_for_dev': self.is_available_for_dev,
+            'featured': self.featured,
+            'popular': self.popular,
+            'code': self.code,
+            'readme_content': self.readme_content,
+            'user_id': str(self.user_id) if self.user_id else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'is_active': self.is_active,
+            'status': self.approval_status,
+            'approval_status': self.approval_status,
+        }
         return data
 
 

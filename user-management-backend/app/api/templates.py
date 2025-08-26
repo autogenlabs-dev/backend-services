@@ -19,7 +19,7 @@ class TemplateCreateRequest(BaseModel):
     type: str
     language: str
     difficulty_level: str
-    plan_type: str
+    plan_type: str = "Free"
     pricing_inr: int = 0
     pricing_usd: int = 0
     short_description: str
@@ -269,7 +269,7 @@ async def get_favorite_templates(
         )
 
 
-@router.get("/{template_id}", response_model=Dict[str, Any])
+@router.get("/{template_id}")
 async def get_template_by_id(template_id: str):
     """Get a specific template by ID."""
     try:
@@ -290,9 +290,10 @@ async def get_template_by_id(template_id: str):
         # Increment view count
         await template.update({"$inc": {"views": 1}})
         
+        # Simple test response
         return {
-            "success": True,
-            "template": template.to_dict()
+            "git_repo_url": "https://github.com/test/repo",
+            "test_field": "this should work"
         }
         
     except HTTPException:

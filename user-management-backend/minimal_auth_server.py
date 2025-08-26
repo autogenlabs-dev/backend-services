@@ -30,6 +30,7 @@ from app.models.user import User, UserRole
 from app.models.organization import Organization
 from app.models.template import Template, TemplateLike, TemplateDownload, TemplateView, TemplateComment, TemplateCategory
 from app.models.component import Component, ContentStatus
+from app.models.component_interactions import ComponentLike, ComponentComment
 from app.models.developer_profile import DeveloperProfile
 from app.models.purchased_item import PurchasedItem
 from app.models.content_approval import ContentApproval
@@ -1120,6 +1121,18 @@ async def get_templates(
             # Ensure ID is properly included as string
             template_data["id"] = str(template.id)
             
+            # Add likes and comments count
+            total_likes = await TemplateLike.find({"template_id": str(template.id)}).count()
+            total_comments = await TemplateComment.find({
+                "template_id": str(template.id), 
+                "is_approved": True
+            }).count()
+            
+            template_data["total_likes"] = total_likes
+            template_data["total_comments"] = total_comments
+            template_data["likes"] = total_likes  # For backward compatibility
+            template_data["comments_count"] = total_comments  # For backward compatibility
+            
             # Add approval info for non-approved templates
             if hasattr(template, 'status') and template.status != "approved":
                 approval = await ContentApproval.find_one({
@@ -1297,7 +1310,9 @@ async def get_template(
 ):
     """Get a specific template by ID with access control."""
     try:
-        template = await Template.get(template_id)
+        # Force fresh data from database with proper ObjectId
+        from bson import ObjectId
+        template = await Template.find_one(Template.id == ObjectId(template_id))
         
         if not template or not template.is_active:
             raise HTTPException(status_code=404, detail="Template not found")
@@ -1322,6 +1337,18 @@ async def get_template(
         # Ensure ID is properly included as string
         template_data["id"] = str(template.id)
         
+        # Add likes and comments count
+        total_likes = await TemplateLike.find({"template_id": template_id}).count()
+        total_comments = await TemplateComment.find({
+            "template_id": template_id, 
+            "is_approved": True
+        }).count()
+        
+        template_data["total_likes"] = total_likes
+        template_data["total_comments"] = total_comments
+        template_data["likes"] = total_likes  # For backward compatibility
+        template_data["comments_count"] = total_comments  # For backward compatibility
+        
         filtered_data = ContentAccessService.filter_content_by_access_level(template_data, access_level)
         
         # Add like status if user is authenticated
@@ -1333,9 +1360,6 @@ async def get_template(
             filtered_data["liked"] = user_like is not None
         else:
             filtered_data["liked"] = False
-        
-        # Add like count
-        filtered_data["total_likes"] = template.likes
         
         # Add access information
         filtered_data["access_info"] = access_info
@@ -2145,6 +2169,18 @@ async def get_components(
             # Ensure ID is properly included as string
             component_data["id"] = str(component.id)
             
+            # Add likes and comments count
+            total_likes = await ComponentLike.find({"component_id": str(component.id)}).count()
+            total_comments = await ComponentComment.find({
+                "component_id": str(component.id), 
+                "is_approved": True
+            }).count()
+            
+            component_data["total_likes"] = total_likes
+            component_data["total_comments"] = total_comments
+            component_data["likes"] = total_likes  # For backward compatibility
+            component_data["comments_count"] = total_comments  # For backward compatibility
+            
             # Add approval info for non-approved components
             if hasattr(component, 'status') and component.status != "approved":
                 approval = await ContentApproval.find_one({
@@ -2198,6 +2234,18 @@ async def get_component(
         
         component_data = component.to_dict()
         
+        # Add likes and comments count
+        total_likes = await ComponentLike.find({"component_id": component_id}).count()
+        total_comments = await ComponentComment.find({
+            "component_id": component_id, 
+            "is_approved": True
+        }).count()
+        
+        component_data["total_likes"] = total_likes
+        component_data["total_comments"] = total_comments
+        component_data["likes"] = total_likes  # For backward compatibility
+        component_data["comments_count"] = total_comments  # For backward compatibility
+        
         # Add like status if user is authenticated
         if current_user:
             user_like = await ComponentLike.find_one(
@@ -2207,9 +2255,6 @@ async def get_component(
             component_data["liked"] = user_like is not None
         else:
             component_data["liked"] = False
-            
-        # Add like count
-        component_data["total_likes"] = component.likes
         
         return component_data
     except Exception as e:
@@ -2266,7 +2311,7 @@ async def toggle_component_like(component_id: str, authorization: str = Header(N
         else:
             # Like
             like = ComponentLike(component_id=component.id, user_id=user.id)
-            await like.create()
+            await like.insert()
             component.likes += 1
             liked = True
         
