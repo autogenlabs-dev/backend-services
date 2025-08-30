@@ -1,7 +1,7 @@
 # Admin moderation endpoints for comments and interactions
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import math
 
 from app.middleware.auth import require_admin
@@ -252,7 +252,7 @@ async def moderate_comment(
         comment_type = "template" if template_comment else "component"
         
         # Apply moderation action
-        update_data = {"updated_at": datetime.utcnow()}
+        update_data = {"updated_at": datetime.now(timezone.utc)}
         
         if moderation_data.action == ModerationAction.approve:
             update_data["is_approved"] = True

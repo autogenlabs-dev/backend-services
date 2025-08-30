@@ -7,7 +7,7 @@ import secrets
 import hashlib
 import string
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, Tuple, List
 from fastapi import HTTPException, status, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -82,7 +82,7 @@ class ApiKeyService:
         # Calculate expiration date
         expires_at = None
         if expires_in_days:
-            expires_at = datetime.utcnow() + timedelta(days=expires_in_days)
+            expires_at = datetime.now(timezone.utc) + timedelta(days=expires_in_days)
         
         # Create API key record
         api_key_obj = ApiKey(
@@ -92,7 +92,7 @@ class ApiKeyService:
             name=name,
             expires_at=expires_at,
             is_active=True,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         
         await api_key_obj.insert() # Use Beanie's insert method
@@ -137,14 +137,14 @@ class ApiKeyService:
                 return None
             
             # Check if key has expired
-            if api_key_obj.expires_at and api_key_obj.expires_at < datetime.utcnow():
+            if api_key_obj.expires_at and api_key_obj.expires_at < datetime.now(timezone.utc):
                 # Automatically deactivate expired keys
                 api_key_obj.is_active = False
                 db.commit()
                 return None
             
             # Update last used timestamp
-            api_key_obj.last_used_at = datetime.utcnow()
+            api_key_obj.last_used_at = datetime.now(timezone.utc)
             await api_key_obj.save() # Use Beanie's save method
             
             return user, api_key_obj

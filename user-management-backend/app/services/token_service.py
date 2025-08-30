@@ -1,6 +1,6 @@
 """Token management service with real business logic."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, Tuple
 from decimal import Decimal
 from sqlalchemy.orm import Session
@@ -63,7 +63,7 @@ class TokenService:
             return subscription.current_period_start, subscription.current_period_end
         
         # For free users or users without active subscription, use monthly periods
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         
         # Calculate next month
@@ -264,7 +264,7 @@ class TokenService:
             model_name=model_name,
             request_metadata=request_metadata or {},
             api_key_id=api_key_id,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(timezone.utc)
         )
         
         # Add sub-user context if applicable
@@ -281,7 +281,7 @@ class TokenService:
     def get_sub_user_usage_summary(self, sub_user_id: str, days: int = 30) -> Dict[str, Any]:
         """Get usage summary for a sub-user"""
         
-        from_date = datetime.utcnow() - timedelta(days=days)
+        from_date = datetime.now(timezone.utc) - timedelta(days=days)
         
         # Get usage logs for sub-user
         usage_query = (
@@ -368,7 +368,7 @@ class TokenService:
     
     def get_usage_stats(self, user: User, days: int = 30) -> Dict[str, Any]:
         """Get detailed usage statistics for the user."""
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
         
         # Get usage logs for the period
         logs = (
@@ -414,7 +414,7 @@ class TokenService:
         # Daily usage for the last 30 days
         daily_usage = []
         for i in range(days):
-            day = (datetime.utcnow() - timedelta(days=i)).date()
+            day = (datetime.now(timezone.utc) - timedelta(days=i)).date()
             day_logs = [log for log in logs if log.created_at.date() == day]
             daily_tokens = sum(log.tokens_used for log in day_logs)
             daily_cost = sum(log.cost_usd or 0.0 for log in day_logs)
@@ -469,7 +469,7 @@ class TokenService:
             "tokens": tokens,
             "request_type": request_type,
             "metadata": metadata,
-            "timestamp": datetime.utcnow()
+            "timestamp": datetime.now(timezone.utc)
         }
         
         return reservation_id

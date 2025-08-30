@@ -1,5 +1,5 @@
 from beanie import Document, PydanticObjectId
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union
 from datetime import datetime
 from pydantic import Field
 from enum import Enum
@@ -30,7 +30,7 @@ class Component(Document):
     developer_experience: str
     is_available_for_dev: bool = True
     featured: bool = False
-    code: Optional[str] = None
+    code: Optional[Union[str, Dict[str, str]]] = None
     readme_content: Optional[str] = None
     user_id: Optional[PydanticObjectId] = None
     
@@ -108,5 +108,9 @@ class Component(Document):
             data["submitted_for_approval_at"] = self.submitted_for_approval_at.isoformat() if hasattr(self.submitted_for_approval_at, 'isoformat') else str(self.submitted_for_approval_at)
         if hasattr(self, 'approved_at') and self.approved_at:
             data["approved_at"] = self.approved_at.isoformat() if hasattr(self.approved_at, 'isoformat') else str(self.approved_at)
+        
+        # Ensure code field is properly handled (preserve dict structure if it exists)
+        if hasattr(self, 'code') and self.code is not None:
+            data["code"] = self.code
             
         return data

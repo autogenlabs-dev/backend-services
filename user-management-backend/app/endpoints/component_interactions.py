@@ -1,7 +1,7 @@
 # Component interaction endpoints - Comments, Ratings, Likes, Views, Downloads
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import math
 from collections import defaultdict
 
@@ -145,7 +145,7 @@ async def record_component_view(
             recent_view = await ComponentView.find_one({
                 "user_id": user_id,
                 "component_id": component_id,
-                "created_at": {"$gte": datetime.utcnow().replace(minute=0, second=0, microsecond=0)}
+                "created_at": {"$gte": datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)}
             })
             
             if recent_view:
@@ -440,7 +440,7 @@ async def update_component_comment(
             update_data["rating"] = comment_data.rating
         
         if update_data:
-            update_data["updated_at"] = datetime.utcnow()
+            update_data["updated_at"] = datetime.now(timezone.utc)
             await comment.update({"$set": update_data})
         
         # Log audit event
@@ -676,7 +676,7 @@ async def flag_component_comment(
             raise HTTPException(status_code=400, detail="Comment does not belong to this component")
         
         # Update flag status
-        await comment.update({"$set": {"is_flagged": True, "updated_at": datetime.utcnow()}})
+        await comment.update({"$set": {"is_flagged": True, "updated_at": datetime.now(timezone.utc)}})
         
         # Log audit event
         await log_audit_event(

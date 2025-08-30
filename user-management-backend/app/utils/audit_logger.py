@@ -1,5 +1,5 @@
 # Audit logging utility functions
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 import traceback
 
@@ -61,7 +61,7 @@ async def log_audit_event(
             target_type=resource_type,
             target_id=resource_id,
             metadata=details or {},
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(timezone.utc)
         )
         
         await audit_log.insert()
@@ -82,7 +82,7 @@ async def log_audit_event(
             resource_id=resource_id,
             details=details or {},
             severity=severity_enum,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(timezone.utc)
         )
 
 

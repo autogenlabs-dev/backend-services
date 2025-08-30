@@ -5,7 +5,7 @@ Seed test components
 
 import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
-from datetime import datetime
+from datetime import datetime, timezone
 
 async def seed_components():
     client = AsyncIOMotorClient('mongodb://localhost:27017')
@@ -42,8 +42,8 @@ async def seed_components():
             'readme_content': '# Button Component\n\nA versatile button component.',
             'status': 'approved',
             'is_active': True,
-            'created_at': datetime.utcnow(),
-            'updated_at': datetime.utcnow()
+            'created_at': datetime.now(timezone.utc),
+            'updated_at': datetime.now(timezone.utc)
         },
         {
             'title': 'Modal Component',
@@ -75,8 +75,8 @@ async def seed_components():
             'readme_content': '# Modal Component\n\nA feature-rich modal component.',
             'status': 'approved',
             'is_active': True,
-            'created_at': datetime.utcnow(),
-            'updated_at': datetime.utcnow()
+            'created_at': datetime.now(timezone.utc),
+            'updated_at': datetime.now(timezone.utc)
         }
     ]
     

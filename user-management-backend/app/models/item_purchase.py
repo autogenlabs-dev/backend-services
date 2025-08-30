@@ -2,7 +2,7 @@
 Enhanced Item Purchase Model for Individual Marketplace Purchases
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from enum import Enum
 from beanie import Document
@@ -110,9 +110,9 @@ class ItemPurchase(Document):
         self.status = PurchaseStatus.COMPLETED
         self.razorpay_payment_id = razorpay_payment_id
         self.razorpay_signature = razorpay_signature
-        self.payment_completed_at = datetime.utcnow()
+        self.payment_completed_at = datetime.now(timezone.utc)
         self.access_granted = True
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
         self.calculate_revenue_split()
 
     def to_dict(self):

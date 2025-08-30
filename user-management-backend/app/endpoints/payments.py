@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.models.user import User
 from app.models.item_purchase import ItemPurchase, PurchaseStatus
@@ -236,7 +236,7 @@ async def get_cart(current_user: User = Depends(require_auth)):
             await cart.insert()
         
         # Update last accessed
-        cart.last_accessed_at = datetime.utcnow()
+        cart.last_accessed_at = datetime.now(timezone.utc)
         await cart.save()
         
         return CartResponse(

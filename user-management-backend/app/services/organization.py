@@ -2,7 +2,7 @@
 
 import secrets
 import hashlib
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from sqlalchemy.orm import Session
@@ -42,7 +42,7 @@ class OrganizationService:
             owner_id=user_id,
             subscription_plan="enterprise",
             monthly_token_limit=1000000,
-            reset_date=datetime.utcnow().replace(day=1) + timedelta(days=32)
+            reset_date=datetime.now(timezone.utc).replace(day=1) + timedelta(days=32)
         )
         
         db.add(org)
@@ -173,7 +173,7 @@ class OrganizationService:
             invited_by_id=invited_by_id,
             status="pending",
             token=secrets.token_urlsafe(32),
-            expires_at=datetime.utcnow() + timedelta(days=7)
+            expires_at=datetime.now(timezone.utc) + timedelta(days=7)
         )
         
         db.add(invitation)
@@ -189,7 +189,7 @@ class OrganizationService:
             and_(
                 OrganizationInvitation.token == token,
                 OrganizationInvitation.status == "pending",
-                OrganizationInvitation.expires_at > datetime.utcnow()
+                OrganizationInvitation.expires_at > datetime.now(timezone.utc)
             )
         ).first()
         
@@ -352,13 +352,13 @@ class OrganizationService:
         usage_percentage = (org.tokens_used / org.monthly_token_limit * 100) if org.monthly_token_limit > 0 else 0
         
         # Calculate days until reset
-        days_until_reset = (org.reset_date - datetime.utcnow()).days if org.reset_date else 0
+        days_until_reset = (org.reset_date - datetime.now(timezone.utc)).days if org.reset_date else 0
         
         # Get recent activity (last 7 days)
         recent_activity = db.query(TokenUsageLog).filter(
             and_(
                 TokenUsageLog.organization_id == org_id,
-                TokenUsageLog.created_at >= datetime.utcnow() - timedelta(days=7)
+                TokenUsageLog.created_at >= datetime.now(timezone.utc) - timedelta(days=7)
             )
         ).count()
         
@@ -381,7 +381,7 @@ class OrganizationService:
             key_hash=secrets.token_hex(32),
             permissions=key_data.permissions,
             created_by=created_by,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         db.add(key)
         db.commit()

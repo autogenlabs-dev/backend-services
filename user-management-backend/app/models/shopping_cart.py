@@ -2,7 +2,7 @@
 Shopping Cart Model for Marketplace
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from enum import Enum
 from beanie import Document
@@ -88,7 +88,7 @@ class ShoppingCart(Document):
         # Add item
         self.items.append(item)
         self.update_totals()
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
         return True
 
     def remove_item(self, item_id: str, item_type: CartItemType) -> bool:
@@ -101,7 +101,7 @@ class ShoppingCart(Document):
         
         if len(self.items) < original_length:
             self.update_totals()
-            self.updated_at = datetime.utcnow()
+            self.updated_at = datetime.now(timezone.utc)
             return True
         return False
 
@@ -109,7 +109,7 @@ class ShoppingCart(Document):
         """Clear all items from cart"""
         self.items = []
         self.update_totals()
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
 
     def update_totals(self):
         """Update cart totals"""
@@ -124,7 +124,7 @@ class ShoppingCart(Document):
                 saved_item = self.items.pop(i)
                 self.save_for_later.append(saved_item)
                 self.update_totals()
-                self.updated_at = datetime.utcnow()
+                self.updated_at = datetime.now(timezone.utc)
                 return True
         return False
 

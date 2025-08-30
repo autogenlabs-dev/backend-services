@@ -7,7 +7,7 @@ import uuid
 import hashlib
 import hmac
 from typing import Optional, Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timezone
 from app.models.item_purchase import ItemPurchase, PurchaseStatus, ItemType
 from app.models.shopping_cart import ShoppingCart, CartItem
 from app.models.developer_earnings import DeveloperEarnings
@@ -82,7 +82,7 @@ class PaymentService:
                 raise ValueError("Developer not found")
             
             # Create unique purchase ID
-            purchase_id = f"PUR_{int(datetime.utcnow().timestamp())}_{uuid.uuid4().hex[:8]}"
+            purchase_id = f"PUR_{int(datetime.now(timezone.utc).timestamp())}_{uuid.uuid4().hex[:8]}"
             
             # Prepare order data
             amount_inr = item.pricing_inr * 100  # Razorpay expects amount in paisa
@@ -271,7 +271,7 @@ class PaymentService:
             total_amount_inr = sum(item.price_inr for item in cart_items)
             
             # Create batch purchase ID
-            batch_purchase_id = f"BATCH_{int(datetime.utcnow().timestamp())}_{uuid.uuid4().hex[:8]}"
+            batch_purchase_id = f"BATCH_{int(datetime.now(timezone.utc).timestamp())}_{uuid.uuid4().hex[:8]}"
             
             # Prepare order data
             amount_paisa = total_amount_inr * 100
@@ -314,7 +314,7 @@ class PaymentService:
                     continue
                 
                 # Create individual purchase record
-                purchase_id = f"PUR_{int(datetime.utcnow().timestamp())}_{uuid.uuid4().hex[:8]}"
+                purchase_id = f"PUR_{int(datetime.now(timezone.utc).timestamp())}_{uuid.uuid4().hex[:8]}"
                 purchase = ItemPurchase(
                     purchase_id=purchase_id,
                     user_id=user.id,

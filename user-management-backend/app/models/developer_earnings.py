@@ -2,7 +2,7 @@
 Developer Earnings and Payout System
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 from enum import Enum
 from beanie import Document
@@ -124,18 +124,18 @@ class DeveloperEarnings(Document):
             self.average_sale_amount_inr = self.total_earnings_inr // self.total_sales_count
         
         # Update monthly stats
-        current_month = datetime.utcnow().strftime("%Y-%m")
+        current_month = datetime.now(timezone.utc).strftime("%Y-%m")
         self.monthly_earnings[current_month] = self.monthly_earnings.get(current_month, 0) + earnings
         self.monthly_sales[current_month] = self.monthly_sales.get(current_month, 0) + 1
         
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
 
     def process_payout_request(self, amount: int) -> bool:
         """Process a payout request (move from available to pending)"""
         if amount <= self.available_balance_inr:
             self.available_balance_inr -= amount
             self.pending_balance_inr += amount
-            self.updated_at = datetime.utcnow()
+            self.updated_at = datetime.now(timezone.utc)
             return True
         return False
 
@@ -144,15 +144,15 @@ class DeveloperEarnings(Document):
         if amount <= self.pending_balance_inr:
             self.pending_balance_inr -= amount
             self.withdrawn_total_inr += amount
-            self.last_payout_date = datetime.utcnow()
-            self.updated_at = datetime.utcnow()
+            self.last_payout_date = datetime.now(timezone.utc)
+            self.updated_at = datetime.now(timezone.utc)
 
     def cancel_payout_request(self, amount: int):
         """Cancel a payout request (move from pending back to available)"""
         if amount <= self.pending_balance_inr:
             self.pending_balance_inr -= amount
             self.available_balance_inr += amount
-            self.updated_at = datetime.utcnow()
+            self.updated_at = datetime.now(timezone.utc)
 
     def get_analytics_summary(self) -> Dict[str, Any]:
         """Get comprehensive analytics summary"""
@@ -257,31 +257,31 @@ class PayoutRequest(Document):
         self.status = PayoutStatus.APPROVED
         self.reviewed_by = admin_id
         self.admin_notes = admin_notes
-        self.reviewed_at = datetime.utcnow()
-        self.updated_at = datetime.utcnow()
+        self.reviewed_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(timezone.utc)
 
     def reject_request(self, admin_id: PydanticObjectId, rejection_reason: str):
         """Reject payout request"""
         self.status = PayoutStatus.REJECTED
         self.reviewed_by = admin_id
         self.rejection_reason = rejection_reason
-        self.reviewed_at = datetime.utcnow()
-        self.updated_at = datetime.utcnow()
+        self.reviewed_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(timezone.utc)
 
     def start_processing(self, transaction_id: str):
         """Start processing payout"""
         self.status = PayoutStatus.PROCESSING
         self.transaction_id = transaction_id
-        self.processed_at = datetime.utcnow()
-        self.updated_at = datetime.utcnow()
+        self.processed_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(timezone.utc)
 
     def complete_payout(self, final_amount: int, processing_fee: int = 0):
         """Complete payout processing"""
         self.status = PayoutStatus.COMPLETED
         self.final_amount_paid = final_amount
         self.processing_fee = processing_fee
-        self.completed_at = datetime.utcnow()
-        self.updated_at = datetime.utcnow()
+        self.completed_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(timezone.utc)
 
     def to_dict(self):
         """Convert to dictionary for API responses"""

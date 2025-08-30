@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Union, Dict
 
 class ComponentCreateRequest(BaseModel):
     title: str
@@ -21,7 +21,7 @@ class ComponentCreateRequest(BaseModel):
     developer_experience: str
     is_available_for_dev: bool = True
     featured: bool = False
-    code: Optional[str] = None
+    code: Optional[Union[str, Dict[str, str]]] = None
     readme_content: Optional[str] = None
 
 class ComponentUpdateRequest(BaseModel):
@@ -44,5 +44,5 @@ class ComponentUpdateRequest(BaseModel):
     developer_experience: Optional[str] = None
     is_available_for_dev: Optional[bool] = None
     featured: Optional[bool] = None
-    code: Optional[str] = None
+    code: Optional[Union[str, Dict[str, str]]] = None
     readme_content: Optional[str] = None

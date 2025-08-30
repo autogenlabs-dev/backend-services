@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 from pydantic import BaseModel
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import bcrypt
 import jwt
 import razorpay
@@ -237,7 +237,7 @@ class TemplateResponse(BaseModel):
 
 # --- COMPONENT SCHEMAS ---
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Union, Dict
 
 class ComponentCreateRequest(BaseModel):
     title: str
@@ -257,7 +257,7 @@ class ComponentCreateRequest(BaseModel):
     developer_experience: str
     is_available_for_dev: bool = True
     featured: bool = False
-    code: Optional[str] = None
+    code: Optional[Union[str, Dict[str, str]]] = None
     readme_content: Optional[str] = None
 
 class ComponentUpdateRequest(BaseModel):
@@ -278,7 +278,7 @@ class ComponentUpdateRequest(BaseModel):
     developer_experience: Optional[str] = None
     is_available_for_dev: Optional[bool] = None
     featured: Optional[bool] = None
-    code: Optional[str] = None
+    code: Optional[Union[str, Dict[str, str]]] = None
     readme_content: Optional[str] = None
 
 # --- END COMPONENT SCHEMAS ---
@@ -300,7 +300,7 @@ def create_access_token(user_id: str, user_email: str = None, user_role: str = N
         "sub": user_id,
         "email": user_email,
         "role": user_role,
-        "exp": datetime.utcnow() + timedelta(minutes=30)  # 30 minutes
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=30)  # 30 minutes
     }
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
@@ -309,7 +309,7 @@ def create_refresh_token(user_id: str) -> str:
     from datetime import datetime, timedelta
     payload = {
         "sub": user_id,
-        "exp": datetime.utcnow() + timedelta(days=7)  # 7 days
+        "exp": datetime.now(timezone.utc) + timedelta(days=7)  # 7 days
     }
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
@@ -340,7 +340,7 @@ async def root():
 @app.get("/health")
 async def health():
     """Health check."""
-    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+    return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 @app.post("/auth/register")
 async def register(user_data: UserCreate):
@@ -404,7 +404,7 @@ async def login_json(login_data: LoginRequest):
             raise HTTPException(status_code=401, detail="Invalid credentials")
         
         # Update last login
-        user.last_login_at = datetime.utcnow()
+        user.last_login_at = datetime.now(timezone.utc)
         await user.save()
         
         # Create tokens
@@ -562,8 +562,8 @@ async def logout(authorization: str = Header(None)):
         user = await get_current_user(token)
         
         # Update last logout time
-        user.last_logout_at = datetime.utcnow()
-        user.updated_at = datetime.utcnow()
+        user.last_logout_at = datetime.now(timezone.utc)
+        user.updated_at = datetime.now(timezone.utc)
         await user.save()
         
         return {
@@ -657,7 +657,7 @@ async def update_user_profile(user_data: UserUpdate, authorization: str = Header
         if field not in ['first_name', 'last_name'] and hasattr(user, field):
             setattr(user, field, value)
     
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(timezone.utc)
     
     # Save the updated user
     await user.save()
@@ -813,7 +813,7 @@ async def list_api_keys(authorization: str = Header(None)):
                 "id": "ak_test_123",
                 "name": "VS Code Extension",
                 "prefix": "ak_test_",
-                "created_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
                 "last_used": None,
                 "status": "active"
             }
@@ -834,7 +834,7 @@ async def generate_api_key(authorization: str = Header(None)):
             "id": "ak_new_456",
             "key": "ak_test_456_abcdef123456789",
             "name": "New API Key",
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "status": "active"
         }
     }
@@ -1344,6 +1344,8 @@ async def get_template(
             "is_approved": True
         }).count()
         
+        print(f"🔍 Template {template_id} stats - Likes: {total_likes}, Comments: {total_comments}")
+        
         template_data["total_likes"] = total_likes
         template_data["total_comments"] = total_comments
         template_data["likes"] = total_likes  # For backward compatibility
@@ -1399,7 +1401,7 @@ async def update_template(template_id: str, template_data: TemplateUpdate, autho
             if hasattr(template, field):
                 setattr(template, field, value)
         
-        template.updated_at = datetime.utcnow()
+        template.updated_at = datetime.now(timezone.utc)
         await template.save()
         
         return TemplateResponse(**template.to_dict())
@@ -1431,7 +1433,7 @@ async def delete_template(template_id: str, authorization: str = Header(None)):
         
         # Soft delete
         template.is_active = False
-        template.updated_at = datetime.utcnow()
+        template.updated_at = datetime.now(timezone.utc)
         await template.save()
         
         return {"message": "Template deleted successfully"}
@@ -1482,8 +1484,11 @@ async def toggle_template_like(template_id: str, authorization: str = Header(Non
         if not template:
             raise HTTPException(status_code=404, detail="Template not found")
         
-        # Check if user already liked this template
-        existing_like = await TemplateLike.find_one({"template_id": template.id, "user_id": user.id})
+        # Check if user already liked this template using string IDs
+        existing_like = await TemplateLike.find_one({
+            "template_id": template_id, 
+            "user_id": str(user.id)
+        })
         
         if existing_like:
             # Unlike
@@ -1492,16 +1497,22 @@ async def toggle_template_like(template_id: str, authorization: str = Header(Non
             liked = False
         else:
             # Like
-            like = TemplateLike(template_id=template.id, user_id=user.id)
+            like = TemplateLike(
+                template_id=template_id, 
+                user_id=str(user.id)
+            )
             await like.create()
             template.likes += 1
             liked = True
         
         await template.save()
         
+        # Get fresh count from database
+        total_likes = await TemplateLike.find({"template_id": template_id}).count()
+        
         return {
             "liked": liked,
-            "total_likes": template.likes
+            "total_likes": total_likes
         }
         
     except HTTPException:
@@ -1844,7 +1855,7 @@ async def update_template_comment(
             update_data["rating"] = comment_data["rating"]
         
         if update_data:
-            update_data["updated_at"] = datetime.utcnow()
+            update_data["updated_at"] = datetime.now(timezone.utc)
             await comment.update({"$set": update_data})
         
         # Get updated comment
@@ -1958,7 +1969,7 @@ async def create_payment_order(request: dict, authorization: str = Header(None))
         order_data = {
             'amount': amount_inr,
             'currency': 'INR',
-            'receipt': f"rcpt_{str(user.id)[-10:]}_{int(datetime.utcnow().timestamp())}"[-40:],  # Ensure max 40 chars
+            'receipt': f"rcpt_{str(user.id)[-10:]}_{int(datetime.now(timezone.utc).timestamp())}"[-40:],  # Ensure max 40 chars
             'notes': {
                 'user_id': str(user.id),
                 'plan_name': plan_name,
@@ -2069,13 +2080,32 @@ async def create_component(
     try:
         client_info = await get_client_info(request)
         
+        # Debug: Print the received code data
+        print(f"🔍 DEBUG: Received code data: {component_data.code}")
+        print(f"🔍 DEBUG: Code type: {type(component_data.code)}")
+        if isinstance(component_data.code, dict):
+            print(f"🔍 DEBUG: HTML preview: {component_data.code.get('html', '')[:100]}...")
+            print(f"🔍 DEBUG: CSS preview: {component_data.code.get('css', '')[:100]}...")
+        
+        # Debug: Check what component_data.dict() returns
+        component_dict = component_data.dict()
+        print(f"🔍 DEBUG: component_data.dict() code type: {type(component_dict.get('code'))}")
+        print(f"🔍 DEBUG: component_data.dict() code: {component_dict.get('code')}")
+        
+        # Manually preserve the code object structure
+        code_field = component_data.code
+        
+        # Remove code from component_dict to avoid duplicate parameter error
+        component_dict.pop('code', None)
+        
         component = Component(
-            **component_data.dict(),
+            **component_dict,
+            code=code_field,  # Use the original code object, not the .dict() version
             user_id=current_user.id,  # Store as PydanticObjectId, not string
             approval_status=ContentStatus.PENDING_APPROVAL,  # Use approval_status field
-            submitted_for_approval_at=datetime.utcnow(),
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            submitted_for_approval_at=datetime.now(timezone.utc),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
         )
         await component.create()
         
@@ -2232,6 +2262,12 @@ async def get_component(
         if not component or (hasattr(component, 'is_active') and not component.is_active):
             raise HTTPException(status_code=404, detail="Component not found")
         
+        # Increment view count
+        if not hasattr(component, 'views'):
+            component.views = 0
+        component.views += 1
+        await component.save()
+        
         component_data = component.to_dict()
         
         # Add likes and comments count
@@ -2240,6 +2276,8 @@ async def get_component(
             "component_id": component_id, 
             "is_approved": True
         }).count()
+        
+        print(f"🔍 Component {component_id} stats - Likes: {total_likes}, Comments: {total_comments}")
         
         component_data["total_likes"] = total_likes
         component_data["total_comments"] = total_comments
@@ -2277,7 +2315,7 @@ async def update_component(component_id: str, component_data: ComponentUpdateReq
         for field, value in update_fields.items():
             if hasattr(component, field):
                 setattr(component, field, value)
-        component.updated_at = datetime.utcnow()
+        component.updated_at = datetime.now(timezone.utc)
         await component.save()
         return component.to_dict()
     except HTTPException:
@@ -2300,26 +2338,39 @@ async def toggle_component_like(component_id: str, authorization: str = Header(N
         if not component:
             raise HTTPException(status_code=404, detail="Component not found")
         
-        # Check if user already liked this component
-        existing_like = await ComponentLike.find_one({"component_id": component.id, "user_id": user.id})
+        # Check if user already liked this component using string IDs
+        existing_like = await ComponentLike.find_one({
+            "component_id": component_id, 
+            "user_id": str(user.id)
+        })
         
         if existing_like:
             # Unlike
             await existing_like.delete()
+            if not hasattr(component, 'likes'):
+                component.likes = 0
             component.likes = max(0, component.likes - 1)
             liked = False
         else:
             # Like
-            like = ComponentLike(component_id=component.id, user_id=user.id)
+            like = ComponentLike(
+                component_id=component_id, 
+                user_id=str(user.id)
+            )
             await like.insert()
+            if not hasattr(component, 'likes'):
+                component.likes = 0
             component.likes += 1
             liked = True
         
         await component.save()
         
+        # Get fresh count from database
+        total_likes = await ComponentLike.find({"component_id": component_id}).count()
+        
         return {
             "liked": liked,
-            "total_likes": component.likes
+            "total_likes": total_likes
         }
         
     except HTTPException:
@@ -2343,7 +2394,7 @@ async def delete_component(component_id: str, authorization: str = Header(None))
         # Soft delete if possible
         if hasattr(component, 'is_active'):
             component.is_active = False
-            component.updated_at = datetime.utcnow()
+            component.updated_at = datetime.now(timezone.utc)
             await component.save()
         else:
             await component.delete()
@@ -2761,7 +2812,7 @@ async def update_component_comment(
             update_data["rating"] = comment_data["rating"]
         
         if update_data:
-            update_data["updated_at"] = datetime.utcnow()
+            update_data["updated_at"] = datetime.now(timezone.utc)
             await comment.update({"$set": update_data})
         
         # Get updated comment
@@ -3201,7 +3252,7 @@ async def approve_content(
         # Update approval record
         approval.status = "approved"
         approval.reviewed_by = str(current_user.id)
-        approval.reviewed_at = datetime.utcnow()
+        approval.reviewed_at = datetime.now(timezone.utc)
         approval.admin_notes = approval_data.admin_notes
         await approval.save()
         
@@ -3210,13 +3261,13 @@ async def approve_content(
             content = await Template.get(approval.content_id)
             if content:
                 content.status = "approved"
-                content.approved_at = datetime.utcnow()
+                content.approved_at = datetime.now(timezone.utc)
                 await content.save()
         elif approval.content_type == "component":
             content = await Component.get(approval.content_id)
             if content:
                 content.status = "approved"
-                content.approved_at = datetime.utcnow()
+                content.approved_at = datetime.now(timezone.utc)
                 await content.save()
         
         # Log action
@@ -3264,7 +3315,7 @@ async def reject_content(
         # Update approval record
         approval.status = "rejected"
         approval.reviewed_by = str(current_user.id)
-        approval.reviewed_at = datetime.utcnow()
+        approval.reviewed_at = datetime.now(timezone.utc)
         approval.rejection_reason = rejection_data.rejection_reason
         approval.admin_notes = rejection_data.admin_notes
         await approval.save()
@@ -3695,7 +3746,7 @@ async def admin_approve_content(
         # Update content status
         if approval_request.action == "approve":
             content.approval_status = "approved"
-            content.approved_at = datetime.utcnow()
+            content.approved_at = datetime.now(timezone.utc)
             content.approved_by = current_user.id  # This should be PydanticObjectId, not string
         else:
             content.approval_status = "rejected"
@@ -3720,7 +3771,7 @@ async def admin_approve_content(
         
         approval.status = "approved" if approval_request.action == "approve" else "rejected"
         approval.reviewed_by = current_user.id  # Should be PydanticObjectId, not string
-        approval.reviewed_at = datetime.utcnow()
+        approval.reviewed_at = datetime.now(timezone.utc)
         approval.approval_notes = approval_request.admin_notes or ""  # Use approval_notes instead of admin_notes
         
         if approval_request.action == "reject":
@@ -3789,7 +3840,7 @@ async def admin_get_analytics(
         client_info = await get_client_info(request)
         
         # Calculate date range
-        end_date = datetime.utcnow()
+        end_date = datetime.now(timezone.utc)
         start_date = end_date.replace(day=1) if days >= 30 else end_date - timedelta(days=days)
         
         # User metrics
@@ -3968,7 +4019,7 @@ async def admin_get_audit_logs(
         query = {}
         
         # Date filter
-        start_date = datetime.utcnow() - timedelta(days=days)
+        start_date = datetime.now(timezone.utc) - timedelta(days=days)
         query["timestamp"] = {"$gte": start_date}
         
         if action_type:
@@ -4055,7 +4106,7 @@ async def admin_update_user(
         for key, value in update_data.items():
             setattr(user, key, value)
         
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(timezone.utc)
         await user.save()
         
         # Log admin action
@@ -4126,7 +4177,7 @@ async def admin_manage_user(
         else:
             raise HTTPException(status_code=400, detail="Invalid action")
         
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(timezone.utc)
         await user.save()
         
         # Log admin action

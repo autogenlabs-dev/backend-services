@@ -4,7 +4,7 @@ Enhanced User Dashboard Endpoints with Purchase History and Recommendations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional, Dict, Any, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.models.user import User
 from app.models.item_purchase import ItemPurchase, PurchaseStatus
@@ -190,7 +190,7 @@ async def get_purchase_statistics(user: User) -> Dict[str, Any]:
         }
         
         # Monthly spending (last 12 months)
-        twelve_months_ago = datetime.utcnow() - timedelta(days=365)
+        twelve_months_ago = datetime.now(timezone.utc) - timedelta(days=365)
         monthly_spending = await ItemPurchase.aggregate([
             {
                 "$match": {
@@ -350,7 +350,7 @@ async def get_usage_analytics(user: User) -> Dict[str, Any]:
         }
         
         # Recent activity (last 30 days)
-        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
         recent_activity = await ItemPurchase.count({
             "user_id": user.id,
             "last_accessed_at": {"$gte": thirty_days_ago}

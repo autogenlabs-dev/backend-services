@@ -1,6 +1,6 @@
 """Subscription management service with real business logic."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List
 from decimal import Decimal
 from sqlalchemy.orm import Session
@@ -89,7 +89,7 @@ class SubscriptionService:
             self.db.add(existing_subscription)
         
         # Calculate billing period
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         period_start = now
         period_end = now + timedelta(days=30)  # Default 30-day billing cycle
         

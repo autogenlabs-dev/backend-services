@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from ..database import get_db
-from ..auth.jwt_auth import get_current_user
+from app.middleware.auth import get_current_user_from_token_from_token
 from ..services.sub_user_service import SubUserService
 from ..services.token_service import TokenService
 from ..models.user import User, TokenUsageLog, ApiKey
@@ -32,7 +32,7 @@ class SubUserActivity(BaseModel):
 
 @router.get("/overview", response_model=DashboardStats)
 async def get_dashboard_overview(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_from_token),
     db: Session = Depends(get_db)
 ):
     """Get overview statistics for all sub-users"""
@@ -87,7 +87,7 @@ async def get_dashboard_overview(
 
 @router.get("/activity", response_model=List[SubUserActivity])
 async def get_sub_user_activity(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_from_token),
     db: Session = Depends(get_db),
     days: int = Query(default=7, ge=1, le=30)
 ):
@@ -96,8 +96,8 @@ async def get_sub_user_activity(
     service = SubUserService(db)
     sub_users = service.get_sub_users(current_user.id)
     
-    from_date = datetime.utcnow() - timedelta(days=days)
-    today = datetime.utcnow().date()
+    from_date = datetime.now(timezone.utc) - timedelta(days=days)
+    today = datetime.now(timezone.utc).date()
     
     activities = []
     
@@ -121,7 +121,7 @@ async def get_sub_user_activity(
         # Determine status
         status = "active" if sub_user.is_active else "inactive"
         if sub_user.is_active and last_active:
-            hours_since_active = (datetime.utcnow() - last_active).total_seconds() / 3600
+            hours_since_active = (datetime.now(timezone.utc) - last_active).total_seconds() / 3600
             if hours_since_active > 24:
                 status = "idle"
         
@@ -142,7 +142,7 @@ async def get_sub_user_activity(
 
 @router.get("/usage-trends")
 async def get_usage_trends(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_from_token),
     db: Session = Depends(get_db),
     days: int = Query(default=30, ge=7, le=90)
 ):
@@ -152,7 +152,7 @@ async def get_usage_trends(
     sub_users = service.get_sub_users(current_user.id)
     sub_user_ids = [str(u.id) for u in sub_users]
     
-    from_date = datetime.utcnow() - timedelta(days=days)
+    from_date = datetime.now(timezone.utc) - timedelta(days=days)
     
     # Get usage logs for all sub-users
     usage_logs = db.query(TokenUsageLog).filter(
@@ -200,7 +200,7 @@ async def get_usage_trends(
 
 @router.get("/limits-analysis")
 async def get_limits_analysis(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_from_token),
     db: Session = Depends(get_db)
 ):
     """Analyze sub-user limits and suggest optimizations"""

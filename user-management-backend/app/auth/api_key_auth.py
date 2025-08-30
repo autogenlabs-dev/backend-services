@@ -7,7 +7,7 @@ import secrets
 import hashlib
 import string
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, Tuple, List
 from fastapi import HTTPException, status, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -92,7 +92,7 @@ class ApiKeyService:
         # Calculate expiration date
         expires_at = None
         if expires_in_days:
-            expires_at = datetime.utcnow() + timedelta(days=expires_in_days)
+            expires_at = datetime.now(timezone.utc) + timedelta(days=expires_in_days)
         
         # Create API key record
         api_key_obj = ApiKey(
@@ -102,7 +102,7 @@ class ApiKeyService:
             name=name,
             expires_at=expires_at,
             is_active=True,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         
         db.add(api_key_obj)
@@ -143,7 +143,7 @@ class ApiKeyService:
                 return None, None
             
             # Check if key is expired
-            if db_key.expires_at and db_key.expires_at < datetime.utcnow():
+            if db_key.expires_at and db_key.expires_at < datetime.now(timezone.utc):
                 return None, None
             
             # Get the user
@@ -152,7 +152,7 @@ class ApiKeyService:
                 return None, None
             
             # Update last used timestamp
-            db_key.last_used_at = datetime.utcnow()
+            db_key.last_used_at = datetime.now(timezone.utc)
             db.commit()
             
             # Handle sub-user API keys

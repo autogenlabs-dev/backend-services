@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List, Optional, Dict, Any
 from beanie import PydanticObjectId
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..models.component import Component
 from ..models.user import User
@@ -23,8 +23,8 @@ async def create_component(
         component = Component(
             **request.dict(),
             user_id=current_user.id,  # Keep as PydanticObjectId, not string
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
         )
         await component.insert()
         return {
@@ -119,7 +119,7 @@ async def update_component(
     update_data = {k: v for k, v in request.dict().items() if v is not None}
     for k, v in update_data.items():
         setattr(component, k, v)
-    component.updated_at = datetime.utcnow()
+    component.updated_at = datetime.now(timezone.utc)
     await component.save()
     return {"success": True, "component": component.to_dict(), "message": "Component updated successfully"}
 

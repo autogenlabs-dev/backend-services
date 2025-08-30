@@ -3,6 +3,7 @@ Content Access Control Service for Marketplace
 """
 
 from typing import Optional, Dict, Any, Tuple
+from datetime import datetime, timezone
 from enum import Enum
 from app.models.user import User
 from app.models.template import Template
@@ -232,7 +233,7 @@ class ContentAccessService:
             from datetime import datetime
             await purchase.update({
                 "$inc": {"download_count": 1},
-                "$set": {"last_accessed_at": datetime.utcnow()}
+                "$set": {"last_accessed_at": datetime.now(timezone.utc)}
             })
             return True
         return False

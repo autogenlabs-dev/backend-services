@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List, Optional, Dict, Any
 from beanie import PydanticObjectId
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..models.template import Template, TemplateView, TemplateLike, TemplateDownload
 from ..models.user import User
@@ -93,8 +93,8 @@ async def create_template(
             code=request.code,
             readme_content=request.readme_content,
             user_id=current_user.id,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
         )
         
         # Save to database
@@ -334,7 +334,7 @@ async def update_template(
                 update_data[field] = value
         
         # Add updated timestamp
-        update_data["updated_at"] = datetime.utcnow()
+        update_data["updated_at"] = datetime.now(timezone.utc)
         
         # Update template
         await template.update({"$set": update_data})
@@ -379,7 +379,7 @@ async def delete_template(
             raise HTTPException(status_code=403, detail="Not authorized to delete this template")
         
         # Soft delete (set is_active to False)
-        await template.update({"$set": {"is_active": False, "updated_at": datetime.utcnow()}})
+        await template.update({"$set": {"is_active": False, "updated_at": datetime.now(timezone.utc)}})
         
         return {
             "success": True,

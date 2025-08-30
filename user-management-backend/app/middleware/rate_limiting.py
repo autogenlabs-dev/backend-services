@@ -231,8 +231,8 @@ class RateLimitMiddleware:
             if not api_key_obj:
                 return None, None
                   # Update last used timestamp
-            from datetime import datetime
-            api_key_obj.last_used_at = datetime.utcnow()
+            from datetime import datetime, timezone
+            api_key_obj.last_used_at = datetime.now(timezone.utc)
             db.commit()
             
             # Get the associated user

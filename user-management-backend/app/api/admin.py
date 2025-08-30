@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Dict, Optional, Any
 from datetime import datetime, timedelta
-from beanie import PydanticObjectId
+from bea, timezonenie import PydanticObjectId
 from ..auth.unified_auth import get_current_user_unified
 from ..models.user import User, UserRole
 from ..models.template import Template
@@ -228,7 +228,7 @@ async def approve_content(
             # Update template approval_status (correct field name)
             if hasattr(template, 'approval_status'):
                 template.approval_status = "approved"
-                template.updated_at = datetime.utcnow()
+                template.updated_at = datetime.now(timezone.utc)
                 await template.save()
             
             return {"message": "Template approved successfully"}
@@ -241,7 +241,7 @@ async def approve_content(
             # Update component approval_status (correct field name)
             if hasattr(component, 'approval_status'):
                 component.approval_status = "approved"
-                component.updated_at = datetime.utcnow()
+                component.updated_at = datetime.now(timezone.utc)
                 await component.save()
             
             return {"message": "Component approved successfully"}

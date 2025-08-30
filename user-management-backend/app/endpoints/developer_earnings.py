@@ -6,7 +6,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.models.user import User, UserRole
 from app.models.developer_earnings import DeveloperEarnings, PayoutRequest, PayoutStatus, PayoutMethod
@@ -163,7 +163,7 @@ async def create_payout_request(
             raise HTTPException(status_code=400, detail="You have a pending payout request")
         
         # Create payout request
-        request_id = f"PAYOUT_{int(datetime.utcnow().timestamp())}_{uuid.uuid4().hex[:8]}"
+        request_id = f"PAYOUT_{int(datetime.now(timezone.utc).timestamp())}_{uuid.uuid4().hex[:8]}"
         
         payout_request = PayoutRequest(
             request_id=request_id,
@@ -307,7 +307,7 @@ async def update_earnings_settings(
             update_data["paypal_email"] = paypal_email
         
         if update_data:
-            update_data["updated_at"] = datetime.utcnow()
+            update_data["updated_at"] = datetime.now(timezone.utc)
             await earnings.update({"$set": update_data})
         
         return {

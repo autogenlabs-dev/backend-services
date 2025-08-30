@@ -1,7 +1,7 @@
 # Template interaction endpoints - Comments, Ratings, Helpful Votes
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import math
 from collections import defaultdict
 
@@ -317,7 +317,7 @@ async def update_template_comment(
             update_data["rating"] = comment_data.rating
         
         if update_data:
-            update_data["updated_at"] = datetime.utcnow()
+            update_data["updated_at"] = datetime.now(timezone.utc)
             await comment.update({"$set": update_data})
         
             # Log audit event (do not fail if logging fails)
@@ -568,7 +568,7 @@ async def flag_comment(
             raise HTTPException(status_code=400, detail="Comment does not belong to this template")
         
         # Update flag status
-        await comment.update({"$set": {"is_flagged": True, "updated_at": datetime.utcnow()}})
+        await comment.update({"$set": {"is_flagged": True, "updated_at": datetime.now(timezone.utc)}})
         
         # Log audit event
         await log_audit_event(
