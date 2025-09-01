@@ -97,6 +97,22 @@ jobs:
             cp .env.production .env.production.backup.$(date +%Y%m%d_%H%M%S)
           fi
           
+          # Update production database URL
+          echo "🔄 Updating production MongoDB connection..."
+          if [ -f .env.production ]; then
+            # Update the database URL in .env.production
+            sed -i 's|DATABASE_URL=.*|DATABASE_URL=mongodb+srv://autogencodebuilder:DataOnline@autogen.jf0j0.mongodb.net/user_management_db?retryWrites=true\&w=majority\&connectTimeoutMS=60000\&socketTimeoutMS=60000|' .env.production
+            echo "✅ Database URL updated successfully"
+          else
+            echo "⚠️ .env.production file not found, creating one..."
+            # Create basic .env.production if it doesn't exist
+            cat > .env.production << 'ENV_EOF'
+DATABASE_URL=mongodb+srv://autogencodebuilder:DataOnline@autogen.jf0j0.mongodb.net/user_management_db?retryWrites=true&w=majority&connectTimeoutMS=60000&socketTimeoutMS=60000
+PORT=8001
+ENVIRONMENT=production
+ENV_EOF
+          fi
+          
           # Create virtual environment if it doesn't exist
           if [ ! -d "venv" ]; then
             python3 -m venv venv

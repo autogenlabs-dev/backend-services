@@ -12,7 +12,7 @@ import time
 import uvicorn
 
 # Create FastAPI instance
-# Updated: Sept 2, 2025 - Testing CI/CD pipeline deployment
+# Updated: Sept 2, 2025 - Testing CI/CD pipeline deployment with new MongoDB connection
 app = FastAPI(
     title=settings.app_name,
     description="User Management System with Paid Plans for VS Code Extension",
