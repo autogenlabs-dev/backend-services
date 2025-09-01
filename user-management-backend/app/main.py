@@ -12,7 +12,7 @@ import time
 import uvicorn
 
 # Create FastAPI instance
-# Updated: Sept 2, 2025 - Fixed bash heredoc syntax error in deployment script
+# Updated: Sept 2, 2025 - Fixed YAML heredoc issue using echo commands approach
 app = FastAPI(
     title=settings.app_name,
     description="User Management System with Paid Plans for VS Code Extension",

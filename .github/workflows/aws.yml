@@ -105,12 +105,13 @@ jobs:
             echo "✅ Database URL updated successfully"
           else
             echo "⚠️ .env.production file not found, creating one..."
-            # Create basic .env.production if it doesn't exist
-            cat > .env.production << 'ENVEOF'
-DATABASE_URL=mongodb+srv://autogencodebuilder:DataOnline@autogen.jf0j0.mongodb.net/user_management_db?retryWrites=true&w=majority&connectTimeoutMS=60000&socketTimeoutMS=60000
-PORT=8001
-ENVIRONMENT=production
-ENVEOF
+            # Create basic .env.production using echo commands
+            echo "DATABASE_URL=mongodb+srv://autogencodebuilder:DataOnline@autogen.jf0j0.mongodb.net/user_management_db?retryWrites=true&w=majority&connectTimeoutMS=60000&socketTimeoutMS=60000" > .env.production
+            echo "PORT=8001" >> .env.production
+            echo "ENVIRONMENT=production" >> .env.production
+            echo "JWT_SECRET_KEY=production-jwt-secret-key-change-this" >> .env.production
+            echo "DEBUG=False" >> .env.production
+            echo "✅ Created .env.production file"
           fi
           
           # Create virtual environment if it doesn't exist
