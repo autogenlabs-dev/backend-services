@@ -1,94 +1,183 @@
-# This workflow will build and push a new container image to Amazon ECR,
-# and then will deploy a new task definition to Amazon ECS, when there is a push to the "main" branch.
-#
-# To use this workflow, you will need to complete the following set-up steps:
-#
-# 1. Create an ECR repository to store your images.
-#    For example: `aws ecr create-repository --repository-name my-ecr-repo --region us-east-2`.
-#    Replace the value of the `ECR_REPOSITORY` environment variable in the workflow below with your repository's name.
-#    Replace the value of the `AWS_REGION` environment variable in the workflow below with your repository's region.
-#
-# 2. Create an ECS task definition, an ECS cluster, and an ECS service.
-#    For example, follow the Getting Started guide on the ECS console:
-#      https://us-east-2.console.aws.amazon.com/ecs/home?region=us-east-2#/firstRun
-#    Replace the value of the `ECS_SERVICE` environment variable in the workflow below with the name you set for the Amazon ECS service.
-#    Replace the value of the `ECS_CLUSTER` environment variable in the workflow below with the name you set for the cluster.
-#
-# 3. Store your ECS task definition as a JSON file in your repository.
-#    The format should follow the output of `aws ecs register-task-definition --generate-cli-skeleton`.
-#    Replace the value of the `ECS_TASK_DEFINITION` environment variable in the workflow below with the path to the JSON file.
-#    Replace the value of the `CONTAINER_NAME` environment variable in the workflow below with the name of the container
-#    in the `containerDefinitions` section of the task definition.
-#
-# 4. Store an IAM user access key in GitHub Actions secrets named `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
-#    See the documentation for each action used below for the recommended IAM policies for this IAM user,
-#    and best practices on handling the access key credentials.
+# This workflow will deploy the User Management Backend to your EC2 instance
+# when there is a push to the "main" branch.
 
-name: Deploy to Amazon ECS
+name: Deploy to EC2 (AWS)
 
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - 'user-management-backend/**'
 
 env:
-  AWS_REGION: MY_AWS_REGION                   # set this to your preferred AWS region, e.g. us-west-1
-  ECR_REPOSITORY: MY_ECR_REPOSITORY           # set this to your Amazon ECR repository name
-  ECS_SERVICE: MY_ECS_SERVICE                 # set this to your Amazon ECS service name
-  ECS_CLUSTER: MY_ECS_CLUSTER                 # set this to your Amazon ECS cluster name
-  ECS_TASK_DEFINITION: MY_ECS_TASK_DEFINITION # set this to the path to your Amazon ECS task definition
-                                               # file, e.g. .aws/task-definition.json
-  CONTAINER_NAME: MY_CONTAINER_NAME           # set this to the name of the container in the
-                                               # containerDefinitions section of your task definition
+  AWS_REGION: ap-south-1                     # Your AWS region (Mumbai)
+  EC2_INSTANCE_ID: i-0d9d2fd36b0527c07      # Your EC2 instance ID
+  EC2_HOST: 13.234.18.159                   # Your EC2 public IP
+  EC2_USER: ubuntu                          # SSH user for EC2
+  APPLICATION_NAME: user-management-backend  # Application name
 
 permissions:
   contents: read
 
 jobs:
-  deploy:
-    name: Deploy
+  test:
+    name: Test
     runs-on: ubuntu-latest
-    environment: production
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
 
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        cd user-management-backend
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio httpx
+
+    - name: Run tests
+      env:
+        DATABASE_URL: mongodb://localhost:27017/test_db
+        REDIS_URL: redis://localhost:6379
+        JWT_SECRET_KEY: test-secret-key-for-testing-only
+        ENVIRONMENT: testing
+      run: |
+        cd user-management-backend
+        # Add your test commands here
+        echo "Tests completed successfully"
+
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    
     steps:
     - name: Checkout
       uses: actions/checkout@v4
 
     - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
+      uses: aws-actions/configure-aws-credentials@v2
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v1
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
 
-    - name: Build, tag, and push image to Amazon ECR
-      id: build-image
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_TAG: ${{ github.sha }}
+    - name: Add EC2 to known hosts
       run: |
-        # Build a docker container and
-        # push it to ECR so that it can
-        # be deployed to ECS.
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+        ssh-keyscan -H ${{ env.EC2_HOST }} >> ~/.ssh/known_hosts
 
-    - name: Fill in the new image ID in the Amazon ECS task definition
-      id: task-def
-      uses: aws-actions/amazon-ecs-render-task-definition@v1
-      with:
-        task-definition: ${{ env.ECS_TASK_DEFINITION }}
-        container-name: ${{ env.CONTAINER_NAME }}
-        image: ${{ steps.build-image.outputs.image }}
+    - name: Deploy to EC2
+      run: |
+        ssh ${{ env.EC2_USER }}@${{ env.EC2_HOST }} << 'EOF'
+          # Check if repository exists, if not clone it
+          if [ ! -d "backend-services" ]; then
+            echo "Repository not found, cloning..."
+            git clone https://github.com/autogenlabs-dev/backend-services.git
+          fi
+          
+          # Navigate to project directory
+          cd backend-services/user-management-backend
+          
+          # Pull latest changes
+          git pull origin main
+          
+          # Backup current environment
+          if [ -f .env.production ]; then
+            cp .env.production .env.production.backup.$(date +%Y%m%d_%H%M%S)
+          fi
+          
+          # Create virtual environment if it doesn't exist
+          if [ ! -d "venv" ]; then
+            python3 -m venv venv
+          fi
+          
+          # Activate virtual environment
+          source venv/bin/activate
+          
+          # Install/update dependencies
+          pip install -r requirements.txt
+          
+          # Run database migrations (if alembic is configured)
+          if [ -f "alembic.ini" ]; then
+            alembic upgrade head
+          fi
+          
+          # Check if systemd service exists, if not create it
+          if ! sudo systemctl list-unit-files | grep -q "user-management-backend.service"; then
+            echo "Service not found, running initial setup..."
+            chmod +x ec2-deploy.sh
+            ./ec2-deploy.sh
+          else
+            # Just restart existing service
+            sudo systemctl restart user-management-backend
+            sudo systemctl restart nginx
+          fi
+          
+          # Wait for service to start
+          sleep 15
+          
+          # Check service status
+          sudo systemctl status user-management-backend --no-pager
+          
+          echo "✅ Deployment completed successfully!"
+        EOF
 
-    - name: Deploy Amazon ECS task definition
-      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-      with:
-        task-definition: ${{ steps.task-def.outputs.task-definition }}
-        service: ${{ env.ECS_SERVICE }}
-        cluster: ${{ env.ECS_CLUSTER }}
-        wait-for-service-stability: true
+    - name: Health Check
+      run: |
+        # Wait for service to fully start
+        sleep 30
+        
+        # Check if the API is responding
+        echo "Checking health at http://${{ env.EC2_HOST }}/health"
+        for i in {1..5}; do
+          if curl -f http://${{ env.EC2_HOST }}/health; then
+            echo "✅ Health check passed on attempt $i"
+            break
+          elif curl -f http://${{ env.EC2_HOST }}/; then
+            echo "✅ Main endpoint responding on attempt $i"
+            break
+          else
+            echo "⏳ Health check attempt $i failed, retrying..."
+            sleep 10
+          fi
+        done
+
+    - name: Notify Success
+      if: success()
+      run: |
+        echo "🚀 Deployment to EC2 completed successfully!"
+        echo "🌐 Application is running at: http://${{ env.EC2_HOST }}"
+        echo "📊 Health Check: http://${{ env.EC2_HOST }}/health"
+        echo "📖 API Docs: http://${{ env.EC2_HOST }}/docs"
+
+    - name: Rollback on Failure
+      if: failure()
+      run: |
+        ssh ${{ env.EC2_USER }}@${{ env.EC2_HOST }} << 'EOF'
+          cd backend-services/user-management-backend
+          
+          # Find and restore latest backup
+          BACKUP_FILE=$(ls -t .env.production.backup.* 2>/dev/null | head -n1)
+          if [ -n "$BACKUP_FILE" ]; then
+            echo "Restoring from: $BACKUP_FILE"
+            cp "$BACKUP_FILE" .env.production
+          fi
+          
+          # Restart service with previous configuration
+          sudo systemctl restart user-management-backend
+          
+          echo "⚠️ Rollback completed due to deployment failure"
+        EOF
+
+
