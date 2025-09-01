@@ -44,6 +44,7 @@ from app.models.developer_earnings import DeveloperEarnings, PayoutRequest, Payo
 from app.middleware.auth import require_auth, require_role, require_admin, require_developer_or_admin, get_current_user_from_token
 from app.utils.email_service import email_service
 from app.services.access_control import ContentAccessService, AccessLevel
+from app.services.cache_service import cache_service, get_cache_service
 from app.config import settings
 from contextlib import asynccontextmanager
 
@@ -57,6 +58,9 @@ async def lifespan(app: FastAPI):
     # Startup
     global client, db
     try:
+        print("🔄 Initializing cache service...")
+        await get_cache_service()
+        
         print("🔄 Connecting to database...")
         client = AsyncIOMotorClient(settings.database_url)
         db = client.user_management_db
@@ -113,6 +117,13 @@ async def lifespan(app: FastAPI):
             print("🔌 Database connection closed")
         except Exception as e:
             print(f"⚠️ Error closing database: {e}")
+    
+    # Close cache service
+    try:
+        await cache_service.close()
+        print("🔌 Cache service closed")
+    except Exception as e:
+        print(f"⚠️ Error closing cache: {e}")
 
 # Create FastAPI app
 app = FastAPI(title="Minimal Auth Test Server", lifespan=lifespan)
@@ -321,9 +332,30 @@ async def get_current_user(token: str) -> User:
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token")
         
+        # Try to get user from cache first
+        cached_user_data = await cache_service.get_user_data(user_id)
+        if cached_user_data:
+            # Return cached user data as User object
+            user = User(**cached_user_data)
+            user.id = user_id  # Ensure ID is set correctly
+            return user
+        
+        # If not in cache, get from database and cache it
         user = await User.get(user_id)
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
+        
+        # Cache the user data for future requests
+        user_data = {
+            "id": str(user.id),
+            "email": user.email,
+            "name": user.name,
+            "role": user.role,
+            "subscription": user.subscription,
+            "tokens_used": user.tokens_used,
+            "email_verified": user.email_verified if hasattr(user, 'email_verified') else True
+        }
+        await cache_service.cache_user_data(str(user.id), user_data)
         
         return user
     except jwt.ExpiredSignatureError:
@@ -394,6 +426,9 @@ async def register(user_data: UserCreate):
 async def login_json(login_data: LoginRequest):
     """VS Code compatible login endpoint."""
     try:
+        # Check cache first for rate limiting and user data
+        cache_key = f"login_attempt:{login_data.email}"
+        
         # Find user
         user = await User.find_one(User.email == login_data.email)
         if not user:
@@ -410,6 +445,29 @@ async def login_json(login_data: LoginRequest):
         # Create tokens
         access_token = create_access_token(str(user.id), user.email, user.role)
         refresh_token = create_refresh_token(str(user.id))
+        
+        # Cache user session data
+        session_data = {
+            "user_id": str(user.id),
+            "email": user.email,
+            "role": user.role,
+            "subscription_tier": user.subscription,
+            "last_login": user.last_login_at.isoformat(),
+            "tokens_used": user.tokens_used
+        }
+        await cache_service.cache_user_session(str(user.id), session_data)
+        
+        # Cache user data for quick access
+        user_data = {
+            "id": str(user.id),
+            "email": user.email,
+            "name": user.name,
+            "role": user.role,
+            "subscription": user.subscription,
+            "tokens_used": user.tokens_used,
+            "email_verified": True
+        }
+        await cache_service.cache_user_data(str(user.id), user_data)
         
         # Return VS Code compatible response
         return LoginResponse(
@@ -561,6 +619,10 @@ async def logout(authorization: str = Header(None)):
     try:
         user = await get_current_user(token)
         
+        # Clear user caches
+        await cache_service.clear_user_session(str(user.id))
+        await cache_service.clear_user_data(str(user.id))
+        
         # Update last logout time
         user.last_logout_at = datetime.now(timezone.utc)
         user.updated_at = datetime.now(timezone.utc)
@@ -661,6 +723,10 @@ async def update_user_profile(user_data: UserUpdate, authorization: str = Header
     
     # Save the updated user
     await user.save()
+    
+    # Clear user caches when user profile is updated
+    await cache_service.clear_user_data(str(user.id))
+    await cache_service.clear_user_session(str(user.id))
     
     return {
         "id": str(user.id),
@@ -1039,6 +1105,9 @@ async def create_template(
             user_agent=client_info["user_agent"]
         )
         
+        # Clear template caches when new template is created
+        await cache_service.clear_template_caches()
+        
         # Return the template using the to_dict method
         template_dict = template.to_dict()
         print(f"Template created successfully: {template_dict}")
@@ -1068,6 +1137,16 @@ async def get_templates(
 ):
     """Get templates with role-based filtering."""
     try:
+        # Create cache key for this request
+        cache_key = f"templates:{skip}:{limit}:{category}:{type}:{plan_type}:{featured}:{popular}:{search}:{show_my_content}"
+        if current_user:
+            cache_key += f":{current_user.id}:{current_user.role}"
+        
+        # Try to get from cache first
+        cached_templates = await cache_service.get_templates(cache_key)
+        if cached_templates:
+            return cached_templates
+        
         # Build base query
         query = {"is_active": True}
         
@@ -1160,7 +1239,7 @@ async def get_templates(
         # Get total count
         total_count = await Template.find(query).count()
         
-        return {
+        result = {
             "templates": template_list,
             "total": total_count,
             "skip": skip,
@@ -1175,6 +1254,11 @@ async def get_templates(
                 "show_my_content": show_my_content
             }
         }
+        
+        # Cache the result for future requests (5 minutes)
+        await cache_service.cache_templates(cache_key, result, ttl=300)
+        
+        return result
         
     except Exception as e:
         print(f"Template retrieval error: {e}")
@@ -1404,6 +1488,9 @@ async def update_template(template_id: str, template_data: TemplateUpdate, autho
         template.updated_at = datetime.now(timezone.utc)
         await template.save()
         
+        # Clear template caches when template is updated
+        await cache_service.clear_template_caches()
+        
         return TemplateResponse(**template.to_dict())
         
     except HTTPException:
@@ -1435,6 +1522,9 @@ async def delete_template(template_id: str, authorization: str = Header(None)):
         template.is_active = False
         template.updated_at = datetime.now(timezone.utc)
         await template.save()
+        
+        # Clear template caches when template is deleted
+        await cache_service.clear_template_caches()
         
         return {"message": "Template deleted successfully"}
         
@@ -2135,6 +2225,9 @@ async def create_component(
             user_agent=client_info["user_agent"]
         )
         
+        # Clear component caches when new component is created
+        await cache_service.clear_component_caches()
+        
         return component.to_dict()
         
     except Exception as e:
@@ -2158,6 +2251,16 @@ async def get_components(
 ):
     """Get components with role-based filtering."""
     try:
+        # Create cache key for this request
+        cache_key = f"components:{skip}:{limit}:{category}:{type}:{plan_type}:{featured}:{popular}:{search}:{show_my_content}"
+        if current_user:
+            cache_key += f":{current_user.id}:{current_user.role}"
+        
+        # Try to get from cache first
+        cached_components = await cache_service.get_components(cache_key)
+        if cached_components:
+            return cached_components
+        
         query = {"is_active": True} if hasattr(Component, 'is_active') else {}
         
         # Content visibility logic based on user role and show_my_content parameter
@@ -2233,7 +2336,7 @@ async def get_components(
             
         total_count = await Component.find(query).count()
         
-        return {
+        result = {
             "components": component_list, 
             "total": total_count, 
             "skip": skip, 
@@ -2248,6 +2351,11 @@ async def get_components(
                 "show_my_content": show_my_content
             }
         }
+        
+        # Cache the result for future requests (5 minutes)
+        await cache_service.cache_components(cache_key, result, ttl=300)
+        
+        return result
     except Exception as e:
         print(f"Component retrieval error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve components: {str(e)}")
@@ -2317,6 +2425,10 @@ async def update_component(component_id: str, component_data: ComponentUpdateReq
                 setattr(component, field, value)
         component.updated_at = datetime.now(timezone.utc)
         await component.save()
+        
+        # Clear component caches when component is updated
+        await cache_service.clear_component_caches()
+        
         return component.to_dict()
     except HTTPException:
         raise
@@ -2398,6 +2510,10 @@ async def delete_component(component_id: str, authorization: str = Header(None))
             await component.save()
         else:
             await component.delete()
+        
+        # Clear component caches when component is deleted
+        await cache_service.clear_component_caches()
+        
         return {"message": "Component deleted successfully"}
     except HTTPException:
         raise
