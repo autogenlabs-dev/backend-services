@@ -155,12 +155,12 @@ jobs:
         sleep 30
         
         # Check if the API is responding
-        echo "Checking health at http://${{ env.EC2_HOST }}/health"
+        echo "Checking health at http://${{ env.EC2_HOST }}:8001/health"
         for i in {1..5}; do
-          if curl -f http://${{ env.EC2_HOST }}/health; then
+          if curl -f http://${{ env.EC2_HOST }}:8001/health; then
             echo "✅ Health check passed on attempt $i"
             break
-          elif curl -f http://${{ env.EC2_HOST }}/; then
+          elif curl -f http://${{ env.EC2_HOST }}:8001/; then
             echo "✅ Main endpoint responding on attempt $i"
             break
           else
@@ -173,9 +173,9 @@ jobs:
       if: success()
       run: |
         echo "🚀 Deployment to EC2 completed successfully!"
-        echo "🌐 Application is running at: http://${{ env.EC2_HOST }}"
-        echo "📊 Health Check: http://${{ env.EC2_HOST }}/health"
-        echo "📖 API Docs: http://${{ env.EC2_HOST }}/docs"
+        echo "🌐 Application is running at: http://${{ env.EC2_HOST }}:8001"
+        echo "📊 Health Check: http://${{ env.EC2_HOST }}:8001/health"
+        echo "📖 API Docs: http://${{ env.EC2_HOST }}:8001/docs"
 
     - name: Rollback on Failure
       if: failure()
