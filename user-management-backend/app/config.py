@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     project_name: str = "User Management API"
     environment: str = "development"
     host: str = "0.0.0.0"
-    port: int = 8000
+    port: int = 8001
     
     # CORS
     backend_cors_origins: List[str] = ["http://localhost:3000", "http://localhost:8080"]
