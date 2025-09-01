@@ -107,10 +107,10 @@ jobs:
             echo "⚠️ .env.production file not found, creating one..."
             # Create basic .env.production if it doesn't exist
             cat > .env.production << 'ENVEOF'
-          DATABASE_URL=mongodb+srv://autogencodebuilder:DataOnline@autogen.jf0j0.mongodb.net/user_management_db?retryWrites=true&w=majority&connectTimeoutMS=60000&socketTimeoutMS=60000
-          PORT=8001
-          ENVIRONMENT=production
-          ENVEOF
+DATABASE_URL=mongodb+srv://autogencodebuilder:DataOnline@autogen.jf0j0.mongodb.net/user_management_db?retryWrites=true&w=majority&connectTimeoutMS=60000&socketTimeoutMS=60000
+PORT=8001
+ENVIRONMENT=production
+ENVEOF
           fi
           
           # Create virtual environment if it doesn't exist

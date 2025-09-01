@@ -12,7 +12,7 @@ import time
 import uvicorn
 
 # Create FastAPI instance
-# Updated: Sept 2, 2025 - Testing CI/CD with MongoDB and correct port configuration
+# Updated: Sept 2, 2025 - Fixed bash heredoc syntax error in deployment script
 app = FastAPI(
     title=settings.app_name,
     description="User Management System with Paid Plans for VS Code Extension",
