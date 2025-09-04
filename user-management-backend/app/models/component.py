@@ -110,11 +110,11 @@ class Component(Document):
             data["approved_at"] = self.approved_at.isoformat() if hasattr(self.approved_at, 'isoformat') else str(self.approved_at)
         
         # Ensure code field is properly handled (preserve dict structure if it exists)
-            if hasattr(self, 'code') and self.code is not None:
-                if isinstance(self.code, dict):
-                    # Join all code parts into a single string (HTML, CSS, JS, etc.)
-                    data["code"] = "\n".join(str(v) for v in self.code.values())
-                else:
-                    data["code"] = str(self.code)
+        if hasattr(self, 'code') and self.code is not None:
+            if isinstance(self.code, dict):
+                # Preserve dict structure for frontend to handle properly
+                data["code"] = self.code
+            else:
+                data["code"] = str(self.code)
             
         return data
