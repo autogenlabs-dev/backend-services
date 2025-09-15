@@ -17,7 +17,7 @@ except ImportError:
 
 
 class CartItemType(str, Enum):
-    """Cart item type enumeration"""
+    """Type of item in cart"""
     TEMPLATE = "template"
     COMPONENT = "component"
 
