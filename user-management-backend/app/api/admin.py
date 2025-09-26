@@ -1,12 +1,43 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Dict, Optional, Any
-from datetime import datetime, timedelta
-from bea, timezonenie import PydanticObjectId
+from datetime import datetime, timedelta, timezone
+from beanie import PydanticObjectId
 from ..auth.unified_auth import get_current_user_unified
-from ..models.user import User, UserRole
+from ..models.user import User, UserRole, TokenUsageLog, UserSubscription, SubscriptionPlan
 from ..models.template import Template
 from ..models.component import Component
 import logging
+from app.database import get_database
+
+# Temporary imports to avoid import errors - these need to be replaced with MongoDB aggregations
+try:
+    from sqlalchemy import select, func, and_, desc, or_
+    from sqlalchemy.orm import Session
+    from sqlalchemy.ext.asyncio import AsyncSession
+except ImportError:
+    # Create dummy functions to avoid import errors
+    def select(*args, **kwargs): pass
+    def func(*args, **kwargs): 
+        class DummyFunc:
+            def sum(self, *args): return self
+            def count(self, *args): return self
+            def distinct(self, *args): return self
+            def date(self, *args): return self
+            def label(self, *args): return self
+            def scalar(self): return 0
+        return DummyFunc()
+    def and_(*args, **kwargs): pass
+    def desc(*args, **kwargs): pass
+    def or_(*args, **kwargs): pass
+    class AsyncSession: pass
+
+# Temporary dummy service to avoid import errors
+try:
+    from ..services.stripe_service import StripeService
+except ImportError:
+    class StripeService:
+        def __init__(self): pass
+        async def get_revenue_stats(self, *args, **kwargs): return {"error": "Service not available"}
 
 logger = logging.getLogger(__name__)
 
@@ -328,7 +359,7 @@ async def usage_stats(
     start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
     group_by: Optional[str] = Query("day", description="Group by: day, week, month, provider, model"),
-    db: AsyncSession = Depends(get_db), 
+    db: Any = Depends(get_database), 
     admin: User = Depends(require_admin)
 ):
     """
@@ -337,6 +368,19 @@ async def usage_stats(
     Returns comprehensive analytics on token usage across the platform.
     """
     try:
+        # TODO: Implement MongoDB aggregation queries to replace SQLAlchemy queries
+        # This is a temporary fix to get the server running
+        return {
+            "message": "Token usage statistics temporarily unavailable - needs MongoDB aggregation implementation",
+            "total_tokens": 0,
+            "total_cost": 0,
+            "unique_users": 0,
+            "daily_breakdown": [],
+            "provider_breakdown": [],
+            "model_breakdown": []
+        }
+        
+        # The following SQLAlchemy code needs to be converted to MongoDB aggregation:
         # Parse date filters
         date_filters = []
         if start_date:
@@ -472,7 +516,7 @@ async def usage_stats(
 @router.get("/revenue")
 async def revenue_stats(
     period: str = Query("month", description="Period: month, quarter, year, all"),
-    db: AsyncSession = Depends(get_db), 
+    db: Any = Depends(get_database), 
     admin: User = Depends(require_admin)
 ):
     """
@@ -583,7 +627,7 @@ async def change_user_plan(
     user_id: str, 
     plan_name: str, 
     update_stripe: bool = Query(True, description="Update Stripe subscription if applicable"),
-    db: AsyncSession = Depends(get_db), 
+    db: Any = Depends(get_database), 
     admin: User = Depends(require_admin)
 ):
     """
@@ -657,7 +701,7 @@ async def change_user_plan(
         raise HTTPException(status_code=500, detail=f"Failed to update user plan: {str(e)}")
 
 @router.get("/system-stats")
-async def system_stats(db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)):
+async def system_stats(db: Any = Depends(get_database), admin: User = Depends(require_admin)):
     """
     Get system statistics for monitoring the platform.
     

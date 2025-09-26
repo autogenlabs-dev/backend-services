@@ -13,7 +13,7 @@ from fastapi import HTTPException, status, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_
-from app.database import get_db
+from app.database import get_database
 from app.models.user import User, ApiKey
 from pydantic import BaseModel
 
@@ -267,7 +267,7 @@ class ApiKeyAuth:
     async def __call__(
         self,
         request: Request,
-        db: Session = Depends(get_db)
+        db: Any = Depends(get_database)
     ) -> Optional[Tuple[User, ApiKey]]:
         """
         Extract and validate API key from request

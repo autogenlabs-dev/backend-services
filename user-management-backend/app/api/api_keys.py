@@ -3,7 +3,7 @@ API Key management endpoints.
 Provides CRUD operations for user API keys.
 """
 
-from typing import List
+from typing import List, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_database as get_db
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api/keys", tags=["API Keys"])
 async def create_api_key(
     key_data: ApiKeyCreate,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: Any = Depends(get_db),
     rate_info: dict = Depends(apply_rate_limit)
 ):
     """
@@ -53,7 +53,7 @@ async def create_api_key(
 @router.get("/", response_model=List[ApiKeyResponse])
 async def list_api_keys(
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: Any = Depends(get_db),
     rate_info: dict = Depends(apply_rate_limit)
 ):
     """
@@ -79,7 +79,7 @@ async def list_api_keys(
 async def revoke_api_key(
     key_id: str,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: Any = Depends(get_db),
     rate_info: dict = Depends(apply_rate_limit)
 ):
     """
