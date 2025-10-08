@@ -1,6 +1,8 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 from typing import List
 import os
+import json
 
 
 class Settings(BaseSettings):
@@ -44,6 +46,16 @@ class Settings(BaseSettings):
     
     # CORS
     backend_cors_origins: List[str] = ["http://localhost:3000", "http://localhost:8080"]
+    
+    @field_validator('backend_cors_origins', mode='before')
+    @classmethod
+    def parse_cors_origins(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return v.split(',')
+        return v
     
     # OAuth
     oauth_providers: List[str] = ["openrouter", "glama", "requesty", "aiml"]
