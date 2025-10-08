@@ -47,7 +47,7 @@ async def list_oauth_providers() -> Dict[str, Any]:
 async def register_user(user_data: UserCreate, db: Any = Depends(get_database)): # Changed type hint from Session to Any, and get_db to get_database
     """Register a new user with email and password."""
     try:
-        user = create_user_with_password(db, user_data)
+        user = await create_user_with_password(db, user_data)
         return UserResponse(
             id=user.id,
             email=user.email,
@@ -103,7 +103,7 @@ async def login_user(
     db: Any = Depends(get_database) # Changed type hint from Session to Any, and get_db to get_database
 ):
     """Login user with email and password."""
-    user = authenticate_user(db, form_data.username, form_data.password)
+    user = await authenticate_user(db, form_data.username, form_data.password)
     
     if not user:
         raise HTTPException(
@@ -119,7 +119,7 @@ async def login_user(
         )
     
     # Update last login
-    update_user_last_login(db, user.id)
+    await update_user_last_login(db, user.id)
       # Create tokens
     access_token = create_access_token(
         data={"sub": str(user.id), "email": user.email},
@@ -151,7 +151,7 @@ async def login_user_json(
     db: Any = Depends(get_database) # Changed type hint from Session to Any, and get_db to get_database
 ):
     """Login user with email and password using JSON."""
-    user = authenticate_user(db, user_data.email, user_data.password)
+    user = await authenticate_user(db, user_data.email, user_data.password)
     
     if not user:
         raise HTTPException(
@@ -166,7 +166,7 @@ async def login_user_json(
             detail="User account is disabled"
         )
       # Update last login
-    update_user_last_login(db, user.id)
+    await update_user_last_login(db, user.id)
       # Create tokens
     access_token = create_access_token(
         data={"sub": str(user.id), "email": user.email},
@@ -261,7 +261,7 @@ async def oauth_callback(
             )
         
         # Get or create user
-        user = get_or_create_user_by_oauth(
+        user = await get_or_create_user_by_oauth(
             db=db,
             provider_name=provider,
             provider_user_id=str(provider_user_id),
@@ -269,7 +269,7 @@ async def oauth_callback(
         )
         
         # Update last login
-        update_user_last_login(db, user.id)
+        await update_user_last_login(db, user.id)
         
         # Create tokens
         access_token = create_access_token(
@@ -318,7 +318,7 @@ async def refresh_access_token(
     
     # Verify user still exists and is active
     from ..services.user_service import get_user_by_id
-    user = get_user_by_id(db, UUID(user_id))
+    user = await get_user_by_id(db, UUID(user_id))
     if not user or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -357,7 +357,7 @@ async def logout(
             # For now, we'll update the user's last logout time
             from ..services.user_service import update_user_last_logout
             try:
-                update_user_last_logout(db, current_user.id)
+                await update_user_last_logout(db, current_user.id)
             except Exception as e:
                 print(f"Warning: Could not update last logout time: {e}")
         
