@@ -67,6 +67,13 @@ async def create_template(
     current_user: User = Depends(get_current_user_unified)
 ):
     """Create a new template."""
+    # Check if user has developer or admin role
+    if current_user.role not in ["developer", "admin", "superadmin"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Developer or Admin access required"
+        )
+    
     try:
         # Create template document
         # Note: preview_images will be empty - using live_demo_url for preview generation
@@ -215,6 +222,17 @@ async def get_my_templates(
         )
 
 
+@router.get("/my-templates", response_model=Dict[str, Any])
+async def get_my_templates_legacy(
+    current_user: User = Depends(get_current_user_unified),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(20, ge=1, le=100, description="Number of templates per page")
+):
+    """Get templates created by the current user. Legacy route for backward compatibility."""
+    # Call the main function
+    return await get_my_templates(current_user, page, limit)
+
+
 @router.get("/favorites", response_model=Dict[str, Any])
 async def get_favorite_templates(
     current_user: User = Depends(get_current_user_unified),
@@ -274,7 +292,7 @@ async def get_template_by_id(template_id: str):
     """Get a specific template by ID."""
     try:
         # Skip validation for special routes
-        if template_id in ['my', 'favorites', 'categories', 'stats']:
+        if template_id in ['my', 'my-templates', 'favorites', 'categories', 'stats']:
             raise HTTPException(status_code=404, detail="Route not found")
         
         # Convert string ID to ObjectId
