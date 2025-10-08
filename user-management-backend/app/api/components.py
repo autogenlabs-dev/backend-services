@@ -19,6 +19,13 @@ async def create_component(
     current_user: User = Depends(get_current_user_unified)
 ):
     """Create a new component."""
+    # Check if user has developer or admin role
+    if current_user.role not in ["developer", "admin", "superadmin"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Developer or Admin access required"
+        )
+    
     try:
         component = Component(
             **request.dict(),
@@ -40,23 +47,64 @@ async def create_component(
 
 @router.get("/", response_model=Dict[str, Any])
 async def get_all_components(
-    category: Optional[str] = Query(None),
-    plan_type: Optional[str] = Query(None),
-    difficulty_level: Optional[str] = Query(None),
-    featured: Optional[bool] = Query(None),
-    popular: Optional[bool] = Query(None),
-    skip: int = 0,
-    limit: int = 20,
-    search: Optional[str] = Query(None)
+    category: Optional[str] = Query(None, description="Filter by category"),
+    plan_type: Optional[str] = Query(None, description="Filter by plan type (Free/Paid)"),
+    difficulty_level: Optional[str] = Query(None, description="Filter by difficulty level"),
+    featured: Optional[bool] = Query(None, description="Filter featured components"),
+    search: Optional[str] = Query(None, description="Search in title and description"),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(20, ge=1, le=100, description="Number of components per page")
 ):
-    query = {}
-    if category: query["category"] = category
-    if plan_type: query["plan_type"] = plan_type
-    if difficulty_level: query["difficulty_level"] = difficulty_level
-    if featured is not None: query["featured"] = featured
-    # Add more filters as needed
-    components = await Component.find(query).skip(skip).limit(limit).to_list()
-    return {"success": True, "components": [c.to_dict() for c in components]}
+    """Get all components with optional filtering and pagination."""
+    try:
+        # Build filter query
+        filter_query = {"is_active": True}
+        
+        if category:
+            filter_query["category"] = category
+        if plan_type:
+            filter_query["plan_type"] = plan_type
+        if difficulty_level:
+            filter_query["difficulty_level"] = difficulty_level
+        if featured is not None:
+            filter_query["featured"] = featured
+        
+        # Add search functionality
+        if search:
+            filter_query["$or"] = [
+                {"title": {"$regex": search, "$options": "i"}},
+                {"short_description": {"$regex": search, "$options": "i"}}
+            ]
+        
+        # Get total count for pagination
+        total_count = await Component.find(filter_query).count()
+        
+        # Get paginated results
+        skip = (page - 1) * limit
+        components = await Component.find(filter_query).sort("-created_at").skip(skip).limit(limit).to_list()
+        
+        # Convert to dictionary format
+        component_list = [component.to_dict() for component in components]
+        
+        return {
+            "success": True,
+            "components": component_list,
+            "total": total_count,
+            "skip": skip,
+            "limit": limit,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total": total_count,
+                "pages": (total_count + limit - 1) // limit
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch components: {str(e)}"
+        )
 
 @router.get("/my", response_model=Dict[str, Any])
 async def get_my_components(
@@ -98,12 +146,42 @@ async def get_my_components(
             detail=f"Failed to fetch user components: {str(e)}"
         )
 
+
+@router.get("/my-components", response_model=Dict[str, Any])
+async def get_my_components_legacy(
+    current_user: User = Depends(get_current_user_unified),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(20, ge=1, le=100, description="Number of components per page")
+):
+    """Get components created by the current user. Legacy route for backward compatibility."""
+    # Call the main function
+    return await get_my_components(current_user, page, limit)
+
 @router.get("/{component_id}", response_model=Dict[str, Any])
 async def get_component(component_id: str):
-    component = await Component.get(component_id)
-    if not component:
-        raise HTTPException(status_code=404, detail="Component not found")
-    return {"success": True, "component": component.to_dict()}
+    """Get a specific component by ID."""
+    try:
+        # Skip validation for special routes
+        if component_id in ['my', 'my-components', 'favorites', 'categories', 'stats']:
+            raise HTTPException(status_code=404, detail="Route not found")
+        
+        # Convert string ID to ObjectId
+        if not PydanticObjectId.is_valid(component_id):
+            raise HTTPException(status_code=400, detail="Invalid component ID")
+        
+        component = await Component.get(PydanticObjectId(component_id))
+        if not component:
+            raise HTTPException(status_code=404, detail="Component not found")
+        
+        return {"success": True, "component": component.to_dict()}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch component: {str(e)}"
+        )
 
 @router.put("/{component_id}", response_model=Dict[str, Any])
 async def update_component(
