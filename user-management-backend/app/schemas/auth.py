@@ -101,7 +101,7 @@ class SubscriptionPlanResponse(BaseModel):
     display_name: str
     monthly_tokens: int
     price_monthly: float
-    features: Optional[Dict[str, Any]]
+    features: Optional[List[str]]  # Changed from Dict to List to match model
     is_active: bool
 
     class Config:

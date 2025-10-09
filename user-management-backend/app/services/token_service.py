@@ -3,8 +3,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, Tuple
 from decimal import Decimal
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from ..models.user import User, TokenUsageLog, SubscriptionPlan, UserSubscription
 
@@ -12,26 +11,24 @@ from ..models.user import User, TokenUsageLog, SubscriptionPlan, UserSubscriptio
 class TokenService:
     """Service for managing user token balances and consumption."""
     
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncIOMotorDatabase):
         self.db = db
     
-    def get_user_subscription_plan(self, user: User) -> SubscriptionPlan:
+    async def get_user_subscription_plan(self, user: User) -> SubscriptionPlan:
         """Get user's current subscription plan, defaulting to free."""
-        subscription = (
-            self.db.query(UserSubscription)
-            .filter(UserSubscription.user_id == user.id)
-            .filter(UserSubscription.status == "active")
-            .first()
+        subscription = await UserSubscription.find_one(
+            UserSubscription.user_id == user.id,
+            UserSubscription.status == "active"
         )
         
-        if subscription:
-            return subscription.plan
+        if subscription and subscription.plan_id:
+            plan = await SubscriptionPlan.get(subscription.plan_id)
+            if plan:
+                return plan
         
         # Return free plan as default
-        free_plan = (
-            self.db.query(SubscriptionPlan)
-            .filter(SubscriptionPlan.name == "free")
-            .first()
+        free_plan = await SubscriptionPlan.find_one(
+            SubscriptionPlan.name == "free"
         )
         
         if not free_plan:
@@ -40,23 +37,19 @@ class TokenService:
                 name="free",
                 display_name="Free Plan",
                 monthly_tokens=10000,
-                price_monthly=Decimal("0.00"),
-                features={"models": ["basic"], "support": "community"},
+                price_monthly=0.0,
+                features=["basic_models", "community_support"],
                 is_active=True
             )
-            self.db.add(free_plan)
-            self.db.commit()
-            self.db.refresh(free_plan)
+            await free_plan.insert()
         
         return free_plan
     
-    def get_current_period_dates(self, user: User) -> Tuple[datetime, datetime]:
+    async def get_current_period_dates(self, user: User) -> Tuple[datetime, datetime]:
         """Get the current billing period start and end dates."""
-        subscription = (
-            self.db.query(UserSubscription)
-            .filter(UserSubscription.user_id == user.id)
-            .filter(UserSubscription.status == "active")
-            .first()
+        subscription = await UserSubscription.find_one(
+            UserSubscription.user_id == user.id,
+            UserSubscription.status == "active"
         )
         
         if subscription and subscription.current_period_start and subscription.current_period_end:
@@ -74,27 +67,27 @@ class TokenService:
         
         return period_start, period_end
     
-    def get_tokens_used_this_period(self, user: User) -> int:
+    async def get_tokens_used_this_period(self, user: User) -> int:
         """Get total tokens used in the current billing period."""
-        period_start, period_end = self.get_current_period_dates(user)
+        period_start, period_end = await self.get_current_period_dates(user)
         
-        result = (
-            self.db.query(func.sum(TokenUsageLog.tokens_used))
-            .filter(TokenUsageLog.user_id == user.id)
-            .filter(TokenUsageLog.created_at >= period_start)
-            .filter(TokenUsageLog.created_at < period_end)
-            .scalar()
-        )
+        # Use Beanie aggregation to sum tokens
+        logs = await TokenUsageLog.find(
+            TokenUsageLog.user_id == user.id,
+            TokenUsageLog.created_at >= period_start,
+            TokenUsageLog.created_at < period_end
+        ).to_list()
         
-        return result or 0
+        total = sum(log.tokens_used for log in logs)
+        return total or 0
     
-    def get_token_balance(self, user: User) -> Dict[str, Any]:
+    async def get_token_balance(self, user: User) -> Dict[str, Any]:
         """Get user's current token balance and limits."""
-        plan = self.get_user_subscription_plan(user)
-        tokens_used = self.get_tokens_used_this_period(user)
+        plan = await self.get_user_subscription_plan(user)
+        tokens_used = await self.get_tokens_used_this_period(user)
         tokens_remaining = max(0, plan.monthly_tokens - tokens_used)
         
-        period_start, period_end = self.get_current_period_dates(user)
+        period_start, period_end = await self.get_current_period_dates(user)
         
         return {
             "tokens_remaining": tokens_remaining,
@@ -107,18 +100,18 @@ class TokenService:
             "usage_percentage": round((tokens_used / plan.monthly_tokens) * 100, 2) if plan.monthly_tokens > 0 else 0
         }
     
-    def check_token_availability(self, user: User, tokens_requested: int) -> Tuple[bool, str]:
+    async def check_token_availability(self, user: User, tokens_requested: int) -> Tuple[bool, str]:
         """Check if user has enough tokens available."""
-        balance = self.get_token_balance(user)
+        balance = await self.get_token_balance(user)
         
         if balance["tokens_remaining"] < tokens_requested:
             return False, f"Insufficient tokens. Requested: {tokens_requested}, Available: {balance['tokens_remaining']}"
         
         return True, "OK"
     
-    def reserve_tokens(self, user: User, amount: int, provider: str, model_name: str, request_type: str) -> Dict[str, Any]:
+    async def reserve_tokens(self, user: User, amount: int, provider: str, model_name: str, request_type: str) -> Dict[str, Any]:
         """Reserve tokens for a request (check availability)."""
-        available, message = self.check_token_availability(user, amount)
+        available, message = await self.check_token_availability(user, amount)
         
         if not available:
             return {
@@ -136,12 +129,12 @@ class TokenService:
             "request_type": request_type
         }
     
-    def consume_tokens(
+    async def consume_tokens(
         self, 
         user: User, 
         tokens: int, 
         model_name: str = "default",
-        request_metadata: Dict[str, Any] = None,
+        request_metadata: Optional[Dict[str, Any]] = None,
         api_key_id: Optional[str] = None
     ) -> Tuple[bool, Dict[str, Any]]:
         """
@@ -152,12 +145,12 @@ class TokenService:
         
         # Handle sub-user token consumption
         if user.is_sub_user and user.parent_user_id:
-            return self._consume_sub_user_tokens(user, tokens, model_name, request_metadata, api_key_id)
+            return await self._consume_sub_user_tokens(user, tokens, model_name, request_metadata, api_key_id)
         
         # Regular user token consumption
         return self._consume_regular_user_tokens(user, tokens, model_name, request_metadata, api_key_id)
     
-    def _consume_sub_user_tokens(
+    async def _consume_sub_user_tokens(
         self,
         sub_user: User,
         tokens: int,
@@ -168,7 +161,7 @@ class TokenService:
         """Consume tokens for a sub-user"""
         
         # Get parent user for billing
-        parent_user = self.db.query(User).filter(User.id == sub_user.parent_user_id).first()
+        parent_user = await User.get(sub_user.parent_user_id)
         if not parent_user:
             return False, {"error": "Parent user not found"}
         
@@ -201,10 +194,12 @@ class TokenService:
         parent_user.tokens_remaining = max(0, parent_user.monthly_limit - parent_user.tokens_used)
         
         # Log usage for both users
-        self._log_token_usage(sub_user, tokens, model_name, request_metadata, api_key_id, is_sub_user=True)
-        self._log_token_usage(parent_user, tokens, model_name, request_metadata, api_key_id, sub_user_id=str(sub_user.id))
+        await self._log_token_usage(sub_user, tokens, model_name, request_metadata, api_key_id, is_sub_user=True)
+        await self._log_token_usage(parent_user, tokens, model_name, request_metadata, api_key_id, sub_user_id=str(sub_user.id))
         
-        self.db.commit()
+        # Save users
+        await sub_user.save()
+        await parent_user.save()
         
         return True, {
             "success": True,
@@ -246,7 +241,7 @@ class TokenService:
             "remaining": user.tokens_remaining
         }
     
-    def _log_token_usage(
+    async def _log_token_usage(
         self,
         user: User,
         tokens: int,
@@ -276,21 +271,18 @@ class TokenService:
                 "billing_user_id": str(user.id)
             })
         
-        self.db.add(usage_log)
+        await usage_log.insert()
     
-    def get_sub_user_usage_summary(self, sub_user_id: str, days: int = 30) -> Dict[str, Any]:
+    async def get_sub_user_usage_summary(self, sub_user_id: str, days: int = 30) -> Dict[str, Any]:
         """Get usage summary for a sub-user"""
         
         from_date = datetime.now(timezone.utc) - timedelta(days=days)
         
-        # Get usage logs for sub-user
-        usage_query = (
-            self.db.query(TokenUsageLog)
-            .filter(TokenUsageLog.user_id == sub_user_id)
-            .filter(TokenUsageLog.timestamp >= from_date)
-        )
-        
-        usage_logs = usage_query.all()
+        # Get usage logs for sub-user using Beanie
+        usage_logs = await TokenUsageLog.find(
+            TokenUsageLog.user_id == sub_user_id,
+            TokenUsageLog.created_at >= from_date
+        ).to_list()
         
         # Calculate statistics
         total_tokens = sum(log.tokens_used for log in usage_logs)
@@ -324,9 +316,9 @@ class TokenService:
             "last_activity": max((log.timestamp for log in usage_logs), default=None)
         }
     
-    def get_rate_limits(self, user: User) -> Dict[str, int]:
+    async def get_rate_limits(self, user: User) -> Dict[str, int]:
         """Get rate limits based on user's subscription plan."""
-        plan = self.get_user_subscription_plan(user)
+        plan = await self.get_user_subscription_plan(user)
         
         # Default rate limits
         rate_limits = {
@@ -335,14 +327,10 @@ class TokenService:
             "per_day": 10000
         }
         
-        # Adjust based on plan features
-        if plan.features:
-            max_requests_per_minute = plan.features.get("max_requests_per_minute", 60)
-            rate_limits.update({
-                "per_minute": max_requests_per_minute,
-                "per_hour": max_requests_per_minute * 60,
-                "per_day": max_requests_per_minute * 60 * 24
-            })
+        # Adjust based on plan features - features is a list of strings
+        if plan.features and isinstance(plan.features, list):
+            # For now just use defaults since features is a list not a dict
+            pass
         
         # Plan-specific adjustments
         if plan.name == "free":
@@ -366,17 +354,15 @@ class TokenService:
         
         return rate_limits
     
-    def get_usage_stats(self, user: User, days: int = 30) -> Dict[str, Any]:
+    async def get_usage_stats(self, user: User, days: int = 30) -> Dict[str, Any]:
         """Get detailed usage statistics for the user."""
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
         
-        # Get usage logs for the period
-        logs = (
-            self.db.query(TokenUsageLog)
-            .filter(TokenUsageLog.user_id == user.id)
-            .filter(TokenUsageLog.created_at >= cutoff_date)
-            .all()
-        )
+        # Get usage logs for the period using Beanie
+        logs = await TokenUsageLog.find(
+            TokenUsageLog.user_id == user.id,
+            TokenUsageLog.created_at >= cutoff_date
+        ).to_list()
         
         if not logs:
             return {
@@ -438,21 +424,21 @@ class TokenService:
         }
 
     # New methods required by LLM proxy service
-    def can_use_tokens(self, user: User, tokens_requested: int) -> bool:
+    async def can_use_tokens(self, user: User, tokens_requested: int) -> bool:
         """Check if user can use the requested number of tokens."""
-        available, _ = self.check_token_availability(user, tokens_requested)
+        available, _ = await self.check_token_availability(user, tokens_requested)
         return available
 
-    def get_available_tokens(self, user: User) -> int:
+    async def get_available_tokens(self, user: User) -> int:
         """Get the number of available tokens for the user."""
-        balance = self.get_token_balance(user)
+        balance = await self.get_token_balance(user)
         return balance["tokens_remaining"]
 
-    def reserve_tokens(self, user: User, tokens: int, request_type: str, metadata: Dict[str, Any]) -> str:
+    async def reserve_tokens_advanced(self, user: User, tokens: int, request_type: str, metadata: Dict[str, Any]) -> str:
         """Reserve tokens for a request and return reservation ID."""
         # For now, this is a simple implementation that just checks availability
         # In a production system, you might want to actually reserve tokens in a separate table
-        available, message = self.check_token_availability(user, tokens)
+        available, message = await self.check_token_availability(user, tokens)
         if not available:
             raise ValueError(f"Cannot reserve tokens: {message}")
         
@@ -474,7 +460,7 @@ class TokenService:
         
         return reservation_id
 
-    def consume_reserved_tokens(self, reservation_id: str, actual_tokens: int, cost_usd: float, response_metadata: Dict[str, Any]):
+    async def consume_reserved_tokens(self, reservation_id: str, actual_tokens: int, cost_usd: float, response_metadata: Dict[str, Any]):
         """Consume tokens that were previously reserved."""
         if not hasattr(self, '_reservations') or reservation_id not in self._reservations:
             raise ValueError(f"Reservation {reservation_id} not found")
