@@ -318,7 +318,18 @@ async def refresh_access_token(
     
     # Verify user still exists and is active
     from ..services.user_service import get_user_by_id
-    user = await get_user_by_id(db, UUID(user_id))
+    from beanie import PydanticObjectId
+    
+    # Convert string ID to PydanticObjectId for MongoDB
+    try:
+        user_obj_id = PydanticObjectId(user_id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user ID format"
+        )
+    
+    user = await get_user_by_id(db, user_obj_id)
     if not user or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
+from contextlib import asynccontextmanager
+from motor.motor_asyncio import AsyncIOMotorClient
+from beanie import init_beanie
 from .config import settings
 from .auth.oauth import register_oauth_clients
 from .middleware.rate_limiting import rate_limit_middleware, add_rate_limit_headers
@@ -11,13 +14,72 @@ from typing import Callable, Dict, Any
 import time
 import uvicorn
 
-# Create FastAPI instance
+# Import all models that need to be registered with Beanie
+from .models.user import User, UserOAuthAccount, UserSubscription, OAuthProvider, SubscriptionPlan
+from .models.template import Template, TemplateCategory
+from .models.component import Component
+from .models.template_interactions import TemplateHelpfulVote
+from .models.component_interactions import (
+    ComponentLike,
+    ComponentView,
+    ComponentDownload,
+    ComponentComment,
+    ComponentHelpfulVote
+)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events"""
+    # Startup: Initialize database and Beanie
+    print("🔄 Connecting to database...")
+    client = AsyncIOMotorClient(settings.database_url)
+    database = client["user_management_db"]  # Extract database name from URL
+    
+    print("🔄 Initializing Beanie...")
+    # Only import models that exist
+    try:
+        await init_beanie(
+            database=database,
+            document_models=[
+                User,
+                UserOAuthAccount,
+                UserSubscription,
+                SubscriptionPlan,
+                OAuthProvider,
+                Template,
+                TemplateCategory,
+                Component,
+                TemplateHelpfulVote,
+                ComponentLike,
+                ComponentView,
+                ComponentDownload,
+                ComponentComment,
+                ComponentHelpfulVote
+            ]
+        )
+        print("✅ Database connected and initialized")
+    except Exception as e:
+        print(f"❌ Error initializing Beanie: {e}")
+        raise
+    
+    yield
+    
+    # Shutdown: Close database connection
+    print("🔄 Closing database connection...")
+    client.close()
+    print("✅ Database connection closed")
+
+
+# Create FastAPI instance with lifespan
 # Updated: Sept 2, 2025 - Corrected port configuration to 8000 for production deployment
+# Updated: Oct 9, 2025 - Added lifespan context manager for Beanie initialization
 app = FastAPI(
     title=settings.app_name,
     description="User Management System with Paid Plans for VS Code Extension",
     version="1.0.0",
     debug=settings.debug,
+    lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc"
 )
