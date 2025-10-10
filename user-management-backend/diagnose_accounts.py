@@ -30,10 +30,10 @@ async def diagnose():
     # Connect to database
     print("\n1️⃣ Testing Database Connection...")
     try:
-        client = AsyncIOMotorClient(settings.DATABASE_URL)
+        client = AsyncIOMotorClient(settings.database_url)
         database = client.get_database()
         await database.command('ping')
-        print(f"✅ Connected to: {settings.DATABASE_URL}")
+        print(f"✅ Connected to: {settings.database_url}")
     except Exception as e:
         print(f"❌ Database connection failed: {e}")
         return
