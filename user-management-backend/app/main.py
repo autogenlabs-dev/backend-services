@@ -15,16 +15,22 @@ import time
 import uvicorn
 
 # Import all models that need to be registered with Beanie
-from .models.user import User, UserOAuthAccount, UserSubscription, OAuthProvider, SubscriptionPlan
-from .models.template import Template, TemplateCategory
-from .models.component import Component
-from .models.template_interactions import TemplateHelpfulVote
-from .models.component_interactions import (
-    ComponentLike,
-    ComponentView,
-    ComponentDownload,
-    ComponentComment,
-    ComponentHelpfulVote
+from app.models.user import (
+    User,
+    UserOAuthAccount,
+    UserSubscription,
+    SubscriptionPlan,
+    OAuthProvider,
+    TokenUsageLog,
+    ApiKey
+)
+from app.models.template import (
+    Template,
+    TemplateCategory,
+    TemplateLike,
+    TemplateDownload,
+    TemplateView,
+    TemplateComment
 )
 
 
@@ -47,15 +53,14 @@ async def lifespan(app: FastAPI):
                 UserSubscription,
                 SubscriptionPlan,
                 OAuthProvider,
+                TokenUsageLog,
+                ApiKey,
                 Template,
                 TemplateCategory,
-                Component,
-                TemplateHelpfulVote,
-                ComponentLike,
-                ComponentView,
-                ComponentDownload,
-                ComponentComment,
-                ComponentHelpfulVote
+                TemplateLike,
+                TemplateDownload,
+                TemplateView,
+                TemplateComment
             ]
         )
         print("✅ Database connected and initialized")
