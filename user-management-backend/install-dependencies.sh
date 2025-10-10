@@ -1,31 +1,83 @@
 #!/bin/bash
-# Simple Python Dependencies Installation for EC2
-# Use this if you just want to install the Python packages
+# EC2 Dependencies Installation for Live Database Reset
+# Handles both virtual environment and direct installation
 
-set -e
+echo "� Installing Python Dependencies for Database Reset"
+echo "===================================================="
 
-echo "🐍 Installing Python dependencies for FastAPI Backend..."
+# Check Python version
+echo "🐍 Python version:"
+python3 --version
 
-# Update system python packages
+# Update system packages
+echo "📦 Updating system packages..."
 sudo apt update
-sudo apt install -y python3-pip python3-venv python3-dev build-essential libpq-dev
+sudo apt install -y python3-pip python3-venv python3-dev build-essential
 
-# Create virtual environment if it doesn't exist
-if [ ! -d "venv" ]; then
-    echo "📦 Creating virtual environment..."
-    python3 -m venv venv
+# Option 1: Try installing dependencies from requirements.txt if it exists
+if [ -f "requirements.txt" ]; then
+    echo "📋 Found requirements.txt - installing from it..."
+    
+    # Create virtual environment if it doesn't exist
+    if [ ! -d "venv" ]; then
+        echo "📦 Creating virtual environment..."
+        python3 -m venv venv
+    fi
+    
+    # Activate virtual environment
+    echo "🔌 Activating virtual environment..."
+    source venv/bin/activate
+    
+    # Upgrade pip
+    pip install --upgrade pip
+    
+    # Install dependencies
+    pip install -r requirements.txt
+    
+    echo ""
+    echo "✅ Dependencies installed in virtual environment!"
+    echo "💡 To use: source venv/bin/activate && python3 reset_live_db.py --confirm"
+    
+else
+    echo "📦 No requirements.txt found - installing core dependencies globally..."
+    
+    # Install required packages globally
+    pip3 install motor beanie pydantic fastapi python-dotenv asyncio-motor pymongo dnspython
+    
+    echo ""
+    echo "✅ Dependencies installed globally!"
+    echo "💡 To use: python3 reset_live_db.py --confirm"
 fi
 
-# Activate virtual environment
-source venv/bin/activate
+echo ""
+echo "🔍 Verifying installations..."
+python3 -c "
+try:
+    import motor.motor_asyncio
+    print('✅ motor: OK')
+except ImportError as e:
+    print(f'❌ motor: {e}')
 
-# Upgrade pip
-pip install --upgrade pip
+try:
+    import beanie
+    print('✅ beanie: OK')
+except ImportError as e:
+    print(f'❌ beanie: {e}')
 
-# Install dependencies
-echo "📦 Installing Python packages..."
-pip install -r requirements.txt
+try:
+    import pydantic
+    print('✅ pydantic: OK')
+except ImportError as e:
+    print(f'❌ pydantic: {e}')
 
-echo "✅ Python dependencies installed successfully!"
-echo "💡 To activate the virtual environment: source venv/bin/activate"
+try:
+    from app.config import Settings
+    print('✅ app.config: OK')
+except ImportError as e:
+    print(f'❌ app.config: {e}')
+"
+
+echo ""
+echo "🚀 Setup complete! You can now run:"
+echo "python3 reset_live_db.py --confirm"
 echo "🚀 To run the server: uvicorn app.main:app --host 0.0.0.0 --port 8000"
