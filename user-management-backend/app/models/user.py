@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Optional, List, Dict, Any
-from pydantic import Field, EmailStr
+from pydantic import Field, EmailStr, ConfigDict
 from beanie import Document, PydanticObjectId
 from beanie.odm.fields import Indexed # Import Indexed explicitly
 from enum import Enum
@@ -14,6 +14,8 @@ class UserRole(str, Enum):
 
 class User(Document):
     """User model for MongoDB"""
+    model_config = ConfigDict(protected_namespaces=())
+    
     email: EmailStr = Field(index=True)
     password_hash: Optional[str] = None
     name: Optional[str] = None
@@ -25,8 +27,8 @@ class User(Document):
     tokens_used: int = 0
     monthly_limit: int = 10000
     reset_date: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     is_active: bool = True
     last_login_at: Optional[datetime] = None
     last_logout_at: Optional[datetime] = None
@@ -113,7 +115,7 @@ class UserOAuthAccount(Document):
     provider_id: PydanticObjectId
     provider_user_id: str
     email: EmailStr
-    connected_at: datetime = Field(default_factory=datetime.utcnow)
+    connected_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     last_used_at: Optional[datetime] = None
 
     class Settings:
@@ -156,8 +158,8 @@ class UserSubscription(Document):
     status: str = "active"  # active, inactive, cancelled, past_due
     current_period_start: Optional[datetime] = None
     current_period_end: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "user_subscriptions"
@@ -179,7 +181,7 @@ class TokenUsageLog(Document):
     tokens_used: int
     cost_usd: Optional[float] = None
     request_type: str  # "completion", "chat", "embedding"
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     request_metadata: Optional[Dict[str, Any]] = None
 
     class Settings:
@@ -203,7 +205,7 @@ class ApiKey(Document):
     name: str
     expires_at: Optional[datetime] = None
     last_used_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     is_active: bool = True
 
     class Settings:
@@ -228,8 +230,8 @@ class Organization(Document):
     monthly_token_limit: int = 1000000
     tokens_used: int = 0
     reset_date: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     is_active: bool = True
 
     class Settings:
@@ -248,7 +250,7 @@ class OrganizationMember(Document):
     organization_id: PydanticObjectId
     user_id: PydanticObjectId
     role: str = "member"  # owner, admin, member
-    joined_at: datetime = Field(default_factory=datetime.utcnow)
+    joined_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "organization_members"
@@ -272,7 +274,7 @@ class OrganizationInvitation(Document):
     token: Indexed(str) # Corrected Indexed usage
     expires_at: datetime
     accepted_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "organization_invitations"
@@ -298,7 +300,7 @@ class OrganizationKey(Document):
     is_active: bool = True
     expires_at: Optional[datetime] = None
     created_by: PydanticObjectId
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     last_used_at: Optional[datetime] = None
 
     class Settings:
@@ -322,7 +324,7 @@ class KeyUsageLog(Document):
     tokens_used: int
     cost_usd: Optional[float] = None
     request_type: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     request_metadata: Optional[Dict[str, Any]] = None
 
     class Settings:
