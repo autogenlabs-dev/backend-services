@@ -9,11 +9,22 @@ Checks:
 """
 import asyncio
 import hashlib
+import os
+import sys
 from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 from app.models.user import User
 from app.config import Settings
 from typing import cast, Any
+
+# Override database URL if running from host (not inside Docker)
+if len(sys.argv) > 1 and sys.argv[1] == "--host":
+    os.environ["DATABASE_URL"] = "mongodb://localhost:27017/user_management_db"
+    print("🖥️  Running from host - using localhost:27017")
+elif "DATABASE_URL" not in os.environ:
+    # Default to localhost if no env var set
+    os.environ["DATABASE_URL"] = "mongodb://localhost:27017/user_management_db"
+    print("🖥️  No DATABASE_URL set - using localhost:27017")
 
 settings = Settings()
 

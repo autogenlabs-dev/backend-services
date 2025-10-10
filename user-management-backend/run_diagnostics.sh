@@ -12,19 +12,18 @@ if [ -f /.dockerenv ]; then
 else
     echo "💻 Running on host system"
     echo ""
-    echo "Option 1: Run diagnostic inside container"
-    echo "docker exec -it user-management-backend-api-1 python3 diagnose_accounts.py"
-    echo ""
-    echo "Option 2: Run diagnostic on host (will connect to mongodb://localhost:27017)"
     
     # Check if we have the script
     if [ -f "diagnose_accounts.py" ]; then
-        echo ""
-        echo "Running diagnostic from host..."
-        python3 diagnose_accounts.py
+        echo "Running diagnostic from host (using localhost:27017)..."
+        python3 diagnose_accounts.py --host
     else
         echo ""
         echo "❌ diagnose_accounts.py not found. Please pull latest code:"
         echo "   git pull origin main"
     fi
+    
+    echo ""
+    echo "💡 Alternative: Run inside Docker container for direct mongodb:27017 access:"
+    echo "   docker exec -it user-management-backend-api-1 python3 diagnose_accounts.py"
 fi
