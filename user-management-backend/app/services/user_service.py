@@ -36,15 +36,18 @@ async def create_user_with_password(db: AsyncIOMotorDatabase, user_data: UserCre
 
     hashed_password = get_password_hash(user_data.password)
 
-    # Extract username from email if no full_name provided
-    # This logic seems a bit complex, assuming it's intended
-    username = user_data.email.split('@')[0] if not hasattr(user_data, 'username') else getattr(user_data, 'username', user_data.email.split('@')[0])
+    # Determine username: use provided username, or extract from email
+    username = user_data.username if user_data.username else user_data.email.split('@')[0]
+    
+    # Determine name: use provided name, fallback to username, then email prefix
+    name = user_data.name if user_data.name else username
 
     db_user = User(
         # Beanie generates ID automatically, no need for uuid4()
         email=user_data.email,
         password_hash=hashed_password,
-        name=username,  # Use username or email prefix as name
+        username=username,  # Set username field properly
+        name=name,  # Use name from input or derived value
         is_active=True,
         subscription="free", # Default subscription
         tokens_remaining=10000, # Default tokens
@@ -53,8 +56,7 @@ async def create_user_with_password(db: AsyncIOMotorDatabase, user_data: UserCre
         created_at=datetime.now(timezone.utc),  # Explicitly set created_at
         updated_at=datetime.now(timezone.utc), # Set updated_at on creation
         last_login_at=None, # No login yet
-        # Optionally set full_name if provided
-        full_name=getattr(user_data, 'full_name', None)
+        full_name=user_data.full_name if user_data.full_name else None  # Set full_name if provided
     )
     await db_user.insert() # Use Beanie's insert method
     return db_user

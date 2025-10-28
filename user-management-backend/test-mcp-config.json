@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "Test API Documentation": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "apidog-mcp-server@latest",
+        "--oas=https://petstore.swagger.io/v2/swagger.json"
+      ]
+    }
+  }
+}

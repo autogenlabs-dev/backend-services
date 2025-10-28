@@ -3,8 +3,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List
 from decimal import Decimal
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from ..models.user import User, SubscriptionPlan, UserSubscription
 
@@ -12,25 +11,23 @@ from ..models.user import User, SubscriptionPlan, UserSubscription
 class SubscriptionService:
     """Service for managing user subscriptions and plan enforcement."""
     
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncIOMotorDatabase):
         self.db = db
     
-    def get_all_plans(self) -> List[SubscriptionPlan]:
+    async def get_all_plans(self) -> List[SubscriptionPlan]:
         """Get all active subscription plans."""
-        return (
-            self.db.query(SubscriptionPlan)
-            .filter(SubscriptionPlan.is_active == True)
-            .order_by(SubscriptionPlan.price_monthly.asc())
-            .all()
-        )
+        # Use Beanie's find method instead of SQLAlchemy query
+        plans = await SubscriptionPlan.find(
+            SubscriptionPlan.is_active == True
+        ).sort("+price_monthly").to_list()
+        return plans
     
-    def get_plan_by_name(self, plan_name: str) -> Optional[SubscriptionPlan]:
+    async def get_plan_by_name(self, plan_name: str) -> Optional[SubscriptionPlan]:
         """Get a subscription plan by name."""
-        return (
-            self.db.query(SubscriptionPlan)
-            .filter(SubscriptionPlan.name == plan_name)
-            .filter(SubscriptionPlan.is_active == True)
-            .first()
+        # Use Beanie's find_one method
+        return await SubscriptionPlan.find_one(
+            SubscriptionPlan.name == plan_name,
+            SubscriptionPlan.is_active == True
         )
     
     def get_user_subscription(self, user: User) -> Optional[UserSubscription]:
@@ -209,9 +206,9 @@ class SubscriptionService:
                 "subscription": None
             }
     
-    def compare_plans(self) -> Dict[str, Any]:
+    async def compare_plans(self) -> Dict[str, Any]:
         """Get a comparison of all available plans."""
-        plans = self.get_all_plans()
+        plans = await self.get_all_plans()  # Added await
         
         comparison = {
             "plans": [],
@@ -225,7 +222,7 @@ class SubscriptionService:
                 "display_name": plan.display_name,
                 "monthly_tokens": plan.monthly_tokens,
                 "price_monthly": float(plan.price_monthly),
-                "features": plan.features or {},
+                "features": plan.features or [],
                 "is_popular": plan.name == "pro",  # Mark pro as popular
                 "recommended": plan.name == "pro"
             }
@@ -233,7 +230,7 @@ class SubscriptionService:
             
             # Collect all unique features
             if plan.features:
-                comparison["features"].update(plan.features.keys())
+                comparison["features"].update(plan.features)
         
         comparison["features"] = list(comparison["features"])
         return comparison

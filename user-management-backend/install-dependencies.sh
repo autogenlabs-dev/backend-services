@@ -1,45 +1,88 @@
 #!/bin/bash
-# Minimal Python Dependencies Installation for EC2
-# No system packages, just Python virtual environment
+# EC2 Dependencies Installation for Live Database Reset
+# Handles both virtual environment and direct installation
 
-set -e
+echo "🔧 Installing Python Dependencies for Database Reset"
+echo "===================================================="
 
-echo "🐍 Installing minimal Python dependencies..."
+# Check Python version
+echo "🐍 Python version:"
+python3 --version
 
-# Check if we're in the right directory
-if [ ! -f "requirements.txt" ]; then
-    echo "❌ Error: requirements.txt not found in current directory"
-    echo "Please run this script from the user-management-backend directory"
-    exit 1
+# Update system packages
+echo "📦 Updating system packages..."
+sudo apt update
+sudo apt install -y python3-pip python3-venv python3-dev build-essential
+
+# Option 1: Try installing dependencies from requirements.txt if it exists
+if [ -f "requirements.txt" ]; then
+    echo "📋 Found requirements.txt - installing from it..."
+    
+    # Create virtual environment if it doesn't exist
+    if [ ! -d "venv" ]; then
+        echo "📦 Creating virtual environment..."
+        python3 -m venv venv
+    fi
+    
+    # Activate virtual environment
+    echo "🔌 Activating virtual environment..."
+    source venv/bin/activate
+    
+    # Upgrade pip
+    pip install --upgrade pip
+    
+    # Install dependencies without cache to save space
+    echo "📦 Installing Python packages (no cache)..."
+    pip install --no-cache-dir -r requirements.txt
+    
+    # Verify installation
+    echo "✅ Verifying installation..."
+    python -c "import fastapi, uvicorn, beanie; print('Core packages installed successfully!')"
+    
+    echo ""
+    echo "✅ Dependencies installed in virtual environment!"
+    echo "💡 To use: source venv/bin/activate && python3 reset_live_db.py --confirm"
+    
+else
+    echo "📦 No requirements.txt found - installing core dependencies globally..."
+    
+    # Install required packages globally
+    pip3 install motor beanie pydantic fastapi python-dotenv asyncio-motor pymongo dnspython
+    
+    echo ""
+    echo "✅ Dependencies installed globally!"
+    echo "💡 To use: python3 reset_live_db.py --confirm"
 fi
 
-# Create virtual environment if it doesn't exist
-if [ ! -d "venv" ]; then
-    echo "📦 Creating virtual environment..."
-    python3 -m venv venv
-fi
+echo ""
+echo "🔍 Verifying installations..."
+python3 -c "
+try:
+    import motor.motor_asyncio
+    print('✅ motor: OK')
+except ImportError as e:
+    print(f'❌ motor: {e}')
 
-# Activate virtual environment
-echo "🔄 Activating virtual environment..."
-source venv/bin/activate
+try:
+    import beanie
+    print('✅ beanie: OK')
+except ImportError as e:
+    print(f'❌ beanie: {e}')
 
-# Upgrade pip
-pip install --upgrade pip
+try:
+    import pydantic
+    print('✅ pydantic: OK')
+except ImportError as e:
+    print(f'❌ pydantic: {e}')
 
-# Install dependencies without cache to save space
-echo "📦 Installing Python packages (no cache)..."
-pip install --no-cache-dir -r requirements.txt
-
-# Verify installation
-echo "✅ Verifying installation..."
-python -c "import fastapi, uvicorn, beanie; print('Core packages installed successfully!')"
+try:
+    from app.config import Settings
+    print('✅ app.config: OK')
+except ImportError as e:
+    print(f'❌ app.config: {e}')
+"
 
 echo ""
-echo "✅ Minimal Python dependencies installed successfully!"
-echo ""
-echo "🚀 To run the server:"
-echo "  source venv/bin/activate"
-echo "  uvicorn app.main:app --host 0.0.0.0 --port 8000"
-echo ""
-echo "📊 Installed packages:"
-pip list --format=freeze | wc -l | xargs echo "Total packages:"
+echo "🚀 Setup complete! You can now run:"
+echo "python3 reset_live_db.py --confirm"
+echo "🚀 To run the server: uvicorn app.main:app --host 0.0.0.0 --port 8000"
