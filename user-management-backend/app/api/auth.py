@@ -196,7 +196,7 @@ async def login_user_json(
 @router.get("/{provider}/login")
 async def oauth_login(provider: str, request: Request):
     """Initiate OAuth login with a provider."""
-    if provider not in ["openrouter", "glama", "requesty", "aiml"]:
+    if provider not in ["openrouter", "google", "github"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid OAuth provider"
@@ -228,7 +228,7 @@ async def oauth_callback(
     db: Any = Depends(get_database) # Changed type hint from Session to Any, and get_db to get_database
 ) -> Token:
     """Handle OAuth callback and create user session."""
-    if provider not in ["openrouter", "glama", "requesty"]:
+    if provider not in ["openrouter", "google", "github"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid OAuth provider"
@@ -251,7 +251,15 @@ async def oauth_callback(
             user_data = token.get("userinfo", {})
         
         # Extract user information
-        email = user_data.get("email")
+        if provider == "github":
+            # GitHub requires a separate call to get email
+            email_response = await client.get("https://api.github.com/user/emails", token=token)
+            emails = email_response.json()
+            primary_email = next((email for email in emails if email.get("primary")), None)
+            email = primary_email.get("email") if primary_email else user_data.get("email")
+        else:
+            email = user_data.get("email")
+
         provider_user_id = user_data.get("id") or user_data.get("sub")
         
         if not email or not provider_user_id:
@@ -424,10 +432,10 @@ async def get_vscode_configuration(
                 "glama": {
                     "enabled": True
                 },
-                "requesty": {
+                "google": {
                     "enabled": True
                 },
-                "aiml": {
+                "github": {
                     "enabled": True
                 }
             }
