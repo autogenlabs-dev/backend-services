@@ -9,8 +9,7 @@ import json
 from typing import Optional, Tuple, Dict, Any, List
 from fastapi import Request, HTTPException, status, Depends
 from fastapi.security import HTTPBearer
-from sqlalchemy.orm import Session
-from sqlalchemy import select
+# Removed SQLAlchemy imports - using Beanie ODM instead
 from app.database import get_database # Changed from get_db to get_database
 from app.models.user import User, ApiKey
 from app.config import settings
@@ -208,25 +207,37 @@ class RateLimitMiddleware:
             except (ValueError, TypeError):
                 return None
                 
-            result = db.execute(select(User).where(User.id == user_id))
-            return result.scalar_one_or_none()
+            # Use Beanie ODM instead of SQLAlchemy
+            from beanie import PydanticObjectId
+            try:
+                user_obj_id = PydanticObjectId(user_id)
+                result = await db.get(User, user_obj_id)
+                return result
+            except Exception:
+                return None
             
         except Exception:
             return None
     
-    async def _get_user_from_api_key(self, api_key: str, db: Session) -> Optional[Tuple[User, ApiKey]]:
+    async def _get_user_from_api_key(self, api_key: str, db: Any) -> Optional[Tuple[User, ApiKey]]:
         """Get user from API key"""
         try:
             # Hash the API key to match stored hash
             key_hash = hashlib.sha256(api_key.encode()).hexdigest()
             
-            result = db.execute(
-                select(ApiKey).where(
-                    ApiKey.key_hash == key_hash,
-                    ApiKey.is_active == True
+            # Use Beanie ODM instead of SQLAlchemy
+            from beanie import PydanticObjectId
+            
+            try:
+                api_key_obj = await db.find_one(
+                    ApiKey,
+                    {
+                        "key_hash": key_hash,
+                        "is_active": True
+                    }
                 )
-            )
-            api_key_obj = result.scalar_one_or_none()
+            except Exception:
+                api_key_obj = None
             
             if not api_key_obj:
                 return None, None
@@ -255,7 +266,7 @@ class RateLimitMiddleware:
     async def check_rate_limit(
         self, 
         request: Request, 
-        db: Session
+        db: Any
     ) -> Dict[str, Any]:
         """
         Check rate limits for incoming request
