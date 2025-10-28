@@ -46,17 +46,15 @@ class Settings(BaseSettings):
     backend_cors_origins: List[str] = ["http://localhost:3000", "http://localhost:8080"]
     
     # OAuth
-    oauth_providers: List[str] = ["openrouter", "glama", "requesty", "aiml"]
-    
+    oauth_providers: List[str] = ["openrouter", "google", "github"]
+
     # OAuth Client Credentials
     openrouter_client_id: str = "your_openrouter_client_id"
     openrouter_client_secret: str = "your_openrouter_client_secret"
-    glama_client_id: str = "your_glama_client_id"
-    glama_client_secret: str = "your_glama_client_secret"
-    requesty_client_id: str = "your_requesty_client_id"
-    requesty_client_secret: str = "your_requesty_client_secret"
-    aiml_client_id: str = "your_aiml_client_id"
-    aiml_client_secret: str = "your_aiml_client_secret"
+    google_client_id: str = "your_google_client_id"
+    google_client_secret: str = "your_google_client_secret"
+    github_client_id: str = "your_github_client_id"
+    github_client_secret: str = "your_github_client_secret"
     
     # LLM Provider API Keys
     openrouter_api_key: str = "your_openrouter_api_key"

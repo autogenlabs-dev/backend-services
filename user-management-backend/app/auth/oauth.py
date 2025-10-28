@@ -9,7 +9,8 @@ from ..config import settings
 oauth = OAuth()
 
 # OAuth provider configurations
-OAUTH_PROVIDERS = {    "openrouter": {
+OAUTH_PROVIDERS = {
+    "openrouter": {
         "name": "openrouter",
         "display_name": "OpenRouter",
         "client_id": settings.openrouter_client_id,
@@ -19,34 +20,25 @@ OAUTH_PROVIDERS = {    "openrouter": {
         "userinfo_endpoint": "https://openrouter.ai/api/auth/me",
         "scopes": ["read:profile", "read:email"],
     },
-    "glama": {
-        "name": "glama",
-        "display_name": "Glama",
-        "client_id": settings.glama_client_id,
-        "client_secret": settings.glama_client_secret,
-        "authorization_endpoint": "https://api.glama.ai/oauth/authorize",
-        "token_endpoint": "https://api.glama.ai/oauth/token",
-        "userinfo_endpoint": "https://api.glama.ai/oauth/userinfo",
-        "scopes": ["openid", "profile", "email"],    },
-    "requesty": {
-        "name": "requesty",
-        "display_name": "Requesty",
-        "client_id": settings.requesty_client_id,
-        "client_secret": settings.requesty_client_secret,
-        "authorization_endpoint": "https://requesty.io/oauth/authorize",
-        "token_endpoint": "https://requesty.io/oauth/token",
-        "userinfo_endpoint": "https://requesty.io/api/user",
-        "scopes": ["user:read"],
+    "google": {
+        "name": "google",
+        "display_name": "Google",
+        "client_id": settings.google_client_id,
+        "client_secret": settings.google_client_secret,
+        "authorization_endpoint": "https://accounts.google.com/o/oauth2/auth",
+        "token_endpoint": "https://oauth2.googleapis.com/token",
+        "userinfo_endpoint": "https://www.googleapis.com/oauth2/v2/userinfo",
+        "scopes": ["openid", "email", "profile"],
     },
-    "aiml": {
-        "name": "aiml",
-        "display_name": "AIML",
-        "client_id": settings.aiml_client_id,
-        "client_secret": settings.aiml_client_secret,
-        "authorization_endpoint": "https://api.aimlapi.com/oauth/authorize",
-        "token_endpoint": "https://api.aimlapi.com/oauth/token",
-        "userinfo_endpoint": "https://api.aimlapi.com/user",
-        "scopes": ["read:profile", "read:email"],
+    "github": {
+        "name": "github",
+        "display_name": "GitHub",
+        "client_id": settings.github_client_id,
+        "client_secret": settings.github_client_secret,
+        "authorization_endpoint": "https://github.com/login/oauth/authorize",
+        "token_endpoint": "https://github.com/login/oauth/access_token",
+        "userinfo_endpoint": "https://api.github.com/user",
+        "scopes": ["user:email", "read:user"],
     },
 }
 
