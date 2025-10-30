@@ -158,15 +158,15 @@ app.add_middleware(PerformanceAndRateLimitMiddleware)
 register_oauth_clients()
 
 # Include routers
-app.include_router(auth.router)
-app.include_router(users.router)
-app.include_router(subscriptions.router)
-app.include_router(tokens.router)
-app.include_router(llm.router)
-app.include_router(admin.router)
-app.include_router(api_keys.router)
-app.include_router(payments.router)
-app.include_router(templates.router)
+app.include_router(auth.router, prefix="/api")
+app.include_router(users.router, prefix="/api")
+app.include_router(subscriptions.router, prefix="/api")
+app.include_router(tokens.router, prefix="/api")
+app.include_router(llm.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
+app.include_router(api_keys.router, prefix="/api")
+app.include_router(payments.router, prefix="/api")
+app.include_router(templates.router, prefix="/api")
 
 # Import interaction routers
 try:

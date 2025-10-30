@@ -42,10 +42,10 @@ class Settings(BaseSettings):
     project_name: str = "User Management API"
     environment: str = "development"
     host: str = "0.0.0.0"
-    port: int = 8001
+    port: int = 8000
     
     # CORS
-    backend_cors_origins: List[str] = ["http://localhost:3000", "http://localhost:8080"]
+    backend_cors_origins: List[str] = ["http://localhost:3000", "http://localhost:3001", "http://localhost:8080"]
     
     @field_validator('backend_cors_origins', mode='before')
     @classmethod

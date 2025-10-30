@@ -10,10 +10,10 @@ from typing import Optional, Tuple, Dict, Any, List
 from fastapi import Request, HTTPException, status, Depends
 from fastapi.security import HTTPBearer
 # Removed SQLAlchemy imports - using Beanie ODM instead
-from app.database import get_database # Changed from get_db to get_database
-from app.models.user import User, ApiKey
-from app.config import settings
-from app.auth.jwt import verify_token
+from ..database import get_database # Changed from get_db to get_database
+from ..models.user import User, ApiKey
+from ..config import settings
+from ..auth.jwt import verify_token
 import hashlib
 
 # Redis client
@@ -163,7 +163,7 @@ class RateLimitMiddleware:
             "ip": {
                 "general": 50,
                 "llm": 0,  # No LLM access without auth
-                "auth": 10
+                "auth": 100  # Increased from 10 to 100 for development
             }
         }
     

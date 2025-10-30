@@ -175,7 +175,15 @@ async def get_or_create_user_by_oauth(
     provider = await OAuthProvider.find_one(OAuthProvider.name == provider_name)
     if not provider:
         # If provider doesn't exist, create it for now for simplicity
-        provider = OAuthProvider(name=provider_name)
+        # Get display name from OAuth providers configuration
+        from ..auth.oauth import OAUTH_PROVIDERS
+        provider_config = OAUTH_PROVIDERS.get(provider_name, {})
+        display_name = provider_config.get("display_name", provider_name.title())
+        
+        provider = OAuthProvider(
+            name=provider_name,
+            display_name=display_name
+        )
         await provider.insert()
 
 

@@ -47,16 +47,30 @@ def register_oauth_clients():
     """Register OAuth clients with authlib."""
     for provider_name, config in OAUTH_PROVIDERS.items():
         if config["client_id"] and config["client_secret"]:
-            oauth.register(
-                name=provider_name,
-                client_id=config["client_id"],
-                client_secret=config["client_secret"],
-                authorize_url=config["authorization_endpoint"],
-                access_token_url=config["token_endpoint"],
-                client_kwargs={
-                    "scope": " ".join(config["scopes"])
-                }
-            )
+            if provider_name == "google":
+                # Google OAuth requires special configuration for OpenID Connect
+                oauth.register(
+                    name=provider_name,
+                    client_id=config["client_id"],
+                    client_secret=config["client_secret"],
+                    authorize_url=config["authorization_endpoint"],
+                    access_token_url=config["token_endpoint"],
+                    jwks_uri="https://www.googleapis.com/oauth2/v3/certs",
+                    client_kwargs={
+                        "scope": " ".join(config["scopes"])
+                    }
+                )
+            else:
+                oauth.register(
+                    name=provider_name,
+                    client_id=config["client_id"],
+                    client_secret=config["client_secret"],
+                    authorize_url=config["authorization_endpoint"],
+                    access_token_url=config["token_endpoint"],
+                    client_kwargs={
+                        "scope": " ".join(config["scopes"])
+                    }
+                )
 
 
 def get_oauth_client(provider: str):

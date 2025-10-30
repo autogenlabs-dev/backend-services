@@ -528,7 +528,7 @@ async def get_vscode_config(authorization: str = Header(None)):
     return {
         "config": {
             "a4f_api_key": settings.a4f_api_key,
-            "api_endpoint": "http://localhost:8001",
+            "api_endpoint": "http://localhost:8000",
             "providers": {
                 "a4f": {
                     "enabled": True,

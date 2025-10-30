@@ -118,7 +118,9 @@ def test_signup():
         "username": TEST_USER_USERNAME,
         "password": TEST_USER_PASSWORD,
         "name": "Test User",
-        "full_name": "Test User Full Name"
+        "full_name": "Test User Full Name",
+        "first_name": "Test",
+        "last_name": "User"
     }
     
     print_info(f"Registering user: {TEST_USER_EMAIL}")
@@ -151,9 +153,9 @@ def test_login():
     global access_token, refresh_token
     print_header("Testing User Login")
     
-    # OAuth2PasswordRequestForm expects form data with 'username' (which is actually email) and 'password'
+    # Use JSON login endpoint instead of form-based login
     payload = {
-        "username": TEST_USER_EMAIL,  # OAuth2 uses 'username' field but we pass email
+        "email": TEST_USER_EMAIL,
         "password": TEST_USER_PASSWORD
     }
     
@@ -161,9 +163,9 @@ def test_login():
     
     try:
         response = requests.post(
-            f"{BASE_URL}/auth/login",
-            data=payload,  # Use data= for form data, not json=
-            headers={"Content-Type": "application/x-www-form-urlencoded"}
+            f"{BASE_URL}/auth/login-json",
+            json=payload,  # Use json= for JSON data
+            headers={"Content-Type": "application/json"}
         )
         
         if response.status_code == 200:

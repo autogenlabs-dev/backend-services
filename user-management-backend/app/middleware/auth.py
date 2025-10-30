@@ -5,8 +5,8 @@ from functools import wraps
 from typing import List, Optional
 from fastapi import HTTPException, Header, Depends
 import jwt
-from app.models.user import User, UserRole
-from app.config import settings
+from ..models.user import User, UserRole
+from ..config import settings
 
 async def get_current_user_from_token(authorization: str = Header(None)) -> Optional[User]:
     """Get current user from JWT token"""

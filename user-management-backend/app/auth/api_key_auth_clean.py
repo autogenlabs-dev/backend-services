@@ -13,7 +13,7 @@ from fastapi import HTTPException, status, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Any # Added Any import
 from beanie import PydanticObjectId # Added PydanticObjectId import
-from app.database import get_database # Changed from get_db to get_database
+from ..database import get_database # Changed from get_db to get_database
 from app.models.user import User, ApiKey
 from pydantic import BaseModel
 
@@ -66,7 +66,7 @@ class ApiKeyService:
 
     async def create_api_key( # Added async
         self,
-        user_id: PydanticObjectId, # Changed type hint from str to PydanticObjectId
+        user_id: PydanticObjectId,
         name: str,
         db: Any, # Changed type hint from Session to Any
         description: Optional[str] = None,
@@ -249,7 +249,7 @@ class ApiKeyAuth:
             return None
         
         # Validate the API key
-        result = api_key_service.validate_api_key(api_key, db)
+        result = await api_key_service.validate_api_key(api_key, db)
         
         if not result:
             if self.required:

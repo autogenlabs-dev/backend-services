@@ -38,7 +38,7 @@ async def list_oauth_providers() -> Dict[str, Any]:
             providers.append({
                 "name": name,
                 "display_name": config["display_name"],
-                "authorization_url": f"/auth/{name}/login"
+                "authorization_url": f"/api/auth/{name}/login"
             })
     return {"providers": providers}
 
@@ -211,7 +211,9 @@ async def oauth_login(provider: str, request: Request):
     
     try:
         client = oauth.create_client(provider)
-        redirect_uri = str(request.url_for("oauth_callback", provider=provider))
+        # Use frontend URL for OAuth redirect
+        frontend_url = "http://localhost:3000"
+        redirect_uri = f"{frontend_url}/auth/callback"
         
         return await client.authorize_redirect(request, redirect_uri)
     except Exception as e:
@@ -277,7 +279,8 @@ async def oauth_callback(
         )
         
         # Update last login
-        await update_user_last_login(db, user.id)
+        if user and user.id:
+            await update_user_last_login(db, user.id)
         
         # Create tokens
         access_token = create_access_token(
@@ -288,10 +291,14 @@ async def oauth_callback(
             data={"sub": str(user.id)}
         )
         
-        return Token(
-            access_token=access_token,
-            refresh_token=refresh_token,
-            token_type="bearer"
+        # Redirect to frontend with tokens
+        frontend_url = "http://localhost:3000/auth/callback"
+        redirect_params = f"?access_token={access_token}&refresh_token={refresh_token}"
+        
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(
+            url=f"{frontend_url}{redirect_params}",
+            status_code=302
         )
         
     except HTTPException:
