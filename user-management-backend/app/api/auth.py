@@ -254,11 +254,14 @@ async def oauth_login(provider: str, request: Request):
                 status_code=status.HTTP_501_NOT_IMPLEMENTED,
                 detail=f"OAuth provider {provider} is not available"
             )
-        # Use frontend URL for OAuth redirect - this must match what's registered
-        # in the OAuth provider's console (Google Cloud Console, GitHub OAuth App)
-        # For development, we use the frontend URL that's registered with Google
-        frontend_url = "http://localhost:3000"
-        redirect_uri = f"{frontend_url}/auth/callback"
+        # Use correct redirect URI that matches Google OAuth configuration
+        # For development, we need to use a URL that matches what's registered in Google
+        if getattr(settings, 'environment', 'development') == 'development':
+            # Development - use the backend URL directly since Google can't reach localhost:3000
+            redirect_uri = "http://localhost:8000/api/auth/google/callback"
+        else:
+            # Production - use the registered production callback
+            redirect_uri = "https://api.codemurf.com/auth/google/callback"
         
         return await client.authorize_redirect(request, redirect_uri)
     except Exception as e:
@@ -311,10 +314,16 @@ async def oauth_callback(
         print(f"🔍 Authorization code received: {code[:20]}...")
         
         # Exchange code for token directly (bypassing authlib for development)
+        # Use the same redirect URI that was used in the authorize step
+        if getattr(settings, 'environment', 'development') == 'development':
+            redirect_uri_for_token = "http://localhost:8000/api/auth/google/callback"
+        else:
+            redirect_uri_for_token = "https://api.codemurf.com/auth/google/callback"
+            
         token_data = {
             'grant_type': 'authorization_code',
             'code': code,
-            'redirect_uri': f"http://localhost:3000/auth/callback",
+            'redirect_uri': redirect_uri_for_token,
             'client_id': getattr(settings, f'{provider}_client_id', None),
             'client_secret': getattr(settings, f'{provider}_client_secret', None)
         }
