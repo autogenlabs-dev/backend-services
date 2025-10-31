@@ -13,7 +13,7 @@ import sys
 import time
 
 # Configuration
-BASE_URL = "http://localhost:8000"  # Updated to match the running server port
+BASE_URL = "http://localhost:8000/api"  # Updated to match the running server port with API prefix
 
 class Colors:
     """ANSI color codes for terminal output"""

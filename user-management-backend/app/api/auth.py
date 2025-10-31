@@ -7,10 +7,13 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Form
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
+from motor.motor_asyncio import AsyncIOMotorDatabase
+from pydantic import BaseModel, Field, EmailStr, HttpUrl
+from beanie import PydanticObjectId
+from datetime import datetime
 
-from ..database import get_database # Changed from get_db to get_database
-from ..schemas.auth import Token, TokenRefresh, OAuthCallback, UserCreate, UserLogin, UserResponse
+from ..database import get_database
+from ..schemas.auth import TokenRefresh, OAuthCallback, UserCreate, UserLogin
 from ..models.user import User
 from ..auth.jwt import create_access_token, create_refresh_token, verify_token
 from ..auth.oauth import get_oauth_client, get_provider_config, oauth
@@ -27,6 +30,29 @@ from ..config import settings
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
+class UserInfoRequest(BaseModel):
+    """Request model for getting user info from OAuth provider."""
+    code: str = Field(..., description="Authorization code from OAuth provider")
+
+
+class UserResponse(BaseModel):
+    """Response model for user information."""
+    id: str
+    email: EmailStr
+    is_active: bool
+    created_at: str | None = None
+    updated_at: str | None = None
+    last_login_at: str | None = None
+
+
+class Token(BaseModel):
+    """JWT token response model."""
+    access_token: str
+    refresh_token: str | None = None
+    token_type: str = "bearer"
+    expires_in: int | None = None
+
+
 @router.get("/providers")
 async def list_oauth_providers() -> Dict[str, Any]:
     """List available OAuth providers."""
@@ -34,7 +60,10 @@ async def list_oauth_providers() -> Dict[str, Any]:
     
     providers = []
     for name, config in OAUTH_PROVIDERS.items():
-        if config["client_id"] and config["client_secret"]:
+        # Use getattr to access settings attributes dynamically
+        client_id = getattr(settings, f'{name}_client_id', None)
+        client_secret = getattr(settings, f'{name}_client_secret', None)
+        if client_id and client_secret:
             providers.append({
                 "name": name,
                 "display_name": config["display_name"],
@@ -44,17 +73,17 @@ async def list_oauth_providers() -> Dict[str, Any]:
 
 
 @router.post("/register", response_model=UserResponse)
-async def register_user(user_data: UserCreate, db: Any = Depends(get_database)): # Changed type hint from Session to Any, and get_db to get_database
+async def register_user(user_data: UserCreate, db: AsyncIOMotorDatabase = Depends(get_database)):
     """Register a new user with email and password."""
     try:
         user = await create_user_with_password(db, user_data)
         return UserResponse(
-            id=user.id,
+            id=str(user.id),
             email=user.email,
             is_active=user.is_active,
-            created_at=user.created_at,
-            updated_at=user.updated_at,
-            last_login_at=user.last_login_at
+            created_at=user.created_at.isoformat() if user.created_at else None,
+            updated_at=user.updated_at.isoformat() if user.updated_at else None,
+            last_login_at=user.last_login_at.isoformat() if user.last_login_at else None
         )
     except ValueError as e:
         raise HTTPException(
@@ -73,7 +102,7 @@ async def register_user(user_data: UserCreate, db: Any = Depends(get_database)):
 
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
-async def signup_user(user_data: UserCreate, db: Any = Depends(get_database)): # Changed type hint from Session to Any, and get_db to get_database
+async def signup_user(user_data: UserCreate, db: AsyncIOMotorDatabase = Depends(get_database)):
     """Alias for user registration to support /signup route with token generation."""
     try:
         # Register the user
@@ -93,14 +122,17 @@ async def signup_user(user_data: UserCreate, db: Any = Depends(get_database)): #
     except Exception as e:
         import traceback
         print(f"Error in signup: {str(e)}")
-        print(traceback.format_exc())
-        raise
+        print(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create user: {str(e)}"
+        )
 
 
 @router.post("/login", response_model=Token)
 async def login_user(
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Any = Depends(get_database) # Changed type hint from Session to Any, and get_db to get_database
+    db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     """Login user with email and password."""
     user = await authenticate_user(db, form_data.username, form_data.password)
@@ -115,12 +147,14 @@ async def login_user(
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User account is disabled"
+            detail="User account is disabled",
+            headers={"WWW-Authenticate": "Bearer"},
         )
     
     # Update last login
-    await update_user_last_login(db, user.id)
-      # Create tokens
+    if user.id:
+        await update_user_last_login(db, user.id)
+    # Create tokens
     access_token = create_access_token(
         data={"sub": str(user.id), "email": user.email},
         expires_delta=timedelta(minutes=settings.access_token_expire_minutes)
@@ -145,10 +179,11 @@ async def login_user(
         }
     }
         
+
 @router.post("/login-json", response_model=Token)
 async def login_user_json(
     user_data: UserLogin,
-    db: Any = Depends(get_database) # Changed type hint from Session to Any, and get_db to get_database
+    db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     """Login user with email and password using JSON."""
     user = await authenticate_user(db, user_data.email, user_data.password)
@@ -163,11 +198,14 @@ async def login_user_json(
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User account is disabled"
+            detail="User account is disabled",
+            headers={"WWW-Authenticate": "Bearer"},
         )
-      # Update last login
-    await update_user_last_login(db, user.id)
-      # Create tokens
+    
+    # Update last login
+    if user.id:
+        await update_user_last_login(db, user.id)
+    # Create tokens
     access_token = create_access_token(
         data={"sub": str(user.id), "email": user.email},
         expires_delta=timedelta(minutes=settings.access_token_expire_minutes)
@@ -211,7 +249,14 @@ async def oauth_login(provider: str, request: Request):
     
     try:
         client = oauth.create_client(provider)
-        # Use frontend URL for OAuth redirect
+        if not client:
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail=f"OAuth provider {provider} is not available"
+            )
+        # Use frontend URL for OAuth redirect - this must match what's registered
+        # in the OAuth provider's console (Google Cloud Console, GitHub OAuth App)
+        # For development, we use the frontend URL that's registered with Google
         frontend_url = "http://localhost:3000"
         redirect_uri = f"{frontend_url}/auth/callback"
         
@@ -227,8 +272,8 @@ async def oauth_login(provider: str, request: Request):
 async def oauth_callback(
     provider: str,
     request: Request,
-    db: Any = Depends(get_database) # Changed type hint from Session to Any, and get_db to get_database
-) -> Token:
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
     """Handle OAuth callback and create user session."""
     if provider not in ["openrouter", "google", "github"]:
         raise HTTPException(
@@ -237,38 +282,117 @@ async def oauth_callback(
         )
     
     try:
-        client = oauth.create_client(provider)
-        token = await client.authorize_access_token(request)
+        # Debug: Log the callback URL and parameters
+        print(f"🔍 OAuth callback for {provider}")
+        print(f"🔍 Callback URL: {request.url}")
+        
+        # Extract authorization code directly from URL for development
+        from urllib.parse import parse_qs
+        parsed_url = str(request.url)
+        query_params = parse_qs(parsed_url.split('?')[1] if '?' in parsed_url else '')
+        
+        code = query_params.get('code', [None])[0]
+        error = query_params.get('error', [None])[0]
+        
+        if error:
+            print(f"🔍 OAuth error returned: {error}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"OAuth error: {error}"
+            )
+        
+        if not code:
+            print("🔍 No authorization code found in callback")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No authorization code received"
+            )
+        
+        print(f"🔍 Authorization code received: {code[:20]}...")
+        
+        # Exchange code for token directly (bypassing authlib for development)
+        token_data = {
+            'grant_type': 'authorization_code',
+            'code': code,
+            'redirect_uri': f"http://localhost:3000/auth/callback",
+            'client_id': getattr(settings, f'{provider}_client_id', None),
+            'client_secret': getattr(settings, f'{provider}_client_secret', None)
+        }
+        
+        import httpx
+        config = get_provider_config(provider)
+        token_endpoint = config.get("token_endpoint")
+        
+        if not token_endpoint:
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail=f"Token endpoint not configured for {provider}"
+            )
+        
+        print(f"🔍 Exchanging code for token at: {token_endpoint}")
+        
+        async with httpx.AsyncClient() as http_client:
+            token_response = await http_client.post(token_endpoint, data=token_data)
+            
+            if token_response.status_code != 200:
+                print(f"🔍 Token exchange failed: {token_response.status_code} - {token_response.text}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Token exchange failed: {token_response.text}"
+                )
+            
+            token = token_response.json()
+            print("🔍 Token exchange successful!")
         
         # Get user info from provider
-        config = get_provider_config(provider)
         userinfo_endpoint = config.get("userinfo_endpoint")
+        access_token = token.get('access_token')
         
+        if not access_token:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="No access token in response"
+            )
+        
+        user_data = {}
         if userinfo_endpoint:
-            # Use the token to get user info
-            user_info = await client.get(userinfo_endpoint, token=token)
-            user_data = user_info.json()
-        else:
-            # Use the token directly if it contains user info
-            user_data = token.get("userinfo", {})
+            print(f"🔍 Getting user info from: {userinfo_endpoint}")
+            headers = {'Authorization': f'Bearer {access_token}'}
+            
+            async with httpx.AsyncClient() as http_client:
+                user_response = await http_client.get(userinfo_endpoint, headers=headers)
+                if user_response.status_code == 200:
+                    user_data = user_response.json()
+                    print(f"🔍 User info retrieved: {user_data.get('email', 'No email')}")
+                else:
+                    print(f"🔍 Failed to get user info: {user_response.status_code}")
         
         # Extract user information
         if provider == "github":
             # GitHub requires a separate call to get email
-            email_response = await client.get("https://api.github.com/user/emails", token=token)
-            emails = email_response.json()
-            primary_email = next((email for email in emails if email.get("primary")), None)
-            email = primary_email.get("email") if primary_email else user_data.get("email")
+            email_url = "https://api.github.com/user/emails"
+            headers = {'Authorization': f'Bearer {access_token}'}
+            async with httpx.AsyncClient() as http_client:
+                email_response = await http_client.get(email_url, headers=headers)
+                if email_response.status_code == 200:
+                    emails = email_response.json()
+                    primary_email = next((email for email in emails if email.get("primary")), None)
+                    email = primary_email.get("email") if primary_email else user_data.get("email")
+                else:
+                    email = user_data.get("email")
         else:
             email = user_data.get("email")
 
         provider_user_id = user_data.get("id") or user_data.get("sub")
         
         if not email or not provider_user_id:
+            print(f"🔍 Missing user data - email: {email}, provider_user_id: {provider_user_id}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Could not extract user information from OAuth provider"
             )
+        
+        print(f"🔍 User identified: {email} (ID: {provider_user_id})")
         
         # Get or create user
         user = await get_or_create_user_by_oauth(
@@ -282,28 +406,33 @@ async def oauth_callback(
         if user and user.id:
             await update_user_last_login(db, user.id)
         
-        # Create tokens
-        access_token = create_access_token(
+        # Create JWT tokens
+        access_token_jwt = create_access_token(
             data={"sub": str(user.id), "email": user.email},
             expires_delta=timedelta(minutes=settings.access_token_expire_minutes)
         )
-        refresh_token = create_refresh_token(
+        refresh_token_jwt = create_refresh_token(
             data={"sub": str(user.id)}
         )
         
-        # Redirect to frontend with tokens
-        frontend_url = "http://localhost:3000/auth/callback"
-        redirect_params = f"?access_token={access_token}&refresh_token={refresh_token}"
+        print(f"🔍 JWT tokens created for user {user.id}")
         
-        from fastapi.responses import RedirectResponse
-        return RedirectResponse(
-            url=f"{frontend_url}{redirect_params}",
-            status_code=302
-        )
+        # Return redirect URL for frontend to handle
+        frontend_url = "http://localhost:3000/auth/callback"
+        redirect_params = f"?access_token={access_token_jwt}&refresh_token={refresh_token_jwt}&user_id={user.id}"
+        
+        print(f"🔍 Redirecting to: {frontend_url}{redirect_params[:50]}...")
+        
+        # Directly redirect to frontend with tokens in URL params
+        return RedirectResponse(url=f"{frontend_url}{redirect_params}")
         
     except HTTPException:
+        # Re-raise HTTP exceptions as-is
         raise
     except Exception as e:
+        print(f"🔍 OAuth callback error: {str(e)}")
+        import traceback
+        print(f"🔍 Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"OAuth callback failed: {str(e)}"
@@ -313,9 +442,10 @@ async def oauth_callback(
 @router.post("/refresh")
 async def refresh_access_token(
     token_data: TokenRefresh,
-    db: Any = Depends(get_database) # Changed type hint from Session to Any, and get_db to get_database
+    db: AsyncIOMotorDatabase = Depends(get_database)
 ) -> Token:
     """Refresh an access token using a refresh token."""
+    # Verify token
     payload = verify_token(token_data.refresh_token)
     
     if not payload or payload.get("type") != "refresh":
@@ -353,7 +483,8 @@ async def refresh_access_token(
     
     # Create new tokens
     access_token = create_access_token(
-        data={"sub": str(user.id), "email": user.email}
+        data={"sub": str(user.id), "email": user.email},
+            expires_delta=timedelta(minutes=settings.access_token_expire_minutes)
     )
     refresh_token = create_refresh_token(
         data={"sub": str(user.id)}
@@ -370,9 +501,9 @@ async def refresh_access_token(
 async def logout(
     request: Request,
     current_user = Depends(get_current_user_unified),
-    db: Any = Depends(get_database)
+    db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    """Logout the current user and invalidate tokens."""
+    """Logout current user and invalidate tokens."""
     try:
         # Get the authorization header to extract the token
         auth_header = request.headers.get("Authorization")
@@ -397,7 +528,8 @@ async def logout(
         # Even if there's an error, we should still return success for logout
         return {
             "success": True,
-            "message": "Successfully logged out"
+            "message": "Successfully logged out",
+            "user_id": str(current_user.id)
         }
 
 
@@ -409,8 +541,49 @@ async def get_current_user_info(current_user = Depends(get_current_user_unified)
         "email": current_user.email,
         "is_active": current_user.is_active,
         "created_at": current_user.created_at,
+        "updated_at": current_user.updated_at,
         "last_login_at": current_user.last_login_at
     }
+
+
+@router.get("/debug/oauth")
+async def debug_oauth_flow(request: Request):
+    """Debug endpoint to check OAuth configuration and state"""
+    from ..auth.oauth import OAUTH_PROVIDERS
+    
+    debug_info = {
+        "oauth_providers": {},
+        "session_data": {},
+        "request_headers": dict(request.headers),
+        "request_cookies": dict(request.cookies)
+    }
+    
+    # Check OAuth provider configurations
+    for name, config in OAUTH_PROVIDERS.items():
+        client_id = getattr(settings, f'{name}_client_id', None)
+        client_secret = getattr(settings, f'{name}_client_secret', None)
+        
+        debug_info["oauth_providers"][name] = {
+            "configured": bool(client_id and client_secret),
+            "client_id_set": bool(client_id),
+            "client_secret_set": bool(client_secret),
+            "is_placeholder": client_id and "your_" in client_id
+        }
+    
+    # Check session data if available
+    if hasattr(request, 'session') and request.session:
+        debug_info["session_data"] = dict(request.session)
+    
+    return debug_info
+
+
+@router.get("/debug/cleanup")
+async def cleanup_oauth_session(request: Request):
+    """Cleanup OAuth session data for testing"""
+    if hasattr(request, 'session'):
+        request.session.clear()
+    
+    return {"message": "Session cleared successfully"}
 
 
 @router.get("/vscode-config")
