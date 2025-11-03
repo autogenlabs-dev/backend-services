@@ -196,6 +196,13 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "app": settings.app_name}
 
+# Backward compatibility endpoint for /auth/me
+@app.get("/auth/me")
+async def auth_me_backward_compatibility(request: Request):
+    """Backward compatibility endpoint for /auth/me - redirects to /api/auth/me"""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/api/auth/me", status_code=307)
+
 # Global exception handler
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):

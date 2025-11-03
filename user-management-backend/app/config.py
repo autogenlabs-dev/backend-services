@@ -7,7 +7,7 @@ import json
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=".env.production" if os.getenv("ENVIRONMENT") == "production" else ".env",
         extra="ignore"  # This will ignore extra environment variables
     )
     
