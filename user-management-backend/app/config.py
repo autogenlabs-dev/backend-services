@@ -44,8 +44,12 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     
+    # Production URLs
+    production_frontend_url: str = "https://codemurf.com"
+    production_backend_url: str = "https://api.codemurf.com"
+    
     # CORS
-    backend_cors_origins: List[str] = ["http://localhost:3000", "http://localhost:3001", "http://localhost:8080"]
+    backend_cors_origins: List[str] = ["http://localhost:3000", "http://localhost:3001", "http://localhost:8080", "https://codemurf.com", "https://www.codemurf.com"]
     
     @field_validator('backend_cors_origins', mode='before')
     @classmethod

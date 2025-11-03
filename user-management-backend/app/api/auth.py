@@ -261,7 +261,7 @@ async def oauth_login(provider: str, request: Request):
             redirect_uri = "http://localhost:8000/api/auth/google/callback"
         else:
             # Production - use the registered production callback
-            redirect_uri = "https://api.codemurf.com/auth/google/callback"
+            redirect_uri = "https://api.codemurf.com/api/auth/google/callback"
         
         return await client.authorize_redirect(request, redirect_uri)
     except Exception as e:
@@ -318,7 +318,7 @@ async def oauth_callback(
         if getattr(settings, 'environment', 'development') == 'development':
             redirect_uri_for_token = "http://localhost:8000/api/auth/google/callback"
         else:
-            redirect_uri_for_token = "https://api.codemurf.com/auth/google/callback"
+            redirect_uri_for_token = "https://api.codemurf.com/api/auth/google/callback"
             
         token_data = {
             'grant_type': 'authorization_code',
@@ -427,7 +427,10 @@ async def oauth_callback(
         print(f"🔍 JWT tokens created for user {user.id}")
         
         # Return redirect URL for frontend to handle
-        frontend_url = "http://localhost:3000/auth/callback"
+        if getattr(settings, 'environment', 'development') == 'development':
+            frontend_url = "http://localhost:3000/auth/callback"
+        else:
+            frontend_url = "https://codemurf.com/auth/callback"
         redirect_params = f"?access_token={access_token_jwt}&refresh_token={refresh_token_jwt}&user_id={user.id}"
         
         print(f"🔍 Redirecting to: {frontend_url}{redirect_params[:50]}...")
