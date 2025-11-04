@@ -98,7 +98,7 @@ app.add_middleware(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.backend_cors_origins,
+    allow_origins=["https://codemurf.com"],  # ✅ only one origin
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
