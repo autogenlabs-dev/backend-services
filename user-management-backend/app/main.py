@@ -194,7 +194,7 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "app": settings.app_name}
+    return {"status": "ok"}
 
 # Backward compatibility endpoint for /auth/me
 @app.get("/auth/me")
