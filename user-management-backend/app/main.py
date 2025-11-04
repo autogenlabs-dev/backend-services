@@ -200,9 +200,21 @@ async def health_check():
 # Backward compatibility endpoint for /auth/me
 @app.get("/auth/me")
 async def auth_me_backward_compatibility(request: Request):
-    """Backward compatibility endpoint for /auth/me - redirects to /api/auth/me"""
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/api/auth/me", status_code=307)
+    """Backward compatibility endpoint for /auth/me - forwards internally instead of redirecting"""
+    from .api.auth import get_current_user_unified
+    try:
+        user = await get_current_user_unified(request)
+        return {
+            "id": user.id,
+            "email": user.email,
+            "is_active": user.is_active,
+            "created_at": user.created_at,
+            "updated_at": user.updated_at,
+            "last_login_at": user.last_login_at
+        }
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=401, content={"detail": str(e)})
 
 # Global exception handler
 @app.exception_handler(HTTPException)
