@@ -797,3 +797,182 @@ async def get_vscode_configuration(
             }
         }
     }
+
+
+# Extension OAuth endpoints
+class ClerkToTicketRequest(BaseModel):
+    """Request model for converting Clerk token to extension ticket."""
+    state: str
+    auth_redirect: str
+
+
+@router.post("/extension/clerk-to-ticket")
+async def clerk_to_ticket(
+    request: ClerkToTicketRequest,
+    current_user: User = Depends(get_current_user_unified),
+    redis = Depends(get_redis)
+):
+    """
+    Convert Clerk authentication to extension ticket.
+    Called by frontend when user is already signed in with Clerk.
+    """
+    try:
+        import json
+        # Generate a one-time ticket
+        ticket = secrets.token_urlsafe(32)
+        
+        # Store ticket in Redis with user info (expires in 5 minutes)
+        # Use the same key pattern as google_callback for consistency
+        ticket_data = {
+            "user_id": str(current_user.id),
+            "email": current_user.email,
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        redis.setex(
+            f"extension:ticket:{ticket}",
+            300,  # 5 minutes
+            json.dumps(ticket_data)
+        )
+        
+        return {
+            "success": True,
+            "ticket": ticket
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate ticket: {str(e)}"
+        )
+
+
+@router.get("/extension/sign-in")
+async def extension_sign_in(
+    state: str,
+    auth_redirect: str,
+    redis = Depends(get_redis)
+):
+    """
+    Extension sign-in endpoint - redirects to Google OAuth with extension parameters.
+    Called by frontend when user is not signed in with Clerk.
+    """
+    try:
+        # Store extension parameters in Redis with the key pattern expected by callback
+        import json
+        extension_data = {
+            "state": state,
+            "auth_redirect": auth_redirect,
+            "is_extension": True
+        }
+        
+        # Store with key pattern that google_callback expects: extension:auth:{state}
+        redis.setex(
+            f"extension:auth:{state}",
+            600,  # 10 minutes
+            json.dumps(extension_data)
+        )
+        
+        # Redirect to Google OAuth with extension state
+        google_config = get_provider_config("google")
+        # Use production URL if in production, otherwise localhost
+        base_url = settings.production_backend_url if settings.environment == "production" else "http://localhost:8000"
+        redirect_uri = f"{base_url}/api/auth/google/callback"
+        
+        oauth_url = (
+            f"{google_config['auth_url']}?"
+            f"response_type=code&"
+            f"client_id={google_config['client_id']}&"
+            f"redirect_uri={redirect_uri}&"
+            f"scope=openid email profile&"
+            f"state={state}&"
+            f"access_type=offline&"
+            f"prompt=consent"
+        )
+        
+        return RedirectResponse(url=oauth_url, status_code=302)
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to initiate OAuth: {str(e)}"
+        )
+
+
+@router.post("/extension/exchange-ticket")
+async def exchange_extension_ticket(
+    ticket: str,
+    redis = Depends(get_redis)
+):
+    """
+    Exchange extension ticket for access token.
+    Called by VS Code extension after receiving ticket from frontend redirect.
+    """
+    try:
+        import json
+        # Get ticket data from Redis (using the key pattern from google_callback)
+        ticket_key = f"extension:ticket:{ticket}"
+        ticket_data_str = redis.get(ticket_key)
+        
+        if not ticket_data_str:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired ticket"
+            )
+        
+        # Delete ticket (one-time use)
+        redis.delete(ticket_key)
+        
+        # Parse ticket data
+        ticket_data = json.loads(ticket_data_str)
+        
+        # Get user from database
+        user = await User.find_one(User.id == PydanticObjectId(ticket_data["user_id"]))
+        
+        if not user or not user.id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # Update last login
+        db = await get_database().__anext__()
+        await update_user_last_login(db, user.id)
+        
+        # Generate tokens
+        access_token_jwt = create_access_token(data={"sub": user.email})
+        refresh_token_jwt = create_refresh_token(data={"sub": user.email})
+        
+        # Generate session ID
+        session_id = secrets.token_urlsafe(32)
+        
+        # Store session in Redis (7 days)
+        session_data = {
+            "user_id": str(user.id),
+            "email": user.email,
+            "access_token": access_token_jwt,
+            "refresh_token": refresh_token_jwt,
+            "created_at": datetime.utcnow().isoformat()
+        }
+        
+        redis.setex(
+            f"session:{session_id}",
+            604800,  # 7 days
+            json.dumps(session_data)
+        )
+        
+        return {
+            "access_token": access_token_jwt,
+            "refresh_token": refresh_token_jwt,
+            "token_type": "bearer",
+            "expires_in": 3600,
+            "user_id": str(user.id),
+            "session_id": session_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to exchange ticket: {str(e)}"
+        )
