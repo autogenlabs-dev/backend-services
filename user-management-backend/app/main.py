@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from contextlib import asynccontextmanager
@@ -9,7 +10,7 @@ from beanie import init_beanie
 from .config import settings
 from .auth.oauth import register_oauth_clients
 from .middleware.rate_limiting import rate_limit_middleware, add_rate_limit_headers
-from .api import auth, users, subscriptions, tokens, llm, admin, api_keys, payments, templates
+from .api import auth, users, subscriptions, tokens, llm, admin, api_keys, payments, templates, extension_auth
 from typing import Callable, Dict, Any
 import time
 import uvicorn
@@ -163,6 +164,18 @@ app.add_middleware(PerformanceAndRateLimitMiddleware)
 # Register OAuth clients
 register_oauth_clients()
 
+# Mount static files BEFORE including routers
+import os
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+try:
+    if os.path.exists(static_dir):
+        app.mount("/static", StaticFiles(directory=static_dir), name="static")
+        print(f"✅ Static files mounted from {static_dir}")
+    else:
+        print(f"⚠️ Static directory not found: {static_dir}")
+except Exception as e:
+    print(f"❌ Error mounting static files: {e}")
+
 # Include routers
 app.include_router(auth.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
@@ -173,6 +186,8 @@ app.include_router(admin.router, prefix="/api")
 app.include_router(api_keys.router, prefix="/api")
 app.include_router(payments.router, prefix="/api")
 app.include_router(templates.router, prefix="/api")
+# Extension authentication endpoints (Clerk-compatible API)
+app.include_router(extension_auth.router, prefix="/api")
 
 # Import interaction routers
 try:

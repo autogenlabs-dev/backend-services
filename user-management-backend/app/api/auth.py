@@ -1,8 +1,11 @@
 """Authentication API endpoints."""
 
 from datetime import timedelta
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from uuid import UUID
+import hashlib
+import base64
+import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Form
 from fastapi.responses import RedirectResponse, JSONResponse
@@ -12,7 +15,7 @@ from pydantic import BaseModel, Field, EmailStr, HttpUrl
 from beanie import PydanticObjectId
 from datetime import datetime
 
-from ..database import get_database
+from ..database import get_database, get_redis
 from ..schemas.auth import TokenRefresh, OAuthCallback, UserCreate, UserLogin
 from ..models.user import User
 from ..auth.jwt import create_access_token, create_refresh_token, verify_token
@@ -51,6 +54,24 @@ class Token(BaseModel):
     refresh_token: str | None = None
     token_type: str = "bearer"
     expires_in: int | None = None
+
+
+class PKCETokenRequest(BaseModel):
+    """Request model for PKCE token exchange."""
+    grant_type: str = Field(..., description="Must be 'authorization_code'")
+    code: str = Field(..., description="Authorization code from OAuth callback")
+    code_verifier: str = Field(..., description="PKCE code verifier")
+    redirect_uri: str = Field(..., description="Redirect URI used in authorization request")
+
+
+class PKCETokenResponse(BaseModel):
+    """Response model for PKCE token exchange."""
+    access_token: str
+    refresh_token: str
+    token_type: str = "Bearer"
+    expires_in: int
+    session_id: str
+    organization_id: Optional[str] = None
 
 
 @router.get("/providers")
@@ -234,8 +255,27 @@ async def login_user_json(
 # Google Login (redirect user to Google's OAuth page)
 @router.get("/google/login")
 @router.head("/google/login")
-async def google_login(request: Request):
-    redirect_uri = settings.google_redirect_uri
+async def google_login(
+    request: Request,
+    state: Optional[str] = None,
+    source: Optional[str] = None,  # ← Added source parameter
+    code_challenge: Optional[str] = None,
+    code_challenge_method: Optional[str] = None,
+    redirect_uri: Optional[str] = None,
+    redis_client = Depends(get_redis)
+):
+    """
+    Initiate Google OAuth login with optional PKCE support.
+    
+    Parameters:
+    - state: CSRF protection token
+    - source: Origin of request ('vscode' for VS Code extension, 'web' for web app)
+    - code_challenge: PKCE code challenge (SHA256 hash of code_verifier)
+    - code_challenge_method: PKCE method (S256 or plain)
+    - redirect_uri: Custom redirect URI for the callback
+    """
+    # Use provided redirect_uri or fallback to configured one
+    oauth_redirect_uri = redirect_uri or settings.google_redirect_uri
     
     # Ensure OAuth client is properly initialized
     if not oauth.google:
@@ -249,12 +289,36 @@ async def google_login(request: Request):
             detail="Google OAuth client is not available"
         )
     
-    return await oauth.google.authorize_redirect(request, redirect_uri)
+    # Store PKCE parameters in Redis if provided
+    if state and code_challenge:
+        import json
+        pkce_data = {
+            "code_challenge": code_challenge,
+            "code_challenge_method": code_challenge_method or "S256",
+            "redirect_uri": oauth_redirect_uri,
+            "source": source or "web",  # ← Store source parameter
+            "created_at": datetime.utcnow().isoformat()
+        }
+        # Store with 10 minute expiry
+        redis_client.setex(f"oauth:pkce:{state}", 600, json.dumps(pkce_data))
+    
+    return await oauth.google.authorize_redirect(request, oauth_redirect_uri, state=state)
 
 
 # Google OAuth callback
 @router.get("/google/callback")
-async def google_callback(request: Request, db: AsyncIOMotorDatabase = Depends(get_database)):
+async def google_callback(
+    request: Request,
+    state: Optional[str] = None,
+    redis_client = Depends(get_redis),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """
+    Handle Google OAuth callback.
+    
+    Supports both traditional OAuth flow (returns tokens directly) and
+    PKCE flow (generates authorization code for token exchange).
+    """
     try:
         # Ensure OAuth client is properly initialized
         if not oauth.google:
@@ -267,6 +331,28 @@ async def google_callback(request: Request, db: AsyncIOMotorDatabase = Depends(g
                 status_code=status.HTTP_501_NOT_IMPLEMENTED,
                 detail="Google OAuth client is not available"
             )
+        
+        # Check if this is an extension or PKCE flow
+        import json
+        pkce_data = None
+        extension_data = None
+        
+        if state:
+            # Check for extension auth flow
+            extension_key = f"extension:auth:{state}"
+            extension_data_str = redis_client.get(extension_key)
+            if extension_data_str:
+                extension_data = json.loads(extension_data_str)
+                # Delete extension data after reading (one-time use)
+                redis_client.delete(extension_key)
+            
+            # Check for PKCE flow
+            pkce_key = f"oauth:pkce:{state}"
+            pkce_data_str = redis_client.get(pkce_key)
+            if pkce_data_str:
+                pkce_data = json.loads(pkce_data_str)
+                # Delete PKCE data after reading (one-time use)
+                redis_client.delete(pkce_key)
         
         # Exchange authorization code for access token
         token = await oauth.google.authorize_access_token(request)
@@ -291,7 +377,58 @@ async def google_callback(request: Request, db: AsyncIOMotorDatabase = Depends(g
         # Update last login
         if user and user.id:
             await update_user_last_login(db, user.id)
+        
+        # If extension flow, generate ticket and redirect
+        if extension_data:
+            # Generate authorization ticket
+            ticket = secrets.token_urlsafe(32)
+            
+            # Store ticket with user data in Redis
+            ticket_data = {
+                "user_id": str(user.id),
+                "email": user.email,
+                "created_at": datetime.utcnow().isoformat()
+            }
+            # Store with 5 minute expiry (tickets should be short-lived)
+            redis_client.setex(f"extension:ticket:{ticket}", 300, json.dumps(ticket_data))
+            
+            # Redirect to extension callback with ticket
+            auth_redirect = extension_data.get("auth_redirect")
+            # Append /auth/clerk/callback path to the vscode:// URI
+            redirect_url = f"{auth_redirect}/auth/clerk/callback?code={ticket}&state={state}"
+            
+            return RedirectResponse(
+                url=redirect_url,
+                status_code=302
+            )
+        
+        # If PKCE flow, generate authorization code and redirect
+        if pkce_data:
+            # Generate authorization code
+            auth_code = secrets.token_urlsafe(32)
+            
+            # Store authorization code with user data in Redis
+            auth_code_data = {
+                "user_id": str(user.id),
+                "email": user.email,
+                "code_challenge": pkce_data.get("code_challenge"),
+                "code_challenge_method": pkce_data.get("code_challenge_method"),
+                "redirect_uri": pkce_data.get("redirect_uri"),
+                "created_at": datetime.utcnow().isoformat()
+            }
+            # Store with 5 minute expiry (authorization codes should be short-lived)
+            redis_client.setex(f"oauth:code:{auth_code}", 300, json.dumps(auth_code_data))
+            
+            # Redirect to VS Code extension callback with authorization code
+            redirect_uri = pkce_data.get("redirect_uri")
+            redirect_url = f"{redirect_uri}?code={auth_code}&state={state}"
+            
+            return RedirectResponse(
+                url=redirect_url,
+                status_code=302
+            )
 
+        # Traditional OAuth flow - return tokens directly
         # Create JWT tokens
         access_token_jwt = create_access_token(
             data={"sub": str(user.id), "email": user.email},
@@ -301,9 +438,16 @@ async def google_callback(request: Request, db: AsyncIOMotorDatabase = Depends(g
             data={"sub": str(user.id)}
         )
 
-        # Redirect to frontend callback with tokens
-        frontend_url = "http://localhost:3000"  # In production, use settings.production_frontend_url
-        redirect_url = f"{frontend_url}/auth/callback?access_token={access_token_jwt}&refresh_token={refresh_token_jwt}&user_id={str(user.id)}"
+        # ← Check source from PKCE data or default to web
+        source = pkce_data.get("source", "web") if pkce_data else "web"
+        
+        # Redirect based on source
+        if source == "vscode":
+            # Redirect to HTML page that will open VS Code
+            redirect_url = f"http://localhost:8000/static/vscode-callback.html?token={access_token_jwt}"
+        else:
+            # Redirect to web app
+            redirect_url = f"http://localhost:3000/auth/callback?access_token={access_token_jwt}&refresh_token={refresh_token_jwt}&user_id={str(user.id)}"
         
         return RedirectResponse(
             url=redirect_url,
@@ -312,6 +456,163 @@ async def google_callback(request: Request, db: AsyncIOMotorDatabase = Depends(g
 
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
+
+
+@router.post("/token", response_model=PKCETokenResponse)
+async def exchange_authorization_code(
+    token_request: PKCETokenRequest,
+    redis_client = Depends(get_redis),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """
+    Exchange authorization code for access token with PKCE validation.
+    
+    This endpoint implements the OAuth 2.0 Authorization Code Flow with PKCE
+    (Proof Key for Code Exchange) as specified in RFC 7636.
+    
+    Flow:
+    1. Client generates code_verifier and code_challenge
+    2. Client requests authorization with code_challenge
+    3. Backend stores code_challenge with authorization code
+    4. Client exchanges authorization code + code_verifier for tokens
+    5. Backend validates code_verifier matches stored code_challenge
+    """
+    try:
+        # Validate grant type
+        if token_request.grant_type != "authorization_code":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid grant_type. Must be 'authorization_code'"
+            )
+        
+        # Retrieve stored authorization data from Redis
+        auth_data_key = f"oauth:code:{token_request.code}"
+        stored_data = redis_client.get(auth_data_key)
+        
+        if not stored_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired authorization code"
+            )
+        
+        # Parse stored data
+        import json
+        auth_data = json.loads(stored_data)
+        
+        # Validate redirect URI matches
+        if auth_data.get("redirect_uri") != token_request.redirect_uri:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Redirect URI mismatch"
+            )
+        
+        # Validate PKCE code_verifier
+        stored_code_challenge = auth_data.get("code_challenge")
+        code_challenge_method = auth_data.get("code_challenge_method", "S256")
+        
+        if stored_code_challenge:
+            # Compute challenge from verifier
+            if code_challenge_method == "S256":
+                computed_challenge = base64.urlsafe_b64encode(
+                    hashlib.sha256(token_request.code_verifier.encode()).digest()
+                ).decode().rstrip("=")
+            elif code_challenge_method == "plain":
+                computed_challenge = token_request.code_verifier
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Unsupported code_challenge_method"
+                )
+            
+            # Verify challenge matches
+            if computed_challenge != stored_code_challenge:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid code_verifier"
+                )
+        
+        # Get user data
+        user_id = auth_data.get("user_id")
+        email = auth_data.get("email")
+        
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid authorization code data"
+            )
+        
+        # Fetch user from database
+        from ..services.user_service import get_user_by_id
+        try:
+            user_obj_id = PydanticObjectId(user_id)
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid user ID format"
+            )
+        
+        user = await get_user_by_id(db, user_obj_id)
+        if not user or not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found or inactive"
+            )
+        
+        if not user.id:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="User ID is missing"
+            )
+        
+        # Update last login
+        await update_user_last_login(db, user.id)
+        
+        # Generate tokens
+        access_token = create_access_token(
+            data={"sub": str(user.id), "email": user.email},
+            expires_delta=timedelta(minutes=settings.access_token_expire_minutes)
+        )
+        refresh_token = create_refresh_token(
+            data={"sub": str(user.id)}
+        )
+        
+        # Generate session ID
+        session_id = secrets.token_urlsafe(32)
+        
+        # Store session in Redis (optional, for session management)
+        session_key = f"session:{session_id}"
+        redis_client.setex(
+            session_key,
+            86400,  # 24 hours
+            json.dumps({
+                "user_id": str(user.id),
+                "email": user.email,
+                "created_at": datetime.utcnow().isoformat()
+            })
+        )
+        
+        # Delete used authorization code
+        redis_client.delete(auth_data_key)
+        
+        return PKCETokenResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_type="Bearer",
+            expires_in=settings.access_token_expire_minutes * 60,
+            session_id=session_id,
+            organization_id=auth_data.get("organization_id")
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Token exchange error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to exchange authorization code for token"
+        )
 
 
 @router.post("/refresh")
