@@ -171,12 +171,14 @@ async def create_my_api_key(
     """Create a new API key for the current user."""
     api_key_record, api_key = await create_api_key(db, current_user.id, key_data) # Added await
     
+    # Convert ObjectId to string for response
     return ApiKeyWithSecret(
-        id=api_key_record.id,
+        id=str(api_key_record.id),  # Convert ObjectId to string
         name=api_key_record.name,
         key_preview=api_key_record.key_preview,
         created_at=api_key_record.created_at,
         last_used_at=api_key_record.last_used_at,
+        expires_at=api_key_record.expires_at,
         is_active=api_key_record.is_active,
         api_key=api_key
     )

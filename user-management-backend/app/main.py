@@ -98,10 +98,16 @@ app.add_middleware(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://codemurf.com"],  # ✅ only one origin
+    allow_origins=[
+        "https://codemurf.com",  # Production frontend
+        "http://localhost:3000",   # Development frontend
+        "http://localhost:3001",   # Test frontend
+        "http://localhost:8080"    # Alternative development port
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Custom middleware for performance monitoring and rate limit headers

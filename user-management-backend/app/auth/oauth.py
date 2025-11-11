@@ -53,12 +53,13 @@ def register_oauth_clients():
                     name=provider_name,
                     client_id=config["client_id"],
                     client_secret=config["client_secret"],
-                    authorize_url=config["authorization_endpoint"],
                     access_token_url=config["token_endpoint"],
-                    jwks_uri="https://www.googleapis.com/oauth2/v3/certs",
-                    client_kwargs={
-                        "scope": " ".join(config["scopes"])
-                    }
+                    access_token_params=None,
+                    authorize_url=config["authorization_endpoint"],
+                    authorize_params=None,
+                    api_base_url="https://www.googleapis.com/oauth2/v2/",
+                    client_kwargs={"scope": "openid email profile"},
+                    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration"
                 )
             else:
                 oauth.register(
@@ -71,6 +72,7 @@ def register_oauth_clients():
                         "scope": " ".join(config["scopes"])
                     }
                 )
+    print("✅ OAuth clients registered")
 
 
 def get_oauth_client(provider: str):

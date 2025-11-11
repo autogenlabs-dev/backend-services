@@ -12,6 +12,16 @@ services:
       - DEBUG=False
       - A4F_API_KEY=${A4F_API_KEY:-your-a4f-api-key}
       - REDIS_URL=redis://redis:6379
+      # Google OAuth Configuration
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-37099745939-4v685b95lv9r2306l1edq4s7dpnk05vd.apps.googleusercontent.com}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-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}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:8000/api/auth/google/callback}
+      # GitHub OAuth Configuration
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-Ov23li9jfiByvkoGx6Ih}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-e26733526b95de417f77a5d924b142cf2f80dfd5}
+      # OpenRouter OAuth Configuration
+      - OPENROUTER_CLIENT_ID=${OPENROUTER_CLIENT_ID:-your_openrouter_client_id}
+      - OPENROUTER_CLIENT_SECRET=${OPENROUTER_CLIENT_SECRET:-your_openrouter_client_secret}
     depends_on:
       - mongodb
       - redis

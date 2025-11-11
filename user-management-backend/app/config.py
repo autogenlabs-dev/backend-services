@@ -69,6 +69,7 @@ class Settings(BaseSettings):
     openrouter_client_secret: str = "your_openrouter_client_secret"
     google_client_id: str = "your_google_client_id"
     google_client_secret: str = "your_google_client_secret"
+    google_redirect_uri: str = "http://localhost:8000/api/auth/google/callback"
     github_client_id: str = "your_github_client_id"
     github_client_secret: str = "your_github_client_secret"
     

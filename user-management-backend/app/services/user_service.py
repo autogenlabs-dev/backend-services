@@ -343,6 +343,12 @@ async def create_api_key(db: AsyncIOMotorDatabase, user_id: PydanticObjectId, ke
     # Hash the API key for storage
     key_hash = hashlib.sha256(api_key.encode()).hexdigest()
 
+    # Calculate expiration date if provided
+    expires_at = None
+    if key_data.name:  # Access the name field instead
+        # For now, create non-expiring keys (can add expiration later)
+        expires_at = None
+
     # Create database record
     db_api_key = ApiKey(
         user_id=user_id,
@@ -351,7 +357,8 @@ async def create_api_key(db: AsyncIOMotorDatabase, user_id: PydanticObjectId, ke
         name=key_data.name,
         is_active=True,
         created_at=datetime.now(timezone.utc), # Explicitly set created_at
-        last_used_at=None # Not used yet
+        last_used_at=None, # Not used yet
+        expires_at=expires_at
     )
 
     await db_api_key.insert()

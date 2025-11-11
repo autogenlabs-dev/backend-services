@@ -6,7 +6,7 @@ import json
 import sys
 
 # Server URL - update this to your EC2 public URL or domain
-BASE_URL = "http://localhost:8000"  # Change to your EC2 URL, e.g., "https://yourdomain.com" or "http://YOUR_EC2_IP:8000"
+BASE_URL = "http://localhost:8000/api"  # Change to your EC2 URL, e.g., "https://yourdomain.com" or "http://YOUR_EC2_IP:8000"
 
 def test_login_json():
     """Test the /auth/login-json endpoint."""

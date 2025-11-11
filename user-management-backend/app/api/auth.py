@@ -5,7 +5,7 @@ from typing import Dict, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Form
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, Field, EmailStr, HttpUrl
@@ -231,190 +231,67 @@ async def login_user_json(
     }
 
 
-@router.get("/{provider}/login")
-async def oauth_login(provider: str, request: Request):
-    """Initiate OAuth login with a provider."""
-    if provider not in ["openrouter", "google", "github"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid OAuth provider"
-        )
+# Google Login (redirect user to Google's OAuth page)
+@router.get("/google/login")
+@router.head("/google/login")
+async def google_login(request: Request):
+    redirect_uri = settings.google_redirect_uri
     
-    config = get_provider_config(provider)
-    if not config or not config.get("client_id"):
+    # Ensure OAuth client is properly initialized
+    if not oauth.google:
+        # Re-register OAuth clients if not available
+        from ..auth.oauth import register_oauth_clients
+        register_oauth_clients()
+    
+    if not oauth.google:
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail=f"OAuth provider {provider} is not configured"
+            detail="Google OAuth client is not available"
         )
     
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+
+# Google OAuth callback
+@router.get("/google/callback")
+async def google_callback(request: Request, db: AsyncIOMotorDatabase = Depends(get_database)):
     try:
-        client = oauth.create_client(provider)
-        if not client:
+        # Ensure OAuth client is properly initialized
+        if not oauth.google:
+            # Re-register OAuth clients if not available
+            from ..auth.oauth import register_oauth_clients
+            register_oauth_clients()
+        
+        if not oauth.google:
             raise HTTPException(
                 status_code=status.HTTP_501_NOT_IMPLEMENTED,
-                detail=f"OAuth provider {provider} is not available"
+                detail="Google OAuth client is not available"
             )
-        # Use correct redirect URI that matches Google OAuth configuration
-        # For development, we need to use a URL that matches what's registered in Google
-        if getattr(settings, 'environment', 'development') == 'development':
-            # Development - use the backend URL directly since Google can't reach localhost:3000
-            redirect_uri = "http://localhost:8000/api/auth/google/callback"
-        else:
-            # Production - use the registered production callback
-            redirect_uri = "https://api.codemurf.com/api/auth/google/callback"
         
-        return await client.authorize_redirect(request, redirect_uri)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to initiate OAuth login: {str(e)}"
-        )
+        # Exchange authorization code for access token
+        token = await oauth.google.authorize_access_token(request)
 
+        # Fetch user info from Google
+        user_info = await oauth.google.get("userinfo", token=token)
+        user_data = user_info.json()
 
-@router.get("/{provider}/callback")
-async def oauth_callback(
-    provider: str,
-    request: Request,
-    db: AsyncIOMotorDatabase = Depends(get_database)
-):
-    """Handle OAuth callback and create user session."""
-    if provider not in ["openrouter", "google", "github"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid OAuth provider"
-        )
-    
-    try:
-        # Debug: Log the callback URL and parameters
-        print(f"🔍 OAuth callback for {provider}")
-        print(f"🔍 Callback URL: {request.url}")
-        
-        # Extract authorization code directly from URL for development
-        from urllib.parse import parse_qs
-        parsed_url = str(request.url)
-        query_params = parse_qs(parsed_url.split('?')[1] if '?' in parsed_url else '')
-        
-        code = query_params.get('code', [None])[0]
-        error = query_params.get('error', [None])[0]
-        
-        if error:
-            print(f"🔍 OAuth error returned: {error}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"OAuth error: {error}"
-            )
-        
-        if not code:
-            print("🔍 No authorization code found in callback")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No authorization code received"
-            )
-        
-        print(f"🔍 Authorization code received: {code[:20]}...")
-        
-        # Exchange code for token directly (bypassing authlib for development)
-        # Use the same redirect URI that was used in the authorize step
-        if getattr(settings, 'environment', 'development') == 'development':
-            redirect_uri_for_token = "http://localhost:8000/api/auth/google/callback"
-        else:
-            redirect_uri_for_token = "https://api.codemurf.com/api/auth/google/callback"
-            
-        token_data = {
-            'grant_type': 'authorization_code',
-            'code': code,
-            'redirect_uri': redirect_uri_for_token,
-            'client_id': getattr(settings, f'{provider}_client_id', None),
-            'client_secret': getattr(settings, f'{provider}_client_secret', None)
-        }
-        
-        import httpx
-        config = get_provider_config(provider)
-        token_endpoint = config.get("token_endpoint")
-        
-        if not token_endpoint:
-            raise HTTPException(
-                status_code=status.HTTP_501_NOT_IMPLEMENTED,
-                detail=f"Token endpoint not configured for {provider}"
-            )
-        
-        print(f"🔍 Exchanging code for token at: {token_endpoint}")
-        
-        async with httpx.AsyncClient() as http_client:
-            token_response = await http_client.post(token_endpoint, data=token_data)
-            
-            if token_response.status_code != 200:
-                print(f"🔍 Token exchange failed: {token_response.status_code} - {token_response.text}")
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Token exchange failed: {token_response.text}"
-                )
-            
-            token = token_response.json()
-            print("🔍 Token exchange successful!")
-        
-        # Get user info from provider
-        userinfo_endpoint = config.get("userinfo_endpoint")
-        access_token = token.get('access_token')
-        
-        if not access_token:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="No access token in response"
-            )
-        
-        user_data = {}
-        if userinfo_endpoint:
-            print(f"🔍 Getting user info from: {userinfo_endpoint}")
-            headers = {'Authorization': f'Bearer {access_token}'}
-            
-            async with httpx.AsyncClient() as http_client:
-                user_response = await http_client.get(userinfo_endpoint, headers=headers)
-                if user_response.status_code == 200:
-                    user_data = user_response.json()
-                    print(f"🔍 User info retrieved: {user_data.get('email', 'No email')}")
-                else:
-                    print(f"🔍 Failed to get user info: {user_response.status_code}")
-        
-        # Extract user information
-        if provider == "github":
-            # GitHub requires a separate call to get email
-            email_url = "https://api.github.com/user/emails"
-            headers = {'Authorization': f'Bearer {access_token}'}
-            async with httpx.AsyncClient() as http_client:
-                email_response = await http_client.get(email_url, headers=headers)
-                if email_response.status_code == 200:
-                    emails = email_response.json()
-                    primary_email = next((email for email in emails if email.get("primary")), None)
-                    email = primary_email.get("email") if primary_email else user_data.get("email")
-                else:
-                    email = user_data.get("email")
-        else:
-            email = user_data.get("email")
+        # Example: Extract useful info
+        email = user_data.get("email")
+        name = user_data.get("name")
+        picture = user_data.get("picture")
 
-        provider_user_id = user_data.get("id") or user_data.get("sub")
-        
-        if not email or not provider_user_id:
-            print(f"🔍 Missing user data - email: {email}, provider_user_id: {provider_user_id}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Could not extract user information from OAuth provider"
-            )
-        
-        print(f"🔍 User identified: {email} (ID: {provider_user_id})")
-        
-        # Get or create user
+        # Get or create user in database
         user = await get_or_create_user_by_oauth(
             db=db,
-            provider_name=provider,
-            provider_user_id=str(provider_user_id),
+            provider_name="google",
+            provider_user_id=user_data.get("id"),
             email=email
         )
-        
+
         # Update last login
         if user and user.id:
             await update_user_last_login(db, user.id)
-        
+
         # Create JWT tokens
         access_token_jwt = create_access_token(
             data={"sub": str(user.id), "email": user.email},
@@ -423,32 +300,18 @@ async def oauth_callback(
         refresh_token_jwt = create_refresh_token(
             data={"sub": str(user.id)}
         )
+
+        # Redirect to frontend callback with tokens
+        frontend_url = "http://localhost:3000"  # In production, use settings.production_frontend_url
+        redirect_url = f"{frontend_url}/auth/callback?access_token={access_token_jwt}&refresh_token={refresh_token_jwt}&user_id={str(user.id)}"
         
-        print(f"🔍 JWT tokens created for user {user.id}")
-        
-        # Return redirect URL for frontend to handle
-        if getattr(settings, 'environment', 'development') == 'development':
-            frontend_url = "http://localhost:3000/auth/callback"
-        else:
-            frontend_url = "https://codemurf.com/auth/callback"
-        redirect_params = f"?access_token={access_token_jwt}&refresh_token={refresh_token_jwt}&user_id={user.id}"
-        
-        print(f"🔍 Redirecting to: {frontend_url}{redirect_params[:50]}...")
-        
-        # Directly redirect to frontend with tokens in URL params
-        return RedirectResponse(url=f"{frontend_url}{redirect_params}")
-        
-    except HTTPException:
-        # Re-raise HTTP exceptions as-is
-        raise
-    except Exception as e:
-        print(f"🔍 OAuth callback error: {str(e)}")
-        import traceback
-        print(f"🔍 Traceback: {traceback.format_exc()}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"OAuth callback failed: {str(e)}"
+        return RedirectResponse(
+            url=redirect_url,
+            status_code=302
         )
+
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
 
 
 @router.post("/refresh")
