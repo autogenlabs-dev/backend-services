@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from contextlib import asynccontextmanager
@@ -9,7 +10,7 @@ from beanie import init_beanie
 from .config import settings
 from .auth.oauth import register_oauth_clients
 from .middleware.rate_limiting import rate_limit_middleware, add_rate_limit_headers
-from .api import auth, users, subscriptions, tokens, llm, admin, api_keys, payments, templates
+from .api import auth, users, subscriptions, tokens, llm, admin, api_keys, payments, templates, extension_auth
 from typing import Callable, Dict, Any
 import time
 import uvicorn
@@ -98,10 +99,16 @@ app.add_middleware(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.backend_cors_origins,
+    allow_origins=[
+        "https://codemurf.com",  # Production frontend
+        "http://localhost:3000",   # Development frontend
+        "http://localhost:3001",   # Test frontend
+        "http://localhost:8080"    # Alternative development port
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Custom middleware for performance monitoring and rate limit headers
@@ -157,16 +164,30 @@ app.add_middleware(PerformanceAndRateLimitMiddleware)
 # Register OAuth clients
 register_oauth_clients()
 
+# Mount static files BEFORE including routers
+import os
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+try:
+    if os.path.exists(static_dir):
+        app.mount("/static", StaticFiles(directory=static_dir), name="static")
+        print(f"✅ Static files mounted from {static_dir}")
+    else:
+        print(f"⚠️ Static directory not found: {static_dir}")
+except Exception as e:
+    print(f"❌ Error mounting static files: {e}")
+
 # Include routers
-app.include_router(auth.router)
-app.include_router(users.router)
-app.include_router(subscriptions.router)
-app.include_router(tokens.router)
-app.include_router(llm.router)
-app.include_router(admin.router)
-app.include_router(api_keys.router)
-app.include_router(payments.router)
-app.include_router(templates.router)
+app.include_router(auth.router, prefix="/api")
+app.include_router(users.router, prefix="/api")
+app.include_router(subscriptions.router, prefix="/api")
+app.include_router(tokens.router, prefix="/api")
+app.include_router(llm.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
+app.include_router(api_keys.router, prefix="/api")
+app.include_router(payments.router, prefix="/api")
+app.include_router(templates.router, prefix="/api")
+# Extension authentication endpoints (Clerk-compatible API)
+app.include_router(extension_auth.router, prefix="/api")
 
 # Import interaction routers
 try:
@@ -192,9 +213,29 @@ async def root():
     return {"message": "User Management Backend API", "status": "healthy"}
 
 @app.get("/health")
+@app.head("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "app": settings.app_name}
+    return {"status": "ok"}
+
+# Backward compatibility endpoint for /auth/me
+@app.get("/auth/me")
+async def auth_me_backward_compatibility(request: Request):
+    """Backward compatibility endpoint for /auth/me - forwards internally instead of redirecting"""
+    from .api.auth import get_current_user_unified
+    try:
+        user = await get_current_user_unified(request)
+        return {
+            "id": user.id,
+            "email": user.email,
+            "is_active": user.is_active,
+            "created_at": user.created_at,
+            "updated_at": user.updated_at,
+            "last_login_at": user.last_login_at
+        }
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=401, content={"detail": str(e)})
 
 # Global exception handler
 @app.exception_handler(HTTPException)

@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 
 # API endpoint (adjust if different)
-BASE_URL = "http://localhost:8001"
+BASE_URL = "http://localhost:8000"
 
 # Test accounts created by the reset script
 TEST_ACCOUNTS = [

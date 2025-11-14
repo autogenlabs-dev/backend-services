@@ -1,6 +1,9 @@
 # Use a slim Python base image for smaller size
 FROM python:3.12-slim
 
+# Install curl for health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 # Set the working directory in the container
 WORKDIR /app
 
@@ -18,4 +21,4 @@ EXPOSE 8000
 
 
 # Run the application
-CMD ["uvicorn", "minimal_auth_server:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

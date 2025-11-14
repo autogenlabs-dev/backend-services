@@ -4,76 +4,7 @@
 # Run this script on your EC2 instance after connecting via SSH
 
 echo "🚀 Starting EC2 Deployment for User Management Backend"
-echo "=========# Test and restart nginx with better error handling
-test_and_start_nginx() {
-    echo "🔧 Testing and st# Build with optimizations for low disk space and dependency issues
-echo "🏗️  Building application with enhanced error handling..."
-export DOCKER_BUILDKIT=1
-export COMPOSE_DOCKER_CLI_BUILD=1
-
-# Clean up any failed builds
-sudo docker-compose down --volumes --remove-orphans 2>/dev/null || true
-
-# Pull base images first to avoid build issues
-echo "📦 Pulling base images..."
-sudo docker-compose pull mongodb redis 2>/dev/null || true
-
-# Build API with better error handling
-echo "🔨 Building API container..."
-if ! sudo docker-compose build --no-cache api; then
-    echo "❌ Build failed! Checking for common issues..."
-    
-    # Check if requirements.txt exists and is readable
-    if [ ! -f "requirements.txt" ]; then
-        echo "❌ requirements.txt not found!"
-        exit 1
-    fi
-    
-    echo "📋 Current requirements.txt:"
-    head -20 requirements.txt
-    
-    echo "🔄 Retrying build with verbose output..."
-    sudo docker-compose build --no-cache --progress=plain api || {
-        echo "❌ Build failed again. Please check the Dockerfile and requirements."
-        exit 1
-    }
-fi
-
-echo "✅ Build completed successfully"ginx..."
-    
-    # Test nginx configuration
-    if sudo nginx -t; then
-        echo "✅ Nginx configuration is valid"
-        
-        # Try to start/restart nginx
-        if sudo systemctl is-active --quiet nginx; then
-            echo "🔄 Reloading nginx configuration..."
-            sudo systemctl reload nginx
-        else
-            echo "▶️  Starting nginx..."
-            sudo systemctl start nginx
-        fi
-        
-        # Verify nginx is running
-        if sudo systemctl is-active --quiet nginx; then
-            echo "✅ Nginx is running successfully"
-            return 0
-        else
-            echo "❌ Nginx failed to start, checking status..."
-            sudo systemctl status nginx --no-pager -l
-            return 1
-        fi
-    else
-        echo "❌ Nginx configuration test failed"
-        echo "📋 Nginx error details:"
-        sudo nginx -t 2>&1
-        return 1
-    fi
-}
-
-# Create nginx configuration and test it
-create_nginx_config
-test_and_start_nginx======================================"
+echo "=================================================="
 
 # Function to check disk space
 check_disk_space() {
@@ -218,19 +149,31 @@ fi
 sudo systemctl start nginx
 sudo systemctl enable nginx
 
-# Function to create nginx configuration with conditional SSL
-create_nginx_config() {
-    echo "🔧 Configuring nginx for api.codemurf.com..."
-    
-    # Check if SSL certificates exist
-    if [ -f "/etc/ssl/certs/cloudflare-origin.pem" ] && [ -f "/etc/ssl/private/cloudflare-origin.key" ]; then
-        echo "✅ SSL certificates found, creating full SSL configuration..."
-        SSL_CONFIG="# HTTPS server block with SSL certificates
+# Create nginx configuration for the API (behind Cloudflare)
+echo "🔧 Configuring nginx for api.codemurf.com..."
+sudo tee /etc/nginx/conf.d/api.codemurf.com.conf > /dev/null <<'NGINX_CONF'
+# HTTP server block (redirects to HTTPS or serves for Flexible mode)
+server {
+    listen 80;
+    server_name api.codemurf.com;
+
+    location / {
+        proxy_pass http://localhost:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $http_cf_connecting_ip;
+        proxy_set_header X-Forwarded-For $http_cf_connecting_ip;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header CF-Ray $http_cf_ray;
+        proxy_set_header CF-IPCountry $http_cf_ipcountry;
+    }
+}
+
+# HTTPS server block (for Full/Full(strict) mode with Origin Certificate)
 server {
     listen 443 ssl http2;
     server_name api.codemurf.com;
 
-    # SSL Configuration
+    # SSL Configuration - Update these paths with your Cloudflare Origin Certificate
     ssl_certificate /etc/ssl/certs/cloudflare-origin.pem;
     ssl_certificate_key /etc/ssl/private/cloudflare-origin.key;
     
@@ -243,54 +186,20 @@ server {
 
     location / {
         proxy_pass http://localhost:8000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$http_cf_connecting_ip;
-        proxy_set_header X-Forwarded-For \$http_cf_connecting_ip;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $http_cf_connecting_ip;
+        proxy_set_header X-Forwarded-For $http_cf_connecting_ip;
         proxy_set_header X-Forwarded-Proto https;
-        proxy_set_header CF-Ray \$http_cf_ray;
-        proxy_set_header CF-IPCountry \$http_cf_ipcountry;
+        proxy_set_header CF-Ray $http_cf_ray;
+        proxy_set_header CF-IPCountry $http_cf_ipcountry;
         
         # WebSocket support
         proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection \"upgrade\";
-    }
-}"
-    else
-        echo "⚠️  SSL certificates not found, creating HTTP-only configuration..."
-        SSL_CONFIG="# SSL certificates not found - install them to enable HTTPS
-# Instructions: https://developers.cloudflare.com/ssl/origin-configuration/origin-ca/"
-    fi
-
-    # Create the nginx configuration
-    sudo tee /etc/nginx/conf.d/api.codemurf.com.conf > /dev/null <<NGINX_CONF
-# HTTP server block (always available)
-server {
-    listen 80;
-    server_name api.codemurf.com;
-
-    location / {
-        proxy_pass http://localhost:8000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$http_cf_connecting_ip;
-        proxy_set_header X-Forwarded-For \$http_cf_connecting_ip;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_set_header CF-Ray \$http_cf_ray;
-        proxy_set_header CF-IPCountry \$http_cf_ipcountry;
-        
-        # WebSocket support
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
     }
 }
-
-$SSL_CONFIG
 NGINX_CONF
-}
-
-# Create nginx configuration
-create_nginx_config
 
 # Test nginx config (but don't fail if SSL certs aren't installed yet)
 echo "� Testing nginx configuration..."
@@ -376,107 +285,46 @@ check_disk_space
 echo "🚀 Starting the application..."
 sudo docker-compose up -d
 
-# Wait a moment before checking nginx
-echo "⏳ Waiting for application startup..."
-sleep 5
+# Reload nginx to apply any configuration changes
+sudo systemctl reload nginx
 
 # Check container status
 echo "📊 Container Status:"
 sudo docker-compose ps
 
-# Enhanced health checks with better debugging
-echo "🔍 Running comprehensive health checks..."
+# Enhanced health checks
+echo "🔍 Running health checks..."
+sleep 10
 
-# Wait longer for containers to be ready
-echo "⏳ Waiting for containers to initialize (30 seconds)..."
-sleep 30
-
-# Check container health first
-echo "📊 Container Status:"
-sudo docker-compose ps
-
-# Check if API container is running and healthy
-API_CONTAINER=$(sudo docker-compose ps -q api)
-if [ -z "$API_CONTAINER" ]; then
-    echo "❌ API container not found!"
-    exit 1
-fi
-
-# Check container logs for errors
-echo "📄 Checking container logs for errors..."
-CONTAINER_LOGS=$(sudo docker-compose logs api 2>&1)
-if echo "$CONTAINER_LOGS" | grep -i "error\|exception\|failed\|traceback"; then
-    echo "❌ Container has errors! Recent logs:"
-    sudo docker-compose logs --tail=20 api
-    echo ""
-    echo "🔄 Attempting to restart containers with fresh build..."
-    sudo docker-compose down
-    sudo docker-compose build --no-cache api
-    sudo docker-compose up -d
-    echo "⏳ Waiting for restart (20 seconds)..."
-    sleep 20
-fi
-
-# Function to test endpoint with enhanced debugging
+# Function to test endpoint with retry
 test_endpoint() {
     local url=$1
     local name=$2
-    local max_retries=6
+    local max_retries=5
     local retry=0
     
     echo "Testing $name at $url..."
     while [ $retry -lt $max_retries ]; do
-        local response_code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 --max-time 15 "$url" 2>/dev/null)
-        
-        if [ "$response_code" = "200" ]; then
-            echo "✅ $name: OK (HTTP $response_code)"
-            # Test with actual response
-            local response=$(curl -s --connect-timeout 10 --max-time 15 "$url" 2>/dev/null)
-            if [ ${#response} -gt 10 ]; then
-                echo "   Response preview: $(echo "$response" | head -c 100)..."
-            fi
+        if curl -f -s --connect-timeout 5 --max-time 10 "$url" > /dev/null 2>&1; then
+            echo "✅ $name: OK"
             return 0
-        elif [ "$response_code" = "000" ]; then
-            echo "⏳ $name: Connection refused (retry $((retry + 1))/$max_retries)"
         else
-            echo "⚠️  $name: HTTP $response_code (retry $((retry + 1))/$max_retries)"
+            retry=$((retry + 1))
+            echo "⏳ $name: Retry $retry/$max_retries"
+            sleep 5
         fi
-        
-        retry=$((retry + 1))
-        sleep 8
     done
-    
-    echo "❌ $name: Failed after $max_retries attempts (last code: $response_code)"
-    echo "🔍 Debugging information:"
-    echo "   - Container status: $(sudo docker-compose ps api --format 'table {{.State}}\t{{.Status}}')"
-    echo "   - Port binding: $(sudo docker-compose port api 8000 2>/dev/null || echo 'Port not bound')"
-    echo "   - Process in container: $(sudo docker-compose exec -T api ps aux 2>/dev/null || echo 'Cannot check processes')"
+    echo "❌ $name: Failed after $max_retries attempts"
     return 1
 }
 
-# Test health endpoint first
-if ! test_endpoint "http://localhost:8000/health" "Health Check"; then
-    echo "❌ Health check failed - showing detailed container logs:"
-    sudo docker-compose logs --tail=50 api
-    echo ""
-    echo "🔍 Container inspection:"
-    sudo docker inspect $(sudo docker-compose ps -q api) --format='{{.State.Health.Status}} - {{.State.Status}}'
-fi
-
-# Test main endpoint
+# Test endpoints
+test_endpoint "http://localhost:8000/health" "Health Check"
 test_endpoint "http://localhost:8000/" "API Info"
 
 # Show logs for debugging
 echo "📄 Recent application logs:"
 sudo docker-compose logs --tail=50 api
-
-# Final nginx check and reload
-echo "🔧 Final nginx configuration check..."
-if test_and_start_nginx; then
-    echo "✅ Nginx is properly configured and running"
-else
-    echo "⚠️  Nginx configuration issues detected - API still accessible on port 8000"
-fi
 
 # Check system resources
 echo "📊 System Resource Usage:"

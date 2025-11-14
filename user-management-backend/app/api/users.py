@@ -28,20 +28,51 @@ router = APIRouter(prefix="/users", tags=["Users"])
 @router.get("/me", response_model=UserProfile)
 async def get_my_profile(
     current_user: User = Depends(get_current_user_unified),
-    db: AsyncIOMotorDatabase = Depends(get_database) # Changed from Session = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     """Get current user's complete profile."""
+    # Ensure current_user and current_user.id are not None
+    if not current_user or not current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not authenticated"
+        )
+    
     # Get OAuth accounts
-    oauth_accounts = await get_user_oauth_accounts(db, current_user.id) # Added await
+    oauth_accounts_raw = await get_user_oauth_accounts(db, current_user.id)
+    
+    # Simplify OAuth accounts response - just return basic info for now
+    oauth_accounts = []
+    for account in oauth_accounts_raw:
+        oauth_accounts.append({
+            "id": str(account.id),
+            "provider_id": str(account.provider_id),
+            "provider_user_id": account.provider_user_id,
+            "email": account.email,
+            "connected_at": account.connected_at.isoformat() if account.connected_at else None,
+            "last_used_at": account.last_used_at.isoformat() if account.last_used_at else None
+        })
     
     # Get subscription
-    subscription = await get_user_subscription(db, current_user.id) # Added await
+    subscription = await get_user_subscription(db, current_user.id)
     
     # Get API keys
-    api_keys = await get_user_api_keys(db, current_user.id) # Added await
+    api_keys = await get_user_api_keys(db, current_user.id)
+    
+    # Simplify API keys response
+    api_keys_response = []
+    for key in api_keys:
+        api_keys_response.append({
+            "id": str(key.id),
+            "name": key.name,
+            "key_preview": key.key_preview,
+            "created_at": key.created_at.isoformat() if key.created_at else None,
+            "last_used_at": key.last_used_at.isoformat() if key.last_used_at else None,
+            "is_active": key.is_active
+        })
     
     return UserProfile(
-        id=current_user.id,
+        id=str(current_user.id),
         email=current_user.email,
         is_active=current_user.is_active,
         created_at=current_user.created_at,
@@ -49,7 +80,7 @@ async def get_my_profile(
         last_login_at=current_user.last_login_at,
         oauth_accounts=oauth_accounts,
         subscription=subscription,
-        api_keys=api_keys
+        api_keys=api_keys_response
     )
 
 
@@ -140,12 +171,14 @@ async def create_my_api_key(
     """Create a new API key for the current user."""
     api_key_record, api_key = await create_api_key(db, current_user.id, key_data) # Added await
     
+    # Convert ObjectId to string for response
     return ApiKeyWithSecret(
-        id=api_key_record.id,
+        id=str(api_key_record.id),  # Convert ObjectId to string
         name=api_key_record.name,
         key_preview=api_key_record.key_preview,
         created_at=api_key_record.created_at,
         last_used_at=api_key_record.last_used_at,
+        expires_at=api_key_record.expires_at,
         is_active=api_key_record.is_active,
         api_key=api_key
     )

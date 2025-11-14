@@ -184,11 +184,17 @@ class OAuthCallback(BaseModel):
 
 
 # User profile schemas
-class UserProfile(UserResponse):
+class UserProfile(BaseModel):  # Changed to inherit from BaseModel instead of UserResponse
+    id: str
+    email: EmailStr
+    is_active: bool
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
+    last_login_at: Optional[datetime]
     oauth_accounts: List[UserOAuthAccountResponse]
     subscription: Optional[UserSubscriptionResponse]
     api_keys: List[ApiKeyResponse]
-
+    
     class Config:
         from_attributes = True
 

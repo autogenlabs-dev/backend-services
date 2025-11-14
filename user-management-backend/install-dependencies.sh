@@ -2,7 +2,7 @@
 # EC2 Dependencies Installation for Live Database Reset
 # Handles both virtual environment and direct installation
 
-echo "� Installing Python Dependencies for Database Reset"
+echo "🔧 Installing Python Dependencies for Database Reset"
 echo "===================================================="
 
 # Check Python version
@@ -31,8 +31,13 @@ if [ -f "requirements.txt" ]; then
     # Upgrade pip
     pip install --upgrade pip
     
-    # Install dependencies
-    pip install -r requirements.txt
+    # Install dependencies without cache to save space
+    echo "📦 Installing Python packages (no cache)..."
+    pip install --no-cache-dir -r requirements.txt
+    
+    # Verify installation
+    echo "✅ Verifying installation..."
+    python -c "import fastapi, uvicorn, beanie; print('Core packages installed successfully!')"
     
     echo ""
     echo "✅ Dependencies installed in virtual environment!"

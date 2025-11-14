@@ -41,18 +41,18 @@ async def get_current_user_unified(
     api_key = request.headers.get("X-API-Key")
     if api_key:
         auth_method = "X-API-Key header"
-        result = api_key_service.validate_api_key(api_key, db)
+        result = await api_key_service.validate_api_key(api_key, db)
         if result:
             user, _ = result
     
     # Method 2: Check Authorization header
-    if not user and credentials:
+    if not user and credentials and hasattr(credentials, 'credentials'):
         auth_header = credentials.credentials
         
         # Check if it's an API key (starts with sk_)
         if auth_header.startswith("sk_"):
             auth_method = "Authorization header (API key)"
-            result = api_key_service.validate_api_key(auth_header, db)
+            result = await api_key_service.validate_api_key(auth_header, db)
             if result:
                 user, _ = result
         
@@ -78,6 +78,10 @@ async def get_current_user_unified(
                     auth_method += " - Token verification failed"
             except (ValueError, TypeError) as e:
                 auth_method += f" - Exception during token processing: {str(e)}"
+    elif not user and credentials and not hasattr(credentials, 'credentials'):
+        auth_method = "Authorization header present but missing credentials attribute"
+    elif not user and not credentials:
+        auth_method = "No Authorization header provided"
     
     # Authentication failed
     if not user:

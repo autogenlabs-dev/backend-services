@@ -9,12 +9,11 @@ import json
 from typing import Optional, Tuple, Dict, Any, List
 from fastapi import Request, HTTPException, status, Depends
 from fastapi.security import HTTPBearer
-from sqlalchemy.orm import Session
-from sqlalchemy import select
-from app.database import get_database # Changed from get_db to get_database
-from app.models.user import User, ApiKey
-from app.config import settings
-from app.auth.jwt import verify_token
+# Removed SQLAlchemy imports - using Beanie ODM instead
+from ..database import get_database # Changed from get_db to get_database
+from ..models.user import User, ApiKey
+from ..config import settings
+from ..auth.jwt import verify_token
 import hashlib
 
 # Redis client
@@ -91,7 +90,7 @@ class RateLimiter:
             
             # Get current count
             current_count = self.redis.get(key)
-            current_count = int(current_count) if current_count else 0
+            current_count = int(current_count) if current_count is not None else 0
             
             # Rate limit info
             remaining = max(0, limit - current_count)
@@ -164,7 +163,7 @@ class RateLimitMiddleware:
             "ip": {
                 "general": 50,
                 "llm": 0,  # No LLM access without auth
-                "auth": 10
+                "auth": 100  # Increased from 10 to 100 for development
             }
         }
     
@@ -189,7 +188,7 @@ class RateLimitMiddleware:
             
         return request.client.host if request.client else "unknown"
     
-    async def _get_user_from_token(self, token: str, db: Session) -> Optional[User]:
+    async def _get_user_from_token(self, token: str, db: Any) -> Optional[User]:
         """Get user from JWT token"""
         try:
             payload = verify_token(token)
@@ -200,62 +199,65 @@ class RateLimitMiddleware:
             if not user_id:
                 return None
             
-            # Convert user_id to UUID if it's a string
-            import uuid
+            # Use Beanie ODM instead of SQLAlchemy
+            from beanie import PydanticObjectId
             try:
-                if isinstance(user_id, str):
-                    user_id = uuid.UUID(user_id)
-            except (ValueError, TypeError):
+                user_obj_id = PydanticObjectId(str(user_id))
+                result = await db.get(User, user_obj_id)
+                return result
+            except Exception:
                 return None
-                
-            result = db.execute(select(User).where(User.id == user_id))
-            return result.scalar_one_or_none()
             
         except Exception:
             return None
     
-    async def _get_user_from_api_key(self, api_key: str, db: Session) -> Optional[Tuple[User, ApiKey]]:
+    async def _get_user_from_api_key(self, api_key: str, db: Any) -> Optional[Tuple[User, ApiKey]]:
         """Get user from API key"""
         try:
             # Hash the API key to match stored hash
             key_hash = hashlib.sha256(api_key.encode()).hexdigest()
             
-            result = db.execute(
-                select(ApiKey).where(
-                    ApiKey.key_hash == key_hash,
-                    ApiKey.is_active == True
+            # Use Beanie ODM instead of SQLAlchemy
+            from beanie import PydanticObjectId
+            
+            try:
+                api_key_obj = await db.find_one(
+                    ApiKey,
+                    {
+                        "key_hash": key_hash,
+                        "is_active": True
+                    }
                 )
-            )
-            api_key_obj = result.scalar_one_or_none()
+            except Exception:
+                api_key_obj = None
             
             if not api_key_obj:
-                return None, None
-                  # Update last used timestamp
+                return None
+                
+            # Update last used timestamp
             from datetime import datetime, timezone
             api_key_obj.last_used_at = datetime.now(timezone.utc)
-            db.commit()
+            await api_key_obj.save()
             
             # Get the associated user
-            import uuid
+            from beanie import PydanticObjectId
             try:
-                user_id = api_key_obj.user_id
-                if isinstance(user_id, str):
-                    user_id = uuid.UUID(user_id)
-            except (ValueError, TypeError):
-                return None, None
-                
-            result = db.execute(select(User).where(User.id == user_id))
-            user = result.scalar_one_or_none()
+                user_obj_id = PydanticObjectId(str(api_key_obj.user_id))
+                user = await db.get(User, user_obj_id)
+                if user:
+                    return user, api_key_obj
+            except Exception:
+                pass
             
-            return user, api_key_obj
+            return None
             
         except Exception:
-            return None, None
+            return None
     
     async def check_rate_limit(
         self, 
         request: Request, 
-        db: Session
+        db: Any
     ) -> Dict[str, Any]:
         """
         Check rate limits for incoming request
@@ -274,8 +276,9 @@ class RateLimitMiddleware:
         # Check for API key in headers
         api_key = request.headers.get("X-API-Key")
         if api_key:
-            user, api_key_obj = await self._get_user_from_api_key(api_key, db)
-            if user and api_key_obj:
+            result = await self._get_user_from_api_key(api_key, db)
+            if result:
+                user, api_key_obj = result
                 identifier = f"api_key:{api_key_obj.id}"
                 rate_limit_tier = "api_key"
         
