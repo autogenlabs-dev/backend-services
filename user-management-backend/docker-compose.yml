@@ -9,8 +9,12 @@ services:
     environment:
       - DATABASE_URL=mongodb://mongodb:27017/user_management_db
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-production-secret-key-change-this}
-      - DEBUG=False
+      - DEBUG=True
       - A4F_API_KEY=${A4F_API_KEY:-your-a4f-api-key}
+      # Clerk configuration for verifying frontend tokens (set to your instance)
+      - CLERK_JWKS_URL=${CLERK_JWKS_URL:-https://apt-clam-53.clerk.accounts.dev/.well-known/jwks.json}
+      - CLERK_ISSUER=${CLERK_ISSUER:-https://apt-clam-53.clerk.accounts.dev}
+      - CLERK_AUDIENCE=${CLERK_AUDIENCE:-http://localhost:3000}
       - REDIS_URL=redis://redis:6379
       # Google OAuth Configuration
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-37099745939-4v685b95lv9r2306l1edq4s7dpnk05vd.apps.googleusercontent.com}
@@ -35,8 +39,9 @@ services:
   # MongoDB Database
   mongodb:
     image: mongo:8.0
-    ports:
-      - "27017:27017"
+    # Host port mapping removed to avoid conflicts with a host MongoDB service.
+    # The MongoDB container still listens on 27017 internally and is
+    # reachable by other services via the Docker network `user_management_network`.
     environment:
       - MONGO_INITDB_DATABASE=user_management_db
     volumes:

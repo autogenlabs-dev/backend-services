@@ -11,6 +11,8 @@ from .config import settings
 from .auth.oauth import register_oauth_clients
 from .middleware.rate_limiting import rate_limit_middleware, add_rate_limit_headers
 from .api import auth, users, subscriptions, tokens, llm, admin, api_keys, payments, templates, extension_auth
+from .api import debug
+from .api import verify
 from typing import Callable, Dict, Any
 import time
 import uvicorn
@@ -116,6 +118,12 @@ class PerformanceAndRateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: Callable
     ) -> JSONResponse:
+        # Debug logging for /api/users/me
+        if request.url.path == "/api/users/me":
+            print(f"DEBUG [middleware]: Request to /api/users/me")
+            print(f"DEBUG [middleware]: Authorization header: {request.headers.get('authorization', 'NOT PRESENT')}")
+            print(f"DEBUG [middleware]: All headers: {dict(request.headers)}")
+        
         # Track request timing
         start_time = time.time()
         
@@ -188,6 +196,8 @@ app.include_router(payments.router, prefix="/api")
 app.include_router(templates.router, prefix="/api")
 # Extension authentication endpoints (Clerk-compatible API)
 app.include_router(extension_auth.router, prefix="/api")
+app.include_router(debug.router, prefix="/api")
+app.include_router(verify.router, prefix="/api")
 
 # Import interaction routers
 try:

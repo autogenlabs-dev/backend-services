@@ -40,6 +40,7 @@ class User(Document):
     social_links: Optional[Dict[str, str]] = Field(default_factory=dict)
     profile_image: Optional[str] = None
     wallet_balance: float = 0.0
+    glm_api_key: Optional[str] = None  # User's GLM API key
     
     # Sub-user management fields (references to other users by ID)
     parent_user_id: Optional[PydanticObjectId] = None

@@ -4,6 +4,7 @@ from typing import Optional, Any # Added Any import
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
+from jose import JWTError
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 

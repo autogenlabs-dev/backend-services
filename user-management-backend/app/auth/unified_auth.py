@@ -8,10 +8,12 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
+import sys
 
 from ..database import get_database # Changed from get_db to get_database
 from ..models.user import User
 from .jwt import verify_token
+from .clerk_verifier import verify_clerk_token
 from .api_key_auth_clean import api_key_service
 
 # HTTP Bearer token scheme (for JWT)
@@ -34,6 +36,14 @@ async def get_current_user_unified(
     This unified approach allows VS Code extensions to use persistent API keys
     while still supporting web applications using JWT tokens.
     """
+    print(f"DEBUG [unified_auth]: Function called", flush=True)
+    sys.stdout.flush()
+    print(f"DEBUG [unified_auth]: credentials present: {credentials is not None}", flush=True)
+    sys.stdout.flush()
+    if credentials:
+        print(f"DEBUG [unified_auth]: credentials.credentials[:20]: {credentials.credentials[:20] if hasattr(credentials, 'credentials') else 'NO CREDENTIALS ATTR'}", flush=True)
+        sys.stdout.flush()
+    
     user = None
     auth_method = "unknown"
     
@@ -60,20 +70,70 @@ async def get_current_user_unified(
         else:
             auth_method = "Authorization header (JWT)"
             try:
+                # First try local JWT verification
                 payload = verify_token(auth_header)
+
+                # If local JWT verification failed, try Clerk JWKS verification
+                if not payload:
+                    try:
+                        payload = verify_clerk_token(auth_header)
+                        auth_method += " (verified via Clerk JWKS)"
+                        print(f"DEBUG [unified_auth]: Clerk token verified, payload: {payload}")
+                    except HTTPException as e:
+                        auth_method += f" - Clerk verification failed (HTTPException): {e.detail}"
+                        print(f"DEBUG [unified_auth]: Clerk verification HTTPException: {e.detail}")
+                    except Exception as e:
+                        auth_method += f" - Clerk verification failed: {str(e)}"
+                        print(f"DEBUG [unified_auth]: Clerk verification Exception: {str(e)}")
+
                 if payload:
+                    # Prefer email-based lookup for external tokens
                     user_id = payload.get("sub")
+                    user = None
+                    print(f"DEBUG [unified_auth]: Looking up user with sub: {user_id}")
+                    # Try by user id first when present
                     if user_id:
-                        # MongoDB: Find user by ID
-                        user = await User.get(user_id) # Use Beanie's get method
-                        if user:
-                            print(f"Found user with ID {user_id}, active status: {user.is_active}")
-                        else:
-                            print(f"No user found with ID {user_id}")
-                        if not user:
-                            auth_method += f" - User not found or inactive for ID {user_id}"
+                        try:
+                            user = await User.get(user_id)
+                        except Exception:
+                            user = None
+
+                    # If not found by id, try email (common for Clerk tokens)
+                    if not user:
+                        email = payload.get("email")
+                        print(f"DEBUG [unified_auth]: Email from payload: {email}")
+                        if email:
+                            user = await User.find_one(User.email == email)
+                            print(f"DEBUG [unified_auth]: User lookup by email result: {user}")
+                        
+                        # If no email in token, use placeholder email format (for Clerk tokens)
+                        if not email and user_id:
+                            placeholder_email = f"{user_id}@clerk.user"
+                            print(f"DEBUG [unified_auth]: Using placeholder email: {placeholder_email}")
+                            user = await User.find_one(User.email == placeholder_email)
+                            print(f"DEBUG [unified_auth]: User lookup by placeholder result: {user}")
+
+                    # If still not found, create a minimal user record
+                    if not user:
+                        email = payload.get("email")
+                        # Use placeholder email if no email in token (for Clerk)
+                        if not email and user_id:
+                            email = f"{user_id}@clerk.user"
+                        
+                        name = payload.get("name") or payload.get("full_name") or payload.get("preferred_username")
+                        if email:
+                            user = User(
+                                email=email,
+                                name=name or email.split("@")[0],
+                                is_active=True
+                            )
+                            await user.insert()
+
+                    if user:
+                        if not getattr(user, "is_active", True):
+                            auth_method += " - User found but inactive"
                     else:
-                        auth_method += " - No 'sub' field in token payload"
+                        auth_method += " - User not found or inactive"
                 else:
                     auth_method += " - Token verification failed"
             except (ValueError, TypeError) as e:

@@ -31,6 +31,7 @@ async def get_my_profile(
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     """Get current user's complete profile."""
+    print(f"DEBUG [get_my_profile]: Endpoint reached, current_user: {current_user}")
     # Ensure current_user and current_user.id are not None
     if not current_user or not current_user.id:
         raise HTTPException(
@@ -80,8 +81,21 @@ async def get_my_profile(
         last_login_at=current_user.last_login_at,
         oauth_accounts=oauth_accounts,
         subscription=subscription,
-        api_keys=api_keys_response
+        api_keys=api_keys_response,
+        glm_api_key=current_user.glm_api_key  # Include GLM API key
     )
+
+
+@router.post("/me/glm-api-key")
+async def set_glm_api_key(
+    api_key: str,
+    current_user: User = Depends(get_current_user_unified),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """Set or update the user's GLM API key."""
+    current_user.glm_api_key = api_key
+    await current_user.save()
+    return {"message": "GLM API key updated successfully", "glm_api_key": api_key}
 
 
 @router.put("/me", response_model=UserResponse)

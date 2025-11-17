@@ -49,6 +49,30 @@ log/
 # Environment variables
 .env
 .env.local
+.env.production
+.env.*.local
+*.env
+!.env.example
+
+# Secrets and API Keys
+secrets/
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+
+# Docker
+docker-compose.override.yml
+.dockerignore
+
+# AWS and Cloud
+.aws/
+*.pem
+credentials
+config
+.env.local
 .env.development
 .env.production
 .env.*

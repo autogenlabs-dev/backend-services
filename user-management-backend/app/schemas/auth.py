@@ -194,6 +194,7 @@ class UserProfile(BaseModel):  # Changed to inherit from BaseModel instead of Us
     oauth_accounts: List[UserOAuthAccountResponse]
     subscription: Optional[UserSubscriptionResponse]
     api_keys: List[ApiKeyResponse]
+    glm_api_key: Optional[str] = None  # User's GLM API key
     
     class Config:
         from_attributes = True
