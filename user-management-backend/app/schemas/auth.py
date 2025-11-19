@@ -6,6 +6,8 @@ from beanie.odm.fields import PydanticObjectId
 
 from pydantic import BaseModel, EmailStr, Field
 
+from ..models.user import SubscriptionPlan
+
 
 # Token schemas
 class Token(BaseModel):
@@ -47,7 +49,7 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = Field(None, max_length=100, description="User's full name")
     first_name: Optional[str] = Field(None, max_length=50, description="First name")
     last_name: Optional[str] = Field(None, max_length=50, description="Last name")
-    role: Optional[str] = Field(None, description="User role (user, developer, admin)")
+    role: Optional[str] = Field(None, description="User role (user, admin)")
 
 
 class UserResponse(UserBase):
@@ -57,7 +59,7 @@ class UserResponse(UserBase):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     role: str = "user"
-    subscription: Optional[str] = "free"
+    subscription: Optional[SubscriptionPlan] = SubscriptionPlan.FREE
     tokens_remaining: Optional[int] = 10000
     tokens_used: Optional[int] = 0
     monthly_limit: Optional[int] = 10000
@@ -177,6 +179,39 @@ class ApiKeyWithSecret(ApiKeyResponse):
     api_key: str
 
 
+class ManagedApiKeyCreate(BaseModel):
+    key: str = Field(..., min_length=10, description="Raw API key value")
+    label: Optional[str] = Field(None, max_length=120, description="Optional label for grouping")
+
+
+class ManagedApiKeyBulkCreate(BaseModel):
+    keys: List[str] = Field(..., min_items=1, description="List of raw API keys to add")
+    label: Optional[str] = Field(None, max_length=120)
+
+
+class ManagedApiKeyResponse(BaseModel):
+    id: PydanticObjectId
+    key_value: Optional[str] = None
+    key_preview: str
+    label: Optional[str]
+    is_active: bool
+    assigned_user_id: Optional[PydanticObjectId]
+    assigned_user_email: Optional[EmailStr] = None
+    assigned_at: Optional[datetime]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ManagedApiKeyAssignmentResponse(BaseModel):
+    managed_key_id: PydanticObjectId
+    key_value: str
+    key_preview: str
+    assigned_at: datetime
+    label: Optional[str]
+
+
 # OAuth callback schemas
 class OAuthCallback(BaseModel):
     code: str
@@ -192,9 +227,12 @@ class UserProfile(BaseModel):  # Changed to inherit from BaseModel instead of Us
     updated_at: Optional[datetime]
     last_login_at: Optional[datetime]
     oauth_accounts: List[UserOAuthAccountResponse]
-    subscription: Optional[UserSubscriptionResponse]
+    subscription: Optional[str] = None  # Subscription plan: "free", "pro", or "ultra"
     api_keys: List[ApiKeyResponse]
     glm_api_key: Optional[str] = None  # User's GLM API key
+    openrouter_api_key: Optional[str] = None
+    role: str
+    can_publish_content: bool = False
     
     class Config:
         from_attributes = True

@@ -148,8 +148,8 @@ class RateLimitMiddleware:
                 "llm": 500,
                 "auth": 100
             },
-            # Enterprise tier limits (per hour)
-            "enterprise": {
+            # Ultra tier limits (per hour)
+            "ultra": {
                 "general": 10000,
                 "llm": 5000,
                 "auth": 500

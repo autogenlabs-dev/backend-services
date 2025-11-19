@@ -1,0 +1,1378 @@
+[
+  {
+    "file": "app/api/sub_users.py",
+    "method": "POST",
+    "path": "/api/sub-users/",
+    "url": "http://127.0.0.1:8000/api/sub-users/",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/sub_users.py",
+    "method": "GET",
+    "path": "/api/sub-users/",
+    "url": "http://127.0.0.1:8000/api/sub-users/",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/sub_users.py",
+    "method": "PUT",
+    "path": "/api/sub-users/{sub_user_id}/permissions",
+    "url": "http://127.0.0.1:8000/api/sub-users/{sub_user_id}/permissions",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/sub_users.py",
+    "method": "PUT",
+    "path": "/api/sub-users/{sub_user_id}/limits",
+    "url": "http://127.0.0.1:8000/api/sub-users/{sub_user_id}/limits",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/sub_users.py",
+    "method": "POST",
+    "path": "/api/sub-users/{sub_user_id}/api-keys",
+    "url": "http://127.0.0.1:8000/api/sub-users/{sub_user_id}/api-keys",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/sub_users.py",
+    "method": "GET",
+    "path": "/api/sub-users/{sub_user_id}/usage",
+    "url": "http://127.0.0.1:8000/api/sub-users/{sub_user_id}/usage",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/sub_users.py",
+    "method": "DELETE",
+    "path": "/api/sub-users/{sub_user_id}",
+    "url": "http://127.0.0.1:8000/api/sub-users/{sub_user_id}",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/debug.py",
+    "method": "POST",
+    "path": "/api/debug/verify-clerk",
+    "url": "http://127.0.0.1:8000/api/debug/verify-clerk",
+    "status_code": 422,
+    "response_snippet": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"token\"],\"msg\":\"Field required\",\"input\":{}}]}"
+  },
+  {
+    "file": "app/api/templates.py",
+    "method": "POST",
+    "path": "/api/templates/",
+    "url": "http://127.0.0.1:8000/api/templates/",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/templates.py",
+    "method": "GET",
+    "path": "/api/templates/",
+    "url": "http://127.0.0.1:8000/api/templates/",
+    "status_code": 200,
+    "response_snippet": "{\"success\":true,\"templates\":[],\"pagination\":{\"page\":1,\"limit\":20,\"total\":0,\"pages\":0}}"
+  },
+  {
+    "file": "app/api/templates.py",
+    "method": "GET",
+    "path": "/api/templates/my",
+    "url": "http://127.0.0.1:8000/api/templates/my",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/templates.py",
+    "method": "GET",
+    "path": "/api/templates/my-templates",
+    "url": "http://127.0.0.1:8000/api/templates/my-templates",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/templates.py",
+    "method": "GET",
+    "path": "/api/templates/favorites",
+    "url": "http://127.0.0.1:8000/api/templates/favorites",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/templates.py",
+    "method": "GET",
+    "path": "/api/templates/000000000000000000000000",
+    "url": "http://127.0.0.1:8000/api/templates/000000000000000000000000",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Template not found\"}"
+  },
+  {
+    "file": "app/api/templates.py",
+    "method": "PUT",
+    "path": "/api/templates/000000000000000000000000",
+    "url": "http://127.0.0.1:8000/api/templates/000000000000000000000000",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/templates.py",
+    "method": "DELETE",
+    "path": "/api/templates/000000000000000000000000",
+    "url": "http://127.0.0.1:8000/api/templates/000000000000000000000000",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/templates.py",
+    "method": "GET",
+    "path": "/api/templates/categories",
+    "url": "http://127.0.0.1:8000/api/templates/categories",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Route not found\"}"
+  },
+  {
+    "file": "app/api/templates.py",
+    "method": "GET",
+    "path": "/api/templates/categories/list",
+    "url": "http://127.0.0.1:8000/api/templates/categories/list",
+    "status_code": 200,
+    "response_snippet": "{\"success\":true,\"categories\":[\"Admin Panel\",\"Blog\",\"Dashboard\",\"E-commerce\",\"Landing Page\",\"Learning Management System\",\"Portfolio\",\"SaaS Tool\"]}"
+  },
+  {
+    "file": "app/api/templates.py",
+    "method": "GET",
+    "path": "/api/templates/stats/overview",
+    "url": "http://127.0.0.1:8000/api/templates/stats/overview",
+    "status_code": 200,
+    "response_snippet": "{\"success\":true,\"stats\":{\"total_templates\":0,\"free_templates\":0,\"paid_templates\":0,\"featured_templates\":0,\"categories_count\":0,\"categories\":[]}}"
+  },
+  {
+    "file": "app/api/templates.py",
+    "method": "POST",
+    "path": "/api/templates/000000000000000000000000/like",
+    "url": "http://127.0.0.1:8000/api/templates/000000000000000000000000/like",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/templates.py",
+    "method": "POST",
+    "path": "/api/templates/000000000000000000000000/download",
+    "url": "http://127.0.0.1:8000/api/templates/000000000000000000000000/download",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/verify.py",
+    "method": "POST",
+    "path": "/api/verify-user",
+    "url": "http://127.0.0.1:8000/api/verify-user",
+    "status_code": 422,
+    "response_snippet": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"token\"],\"msg\":\"Field required\",\"input\":{}}]}"
+  },
+  {
+    "file": "app/api/sub_user_dashboard.py",
+    "method": "GET",
+    "path": "/api/dashboard/sub-users/overview",
+    "url": "http://127.0.0.1:8000/api/dashboard/sub-users/overview",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/sub_user_dashboard.py",
+    "method": "GET",
+    "path": "/api/dashboard/sub-users/activity",
+    "url": "http://127.0.0.1:8000/api/dashboard/sub-users/activity",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/sub_user_dashboard.py",
+    "method": "GET",
+    "path": "/api/dashboard/sub-users/usage-trends",
+    "url": "http://127.0.0.1:8000/api/dashboard/sub-users/usage-trends",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/sub_user_dashboard.py",
+    "method": "GET",
+    "path": "/api/dashboard/sub-users/limits-analysis",
+    "url": "http://127.0.0.1:8000/api/dashboard/sub-users/limits-analysis",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/components.py",
+    "method": "POST",
+    "path": "/api/components/",
+    "url": "http://127.0.0.1:8000/api/components/",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/components.py",
+    "method": "GET",
+    "path": "/api/components/",
+    "url": "http://127.0.0.1:8000/api/components/",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/components.py",
+    "method": "GET",
+    "path": "/api/components/my",
+    "url": "http://127.0.0.1:8000/api/components/my",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/components.py",
+    "method": "GET",
+    "path": "/api/components/my-components",
+    "url": "http://127.0.0.1:8000/api/components/my-components",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/components.py",
+    "method": "GET",
+    "path": "/api/components/000000000000000000000000",
+    "url": "http://127.0.0.1:8000/api/components/000000000000000000000000",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/components.py",
+    "method": "PUT",
+    "path": "/api/components/000000000000000000000000",
+    "url": "http://127.0.0.1:8000/api/components/000000000000000000000000",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/components.py",
+    "method": "DELETE",
+    "path": "/api/components/000000000000000000000000",
+    "url": "http://127.0.0.1:8000/api/components/000000000000000000000000",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/llm.py",
+    "method": "POST",
+    "path": "/api/llm/chat/completions",
+    "url": "http://127.0.0.1:8000/api/llm/chat/completions",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/llm.py",
+    "method": "POST",
+    "path": "/api/llm/completions",
+    "url": "http://127.0.0.1:8000/api/llm/completions",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/llm.py",
+    "method": "POST",
+    "path": "/api/llm/embeddings",
+    "url": "http://127.0.0.1:8000/api/llm/embeddings",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/llm.py",
+    "method": "GET",
+    "path": "/api/llm/models",
+    "url": "http://127.0.0.1:8000/api/llm/models",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/llm.py",
+    "method": "GET",
+    "path": "/api/llm/providers",
+    "url": "http://127.0.0.1:8000/api/llm/providers",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/llm.py",
+    "method": "GET",
+    "path": "/api/llm/health",
+    "url": "http://127.0.0.1:8000/api/llm/health",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/tokens.py",
+    "method": "GET",
+    "path": "/api/tokens/balance",
+    "url": "http://127.0.0.1:8000/api/tokens/balance",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/tokens.py",
+    "method": "GET",
+    "path": "/api/tokens/usage",
+    "url": "http://127.0.0.1:8000/api/tokens/usage",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/tokens.py",
+    "method": "POST",
+    "path": "/api/tokens/reserve",
+    "url": "http://127.0.0.1:8000/api/tokens/reserve",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/tokens.py",
+    "method": "POST",
+    "path": "/api/tokens/consume",
+    "url": "http://127.0.0.1:8000/api/tokens/consume",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/tokens.py",
+    "method": "GET",
+    "path": "/api/tokens/limits",
+    "url": "http://127.0.0.1:8000/api/tokens/limits",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/tokens.py",
+    "method": "GET",
+    "path": "/api/tokens/stats",
+    "url": "http://127.0.0.1:8000/api/tokens/stats",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/tokens.py",
+    "method": "GET",
+    "path": "/api/tokens/pricing/{provider}/{model_name}",
+    "url": "http://127.0.0.1:8000/api/tokens/pricing/{provider}/{model_name}",
+    "status_code": 200,
+    "response_snippet": "{\"provider\":\"{provider}\",\"model_name\":\"{model_name}\",\"pricing\":{\"input\":0.001,\"output\":0.001},\"currency\":\"USD\",\"unit\":\"per 1K tokens\"}"
+  },
+  {
+    "file": "app/api/organizations.py",
+    "method": "POST",
+    "path": "/api/organizations/",
+    "url": "http://127.0.0.1:8000/api/organizations/",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/organizations.py",
+    "method": "GET",
+    "path": "/api/organizations/",
+    "url": "http://127.0.0.1:8000/api/organizations/",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/organizations.py",
+    "method": "GET",
+    "path": "/api/organizations/000000000000000000000000",
+    "url": "http://127.0.0.1:8000/api/organizations/000000000000000000000000",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/organizations.py",
+    "method": "PUT",
+    "path": "/api/organizations/000000000000000000000000",
+    "url": "http://127.0.0.1:8000/api/organizations/000000000000000000000000",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/organizations.py",
+    "method": "DELETE",
+    "path": "/api/organizations/000000000000000000000000",
+    "url": "http://127.0.0.1:8000/api/organizations/000000000000000000000000",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/organizations.py",
+    "method": "GET",
+    "path": "/api/organizations/000000000000000000000000/members",
+    "url": "http://127.0.0.1:8000/api/organizations/000000000000000000000000/members",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/organizations.py",
+    "method": "POST",
+    "path": "/api/organizations/000000000000000000000000/members/invite",
+    "url": "http://127.0.0.1:8000/api/organizations/000000000000000000000000/members/invite",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/organizations.py",
+    "method": "POST",
+    "path": "/api/organizations/invitations/{token}/accept",
+    "url": "http://127.0.0.1:8000/api/organizations/invitations/{token}/accept",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/organizations.py",
+    "method": "PUT",
+    "path": "/api/organizations/000000000000000000000000/members/MEM_000",
+    "url": "http://127.0.0.1:8000/api/organizations/000000000000000000000000/members/MEM_000",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/organizations.py",
+    "method": "DELETE",
+    "path": "/api/organizations/000000000000000000000000/members/MEM_000",
+    "url": "http://127.0.0.1:8000/api/organizations/000000000000000000000000/members/MEM_000",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/organizations.py",
+    "method": "POST",
+    "path": "/api/organizations/000000000000000000000000/api-keys",
+    "url": "http://127.0.0.1:8000/api/organizations/000000000000000000000000/api-keys",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/organizations.py",
+    "method": "GET",
+    "path": "/api/organizations/000000000000000000000000/api-keys",
+    "url": "http://127.0.0.1:8000/api/organizations/000000000000000000000000/api-keys",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/organizations.py",
+    "method": "DELETE",
+    "path": "/api/organizations/000000000000000000000000/api-keys/KEY_000",
+    "url": "http://127.0.0.1:8000/api/organizations/000000000000000000000000/api-keys/KEY_000",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/organizations.py",
+    "method": "POST",
+    "path": "/api/organizations/000000000000000000000000/keys",
+    "url": "http://127.0.0.1:8000/api/organizations/000000000000000000000000/keys",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/organizations.py",
+    "method": "PUT",
+    "path": "/api/organizations/keys/KEY_000",
+    "url": "http://127.0.0.1:8000/api/organizations/keys/KEY_000",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/organizations.py",
+    "method": "DELETE",
+    "path": "/api/organizations/keys/KEY_000",
+    "url": "http://127.0.0.1:8000/api/organizations/keys/KEY_000",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/organizations.py",
+    "method": "GET",
+    "path": "/api/organizations/000000000000000000000000/stats",
+    "url": "http://127.0.0.1:8000/api/organizations/000000000000000000000000/stats",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/payments.py",
+    "method": "POST",
+    "path": "/api/payments/create-order",
+    "url": "http://127.0.0.1:8000/api/payments/create-order",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/payments.py",
+    "method": "POST",
+    "path": "/api/payments/verify-payment",
+    "url": "http://127.0.0.1:8000/api/payments/verify-payment",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/payments.py",
+    "method": "GET",
+    "path": "/api/payments/orders",
+    "url": "http://127.0.0.1:8000/api/payments/orders",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/payments.py",
+    "method": "GET",
+    "path": "/api/payments/order/ORDER_000",
+    "url": "http://127.0.0.1:8000/api/payments/order/ORDER_000",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/payments.py",
+    "method": "POST",
+    "path": "/api/payments/refund/PAY_000",
+    "url": "http://127.0.0.1:8000/api/payments/refund/PAY_000",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/payments.py",
+    "method": "GET",
+    "path": "/api/payments/config",
+    "url": "http://127.0.0.1:8000/api/payments/config",
+    "status_code": 200,
+    "response_snippet": "{\"razorpay_key_id\":\"rzp_test_1234567890\",\"currency\":\"INR\",\"usd_to_inr_rate\":85}"
+  },
+  {
+    "file": "app/api/admin.py",
+    "method": "GET",
+    "path": "/api/admin/users",
+    "url": "http://127.0.0.1:8000/api/admin/users",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/admin.py",
+    "method": "GET",
+    "path": "/api/admin/content",
+    "url": "http://127.0.0.1:8000/api/admin/content",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/admin.py",
+    "method": "GET",
+    "path": "/api/admin/analytics",
+    "url": "http://127.0.0.1:8000/api/admin/analytics",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/admin.py",
+    "method": "POST",
+    "path": "/api/admin/content/{content_id}/approve",
+    "url": "http://127.0.0.1:8000/api/admin/content/{content_id}/approve",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/admin.py",
+    "method": "POST",
+    "path": "/api/admin/users/000000000000000000000000/manage",
+    "url": "http://127.0.0.1:8000/api/admin/users/000000000000000000000000/manage",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/admin.py",
+    "method": "PUT",
+    "path": "/api/admin/users/000000000000000000000000",
+    "url": "http://127.0.0.1:8000/api/admin/users/000000000000000000000000",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/admin.py",
+    "method": "GET",
+    "path": "/api/admin/usage-stats",
+    "url": "http://127.0.0.1:8000/api/admin/usage-stats",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/admin.py",
+    "method": "GET",
+    "path": "/api/admin/revenue",
+    "url": "http://127.0.0.1:8000/api/admin/revenue",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/admin.py",
+    "method": "PUT",
+    "path": "/api/admin/users/000000000000000000000000/plan",
+    "url": "http://127.0.0.1:8000/api/admin/users/000000000000000000000000/plan",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/admin.py",
+    "method": "GET",
+    "path": "/api/admin/system-stats",
+    "url": "http://127.0.0.1:8000/api/admin/system-stats",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/subscriptions.py",
+    "method": "GET",
+    "path": "/api/subscriptions/plans",
+    "url": "http://127.0.0.1:8000/api/subscriptions/plans",
+    "status_code": 200,
+    "response_snippet": "[]"
+  },
+  {
+    "file": "app/api/subscriptions.py",
+    "method": "GET",
+    "path": "/api/subscriptions/plans/compare",
+    "url": "http://127.0.0.1:8000/api/subscriptions/plans/compare",
+    "status_code": 200,
+    "response_snippet": "{\"plans\":[],\"features\":[]}"
+  },
+  {
+    "file": "app/api/subscriptions.py",
+    "method": "GET",
+    "path": "/api/subscriptions/current",
+    "url": "http://127.0.0.1:8000/api/subscriptions/current",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/subscriptions.py",
+    "method": "POST",
+    "path": "/api/subscriptions/subscribe",
+    "url": "http://127.0.0.1:8000/api/subscriptions/subscribe",
+    "status_code": 403,
+    "response_snippet": "{\"detail\":\"Not authenticated\"}"
+  },
+  {
+    "file": "app/api/subscriptions.py",
+    "method": "PUT",
+    "path": "/api/subscriptions/upgrade",
+    "url": "http://127.0.0.1:8000/api/subscriptions/upgrade",
+    "status_code": 403,
+    "response_snippet": "{\"detail\":\"Not authenticated\"}"
+  },
+  {
+    "file": "app/api/subscriptions.py",
+    "method": "POST",
+    "path": "/api/subscriptions/downgrade",
+    "url": "http://127.0.0.1:8000/api/subscriptions/downgrade",
+    "status_code": 403,
+    "response_snippet": "{\"detail\":\"Not authenticated\"}"
+  },
+  {
+    "file": "app/api/subscriptions.py",
+    "method": "POST",
+    "path": "/api/subscriptions/cancel",
+    "url": "http://127.0.0.1:8000/api/subscriptions/cancel",
+    "status_code": 403,
+    "response_snippet": "{\"detail\":\"Not authenticated\"}"
+  },
+  {
+    "file": "app/api/subscriptions.py",
+    "method": "GET",
+    "path": "/api/subscriptions/usage",
+    "url": "http://127.0.0.1:8000/api/subscriptions/usage",
+    "status_code": 403,
+    "response_snippet": "{\"detail\":\"Not authenticated\"}"
+  },
+  {
+    "file": "app/api/subscriptions.py",
+    "method": "GET",
+    "path": "/api/subscriptions/upgrade-options",
+    "url": "http://127.0.0.1:8000/api/subscriptions/upgrade-options",
+    "status_code": 403,
+    "response_snippet": "{\"detail\":\"Not authenticated\"}"
+  },
+  {
+    "file": "app/api/subscriptions.py",
+    "method": "GET",
+    "path": "/api/subscriptions/payment-methods",
+    "url": "http://127.0.0.1:8000/api/subscriptions/payment-methods",
+    "status_code": 403,
+    "response_snippet": "{\"detail\":\"Not authenticated\"}"
+  },
+  {
+    "file": "app/api/subscriptions.py",
+    "method": "POST",
+    "path": "/api/subscriptions/webhooks/stripe",
+    "url": "http://127.0.0.1:8000/api/subscriptions/webhooks/stripe",
+    "status_code": 400,
+    "response_snippet": "{\"detail\":\"Webhook error: 400: Missing Stripe signature\"}"
+  },
+  {
+    "file": "app/api/users.py",
+    "method": "GET",
+    "path": "/api/users/me",
+    "url": "http://127.0.0.1:8000/api/users/me",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/users.py",
+    "method": "POST",
+    "path": "/api/users/me/glm-api-key",
+    "url": "http://127.0.0.1:8000/api/users/me/glm-api-key",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/users.py",
+    "method": "PUT",
+    "path": "/api/users/me",
+    "url": "http://127.0.0.1:8000/api/users/me",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/users.py",
+    "method": "GET",
+    "path": "/api/users/000000000000000000000000",
+    "url": "http://127.0.0.1:8000/api/users/000000000000000000000000",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/users.py",
+    "method": "POST",
+    "path": "/api/users/me/token-usage",
+    "url": "http://127.0.0.1:8000/api/users/me/token-usage",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/users.py",
+    "method": "GET",
+    "path": "/api/users/me/token-usage",
+    "url": "http://127.0.0.1:8000/api/users/me/token-usage",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/users.py",
+    "method": "GET",
+    "path": "/api/users/me/token-usage/stats",
+    "url": "http://127.0.0.1:8000/api/users/me/token-usage/stats",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/users.py",
+    "method": "POST",
+    "path": "/api/users/me/api-keys",
+    "url": "http://127.0.0.1:8000/api/users/me/api-keys",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/users.py",
+    "method": "GET",
+    "path": "/api/users/me/api-keys",
+    "url": "http://127.0.0.1:8000/api/users/me/api-keys",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/users.py",
+    "method": "DELETE",
+    "path": "/api/users/me/api-keys/{api_key_id}",
+    "url": "http://127.0.0.1:8000/api/users/me/api-keys/{api_key_id}",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/users.py",
+    "method": "GET",
+    "path": "/api/users/user/name-matches",
+    "url": "http://127.0.0.1:8000/api/users/user/name-matches",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/api/extension_auth.py",
+    "method": "GET",
+    "path": "/api/extension/sign-in",
+    "url": "http://127.0.0.1:8000/api/extension/sign-in",
+    "status_code": 422,
+    "response_snippet": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"query\",\"state\"],\"msg\":\"Field required\",\"input\":null},{\"type\":\"missing\",\"loc\":[\"query\",\"auth_redirect\"],\"msg\":\"Field required\",\"input\":null}]}"
+  },
+  {
+    "file": "app/api/extension_auth.py",
+    "method": "POST",
+    "path": "/api/v1/client/sign_ins",
+    "url": "http://127.0.0.1:8000/api/v1/client/sign_ins",
+    "status_code": 422,
+    "response_snippet": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"strategy\"],\"msg\":\"Field required\",\"input\":null},{\"type\":\"missing\",\"loc\":[\"body\",\"ticket\"],\"msg\":\"Field required\",\"input\":null}]}"
+  },
+  {
+    "file": "app/api/extension_auth.py",
+    "method": "POST",
+    "path": "/api/v1/client/sessions/SESSION_000/tokens",
+    "url": "http://127.0.0.1:8000/api/v1/client/sessions/SESSION_000/tokens",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Missing or invalid authorization header\"}"
+  },
+  {
+    "file": "app/api/extension_auth.py",
+    "method": "GET",
+    "path": "/api/v1/me",
+    "url": "http://127.0.0.1:8000/api/v1/me",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Missing or invalid authorization header\"}"
+  },
+  {
+    "file": "app/api/extension_auth.py",
+    "method": "GET",
+    "path": "/api/v1/me/organization_memberships",
+    "url": "http://127.0.0.1:8000/api/v1/me/organization_memberships",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Missing or invalid authorization header\"}"
+  },
+  {
+    "file": "app/api/extension_auth.py",
+    "method": "POST",
+    "path": "/api/v1/client/sessions/SESSION_000/remove",
+    "url": "http://127.0.0.1:8000/api/v1/client/sessions/SESSION_000/remove",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Missing or invalid authorization header\"}"
+  },
+  {
+    "file": "app/api/extension_auth.py",
+    "method": "POST",
+    "path": "/api/extension/clerk-to-ticket",
+    "url": "http://127.0.0.1:8000/api/extension/clerk-to-ticket",
+    "status_code": 422,
+    "response_snippet": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"state\"],\"msg\":\"Field required\",\"input\":{}},{\"type\":\"missing\",\"loc\":[\"body\",\"auth_redirect\"],\"msg\":\"Field required\",\"input\":{}}]}"
+  },
+  {
+    "file": "app/api/auth.py",
+    "method": "GET",
+    "path": "/api/auth/providers",
+    "url": "http://127.0.0.1:8000/api/auth/providers",
+    "status_code": 200,
+    "response_snippet": "{\"providers\":[{\"name\":\"openrouter\",\"display_name\":\"OpenRouter\",\"authorization_url\":\"/api/auth/openrouter/login\"},{\"name\":\"google\",\"display_name\":\"Google\",\"authorization_url\":\"/api/auth/google/login\"},{\"name\":\"github\",\"display_name\":\"GitHub\",\"authorization_url\":\"/api/auth/github/login\"}]}"
+  },
+  {
+    "file": "app/api/auth.py",
+    "method": "POST",
+    "path": "/api/auth/register",
+    "url": "http://127.0.0.1:8000/api/auth/register",
+    "status_code": 422,
+    "response_snippet": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"email\"],\"msg\":\"Field required\",\"input\":{}},{\"type\":\"missing\",\"loc\":[\"body\",\"password\"],\"msg\":\"Field required\",\"input\":{}}]}"
+  },
+  {
+    "file": "app/api/auth.py",
+    "method": "POST",
+    "path": "/api/auth/signup",
+    "url": "http://127.0.0.1:8000/api/auth/signup",
+    "status_code": 422,
+    "response_snippet": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"email\"],\"msg\":\"Field required\",\"input\":{}},{\"type\":\"missing\",\"loc\":[\"body\",\"password\"],\"msg\":\"Field required\",\"input\":{}}]}"
+  },
+  {
+    "file": "app/api/auth.py",
+    "method": "POST",
+    "path": "/api/auth/login",
+    "url": "http://127.0.0.1:8000/api/auth/login",
+    "status_code": 422,
+    "response_snippet": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"username\"],\"msg\":\"Field required\",\"input\":null},{\"type\":\"missing\",\"loc\":[\"body\",\"password\"],\"msg\":\"Field required\",\"input\":null}]}"
+  },
+  {
+    "file": "app/api/auth.py",
+    "method": "POST",
+    "path": "/api/auth/login-json",
+    "url": "http://127.0.0.1:8000/api/auth/login-json",
+    "status_code": 422,
+    "response_snippet": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"email\"],\"msg\":\"Field required\",\"input\":{}},{\"type\":\"missing\",\"loc\":[\"body\",\"password\"],\"msg\":\"Field required\",\"input\":{}}]}"
+  },
+  {
+    "file": "app/api/auth.py",
+    "method": "GET",
+    "path": "/api/auth/google/login",
+    "url": "http://127.0.0.1:8000/api/auth/google/login",
+    "status_code": 200,
+    "response_snippet": "<!doctype html><html lang=\"en-US\" dir=\"ltr\"><head><base href=\"https://accounts.google.com/v3/signin/\"><link rel=\"preconnect\" href=\"//www.gstatic.com\"><meta name=\"referrer\" content=\"origin\"><style data-href=\"https://www.gstatic.com/_/mss/boq-identity/_/ss/k=boq-identity.AccountsSignInUi.Dz5vRxEQ27k.L.W.O/am=CRgFYGJcMoDfAMAA5f-fABQCAAgAUAAAAAAAAAAAAAwAgEwhACA/d=1/ed=1/rs=AOaEmlFdmXfd0YX5kOmOm3b20MPG"
+  },
+  {
+    "file": "app/api/auth.py",
+    "method": "GET",
+    "path": "/api/auth/google/callback",
+    "url": "http://127.0.0.1:8000/api/auth/google/callback",
+    "status_code": 400,
+    "response_snippet": "{\"error\":\"mismatching_state: CSRF Warning! State not equal in request and response.\"}"
+  },
+  {
+    "file": "app/api/auth.py",
+    "method": "POST",
+    "path": "/api/auth/token",
+    "url": "http://127.0.0.1:8000/api/auth/token",
+    "status_code": 422,
+    "response_snippet": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"grant_type\"],\"msg\":\"Field required\",\"input\":{}},{\"type\":\"missing\",\"loc\":[\"body\",\"code\"],\"msg\":\"Field required\",\"input\":{}},{\"type\":\"missing\",\"loc\":[\"body\",\"code_verifier\"],\"msg\":\"Field required\",\"input\":{}},{\"type\":\"missing\",\"loc\":[\"body\",\"redirect_uri\"],\"msg\":\"Field required\",\"input\":{}}]}"
+  },
+  {
+    "file": "app/api/auth.py",
+    "method": "POST",
+    "path": "/api/auth/refresh",
+    "url": "http://127.0.0.1:8000/api/auth/refresh",
+    "status_code": 422,
+    "response_snippet": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"refresh_token\"],\"msg\":\"Field required\",\"input\":{}}]}"
+  },
+  {
+    "file": "app/api/auth.py",
+    "method": "POST",
+    "path": "/api/auth/logout",
+    "url": "http://127.0.0.1:8000/api/auth/logout",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/auth.py",
+    "method": "GET",
+    "path": "/api/auth/me",
+    "url": "http://127.0.0.1:8000/api/auth/me",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/auth.py",
+    "method": "GET",
+    "path": "/api/auth/debug/oauth",
+    "url": "http://127.0.0.1:8000/api/auth/debug/oauth",
+    "status_code": 200,
+    "response_snippet": "{\"oauth_providers\":{\"openrouter\":{\"configured\":true,\"client_id_set\":true,\"client_secret_set\":true,\"is_placeholder\":true},\"google\":{\"configured\":true,\"client_id_set\":true,\"client_secret_set\":true,\"is_placeholder\":false},\"github\":{\"configured\":true,\"client_id_set\":true,\"client_secret_set\":true,\"is_placeholder\":false}},\"session_data\":{},\"request_headers\":{\"host\":\"127.0.0.1:8000\",\"user-agent\":\"python-"
+  },
+  {
+    "file": "app/api/auth.py",
+    "method": "GET",
+    "path": "/api/auth/debug/cleanup",
+    "url": "http://127.0.0.1:8000/api/auth/debug/cleanup",
+    "status_code": 200,
+    "response_snippet": "{\"message\":\"Session cleared successfully\"}"
+  },
+  {
+    "file": "app/api/auth.py",
+    "method": "GET",
+    "path": "/api/auth/vscode-config",
+    "url": "http://127.0.0.1:8000/api/auth/vscode-config",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/auth.py",
+    "method": "POST",
+    "path": "/api/auth/extension/clerk-to-ticket",
+    "url": "http://127.0.0.1:8000/api/auth/extension/clerk-to-ticket",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/api/auth.py",
+    "method": "GET",
+    "path": "/api/auth/extension/sign-in",
+    "url": "http://127.0.0.1:8000/api/auth/extension/sign-in",
+    "status_code": 422,
+    "response_snippet": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"query\",\"state\"],\"msg\":\"Field required\",\"input\":null},{\"type\":\"missing\",\"loc\":[\"query\",\"auth_redirect\"],\"msg\":\"Field required\",\"input\":null}]}"
+  },
+  {
+    "file": "app/api/auth.py",
+    "method": "POST",
+    "path": "/api/auth/extension/exchange-ticket",
+    "url": "http://127.0.0.1:8000/api/auth/extension/exchange-ticket",
+    "status_code": 422,
+    "response_snippet": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"query\",\"ticket\"],\"msg\":\"Field required\",\"input\":null}]}"
+  },
+  {
+    "file": "app/api/api_keys.py",
+    "method": "POST",
+    "path": "/api/api/keys/",
+    "url": "http://127.0.0.1:8000/api/api/keys/",
+    "status_code": 403,
+    "response_snippet": "{\"detail\":\"Not authenticated\"}"
+  },
+  {
+    "file": "app/api/api_keys.py",
+    "method": "GET",
+    "path": "/api/api/keys/",
+    "url": "http://127.0.0.1:8000/api/api/keys/",
+    "status_code": 403,
+    "response_snippet": "{\"detail\":\"Not authenticated\"}"
+  },
+  {
+    "file": "app/api/api_keys.py",
+    "method": "DELETE",
+    "path": "/api/api/keys/KEY_000",
+    "url": "http://127.0.0.1:8000/api/api/keys/KEY_000",
+    "status_code": 403,
+    "response_snippet": "{\"detail\":\"Not authenticated\"}"
+  },
+  {
+    "file": "app/api/api_keys.py",
+    "method": "GET",
+    "path": "/api/api/keys/validate",
+    "url": "http://127.0.0.1:8000/api/api/keys/validate",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Could not validate credentials using No Authorization header provided. Please provide a valid JWT token or API key.\"}"
+  },
+  {
+    "file": "app/endpoints/template_interactions.py",
+    "method": "POST",
+    "path": "/api/templates/000000000000000000000000/comments",
+    "url": "http://127.0.0.1:8000/api/templates/000000000000000000000000/comments",
+    "status_code": 422,
+    "response_snippet": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"content\"],\"msg\":\"Field required\",\"input\":{}}]}"
+  },
+  {
+    "file": "app/endpoints/template_interactions.py",
+    "method": "GET",
+    "path": "/api/templates/000000000000000000000000/comments",
+    "url": "http://127.0.0.1:8000/api/templates/000000000000000000000000/comments",
+    "status_code": 500,
+    "response_snippet": "{\"detail\":\"Failed to get comments: 404: Template not found\"}"
+  },
+  {
+    "file": "app/endpoints/template_interactions.py",
+    "method": "PUT",
+    "path": "/api/templates/000000000000000000000000/comments/COMM_000",
+    "url": "http://127.0.0.1:8000/api/templates/000000000000000000000000/comments/COMM_000",
+    "status_code": 500,
+    "response_snippet": "{\"detail\":\"Failed to update comment: 1 validation error for nullable[json-or-python[json=function-after[_validate(), constrained-str],python=function-plain[_validate()]]]\\n  Value error, Id must be of type PydanticObjectId [type=value_error, input_value='COMM_000', input_type=str]\\n    For further information visit https://errors.pydantic.dev/2.12/v/value_error\"}"
+  },
+  {
+    "file": "app/endpoints/template_interactions.py",
+    "method": "DELETE",
+    "path": "/api/templates/000000000000000000000000/comments/COMM_000",
+    "url": "http://127.0.0.1:8000/api/templates/000000000000000000000000/comments/COMM_000",
+    "status_code": 500,
+    "response_snippet": "{\"detail\":\"Failed to delete comment: 1 validation error for nullable[json-or-python[json=function-after[_validate(), constrained-str],python=function-plain[_validate()]]]\\n  Value error, Id must be of type PydanticObjectId [type=value_error, input_value='COMM_000', input_type=str]\\n    For further information visit https://errors.pydantic.dev/2.12/v/value_error\"}"
+  },
+  {
+    "file": "app/endpoints/template_interactions.py",
+    "method": "POST",
+    "path": "/api/templates/000000000000000000000000/comments/COMM_000/helpful",
+    "url": "http://127.0.0.1:8000/api/templates/000000000000000000000000/comments/COMM_000/helpful",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Missing or invalid authorization header\"}"
+  },
+  {
+    "file": "app/endpoints/template_interactions.py",
+    "method": "GET",
+    "path": "/api/templates/000000000000000000000000/comments/COMM_000/replies",
+    "url": "http://127.0.0.1:8000/api/templates/000000000000000000000000/comments/COMM_000/replies",
+    "status_code": 500,
+    "response_snippet": "{\"detail\":\"Failed to get replies: 1 validation error for nullable[json-or-python[json=function-after[_validate(), constrained-str],python=function-plain[_validate()]]]\\n  Value error, Id must be of type PydanticObjectId [type=value_error, input_value='COMM_000', input_type=str]\\n    For further information visit https://errors.pydantic.dev/2.12/v/value_error\"}"
+  },
+  {
+    "file": "app/endpoints/template_interactions.py",
+    "method": "POST",
+    "path": "/api/templates/000000000000000000000000/comments/COMM_000/flag",
+    "url": "http://127.0.0.1:8000/api/templates/000000000000000000000000/comments/COMM_000/flag",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Missing or invalid authorization header\"}"
+  },
+  {
+    "file": "app/endpoints/payments.py",
+    "method": "POST",
+    "path": "/api/payments/create-item-order",
+    "url": "http://127.0.0.1:8000/api/payments/create-item-order",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/endpoints/payments.py",
+    "method": "POST",
+    "path": "/api/payments/verify-item-purchase",
+    "url": "http://127.0.0.1:8000/api/payments/verify-item-purchase",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/endpoints/payments.py",
+    "method": "GET",
+    "path": "/api/user/purchased-items",
+    "url": "http://127.0.0.1:8000/api/user/purchased-items",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/endpoints/payments.py",
+    "method": "POST",
+    "path": "/api/cart/add",
+    "url": "http://127.0.0.1:8000/api/cart/add",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/endpoints/payments.py",
+    "method": "GET",
+    "path": "/api/cart",
+    "url": "http://127.0.0.1:8000/api/cart",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/endpoints/payments.py",
+    "method": "DELETE",
+    "path": "/api/cart/item/ITEM_000",
+    "url": "http://127.0.0.1:8000/api/cart/item/ITEM_000",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/endpoints/payments.py",
+    "method": "POST",
+    "path": "/api/cart/checkout",
+    "url": "http://127.0.0.1:8000/api/cart/checkout",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/endpoints/payments.py",
+    "method": "POST",
+    "path": "/api/cart/verify-purchase",
+    "url": "http://127.0.0.1:8000/api/cart/verify-purchase",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/endpoints/payments.py",
+    "method": "POST",
+    "path": "/api/cart/clear",
+    "url": "http://127.0.0.1:8000/api/cart/clear",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/endpoints/payments.py",
+    "method": "GET",
+    "path": "/api/cart/summary",
+    "url": "http://127.0.0.1:8000/api/cart/summary",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/endpoints/component_interactions.py",
+    "method": "POST",
+    "path": "/api/components/000000000000000000000000/like",
+    "url": "http://127.0.0.1:8000/api/components/000000000000000000000000/like",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Missing or invalid authorization header\"}"
+  },
+  {
+    "file": "app/endpoints/component_interactions.py",
+    "method": "POST",
+    "path": "/api/components/000000000000000000000000/view",
+    "url": "http://127.0.0.1:8000/api/components/000000000000000000000000/view",
+    "status_code": 500,
+    "response_snippet": "{\"detail\":\"Failed to record view: \"}"
+  },
+  {
+    "file": "app/endpoints/component_interactions.py",
+    "method": "POST",
+    "path": "/api/components/000000000000000000000000/download",
+    "url": "http://127.0.0.1:8000/api/components/000000000000000000000000/download",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Missing or invalid authorization header\"}"
+  },
+  {
+    "file": "app/endpoints/component_interactions.py",
+    "method": "POST",
+    "path": "/api/components/000000000000000000000000/comments",
+    "url": "http://127.0.0.1:8000/api/components/000000000000000000000000/comments",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Missing or invalid authorization header\"}"
+  },
+  {
+    "file": "app/endpoints/component_interactions.py",
+    "method": "GET",
+    "path": "/api/components/000000000000000000000000/comments",
+    "url": "http://127.0.0.1:8000/api/components/000000000000000000000000/comments",
+    "status_code": 500,
+    "response_snippet": "{\"detail\":\"Failed to get comments: \"}"
+  },
+  {
+    "file": "app/endpoints/component_interactions.py",
+    "method": "PUT",
+    "path": "/api/components/000000000000000000000000/comments/COMM_000",
+    "url": "http://127.0.0.1:8000/api/components/000000000000000000000000/comments/COMM_000",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Missing or invalid authorization header\"}"
+  },
+  {
+    "file": "app/endpoints/component_interactions.py",
+    "method": "DELETE",
+    "path": "/api/components/000000000000000000000000/comments/COMM_000",
+    "url": "http://127.0.0.1:8000/api/components/000000000000000000000000/comments/COMM_000",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Missing or invalid authorization header\"}"
+  },
+  {
+    "file": "app/endpoints/component_interactions.py",
+    "method": "POST",
+    "path": "/api/components/000000000000000000000000/comments/COMM_000/helpful",
+    "url": "http://127.0.0.1:8000/api/components/000000000000000000000000/comments/COMM_000/helpful",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Missing or invalid authorization header\"}"
+  },
+  {
+    "file": "app/endpoints/component_interactions.py",
+    "method": "GET",
+    "path": "/api/components/000000000000000000000000/comments/COMM_000/replies",
+    "url": "http://127.0.0.1:8000/api/components/000000000000000000000000/comments/COMM_000/replies",
+    "status_code": 500,
+    "response_snippet": "{\"detail\":\"Failed to get replies: 1 validation error for nullable[json-or-python[json=function-after[_validate(), constrained-str],python=function-plain[_validate()]]]\\n  Value error, Id must be of type PydanticObjectId [type=value_error, input_value='COMM_000', input_type=str]\\n    For further information visit https://errors.pydantic.dev/2.12/v/value_error\"}"
+  },
+  {
+    "file": "app/endpoints/component_interactions.py",
+    "method": "POST",
+    "path": "/api/components/000000000000000000000000/comments/COMM_000/flag",
+    "url": "http://127.0.0.1:8000/api/components/000000000000000000000000/comments/COMM_000/flag",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Missing or invalid authorization header\"}"
+  },
+  {
+    "file": "app/endpoints/component_interactions.py",
+    "method": "GET",
+    "path": "/api/components/000000000000000000000000/analytics",
+    "url": "http://127.0.0.1:8000/api/components/000000000000000000000000/analytics",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Missing or invalid authorization header\"}"
+  },
+  {
+    "file": "app/endpoints/developer_earnings.py",
+    "method": "GET",
+    "path": "/api/developer/earnings",
+    "url": "http://127.0.0.1:8000/api/developer/earnings",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/endpoints/developer_earnings.py",
+    "method": "POST",
+    "path": "/api/developer/payout-request",
+    "url": "http://127.0.0.1:8000/api/developer/payout-request",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/endpoints/developer_earnings.py",
+    "method": "GET",
+    "path": "/api/developer/payout-requests",
+    "url": "http://127.0.0.1:8000/api/developer/payout-requests",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/endpoints/developer_earnings.py",
+    "method": "PUT",
+    "path": "/api/developer/earnings/settings",
+    "url": "http://127.0.0.1:8000/api/developer/earnings/settings",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/endpoints/developer_earnings.py",
+    "method": "GET",
+    "path": "/api/admin/payout-requests",
+    "url": "http://127.0.0.1:8000/api/admin/payout-requests",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/endpoints/developer_earnings.py",
+    "method": "PUT",
+    "path": "/api/admin/payout-requests/REQ_000",
+    "url": "http://127.0.0.1:8000/api/admin/payout-requests/REQ_000",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/endpoints/developer_earnings.py",
+    "method": "POST",
+    "path": "/api/admin/payout-requests/REQ_000/complete",
+    "url": "http://127.0.0.1:8000/api/admin/payout-requests/REQ_000/complete",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/endpoints/admin_moderation.py",
+    "method": "GET",
+    "path": "/api/admin/comments",
+    "url": "http://127.0.0.1:8000/api/admin/comments",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Authentication required\"}"
+  },
+  {
+    "file": "app/endpoints/admin_moderation.py",
+    "method": "GET",
+    "path": "/api/admin/comments/flagged",
+    "url": "http://127.0.0.1:8000/api/admin/comments/flagged",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Authentication required\"}"
+  },
+  {
+    "file": "app/endpoints/admin_moderation.py",
+    "method": "POST",
+    "path": "/api/admin/comments/COMM_000/moderate",
+    "url": "http://127.0.0.1:8000/api/admin/comments/COMM_000/moderate",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Authentication required\"}"
+  },
+  {
+    "file": "app/endpoints/admin_moderation.py",
+    "method": "DELETE",
+    "path": "/api/admin/comments/COMM_000",
+    "url": "http://127.0.0.1:8000/api/admin/comments/COMM_000",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Authentication required\"}"
+  },
+  {
+    "file": "app/endpoints/admin_moderation.py",
+    "method": "GET",
+    "path": "/api/admin/analytics/interactions",
+    "url": "http://127.0.0.1:8000/api/admin/analytics/interactions",
+    "status_code": 401,
+    "response_snippet": "{\"detail\":\"Authentication required\"}"
+  },
+  {
+    "file": "app/endpoints/user_dashboard.py",
+    "method": "GET",
+    "path": "/api/user/dashboard",
+    "url": "http://127.0.0.1:8000/api/user/dashboard",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/endpoints/user_dashboard.py",
+    "method": "GET",
+    "path": "/api/user/purchased-content",
+    "url": "http://127.0.0.1:8000/api/user/purchased-content",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  },
+  {
+    "file": "app/endpoints/user_dashboard.py",
+    "method": "GET",
+    "path": "/api/user/recommendations",
+    "url": "http://127.0.0.1:8000/api/user/recommendations",
+    "status_code": 404,
+    "response_snippet": "{\"detail\":\"Not Found\"}"
+  }
+]

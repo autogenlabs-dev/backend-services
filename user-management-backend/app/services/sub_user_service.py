@@ -6,7 +6,7 @@ from uuid import uuid4
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
-from ..models.user import User
+from ..models.user import User, SubscriptionPlan
 from ..auth.jwt import get_password_hash
 
 
@@ -39,7 +39,7 @@ def create_sub_user(
         parent_user_id=parent_user_user_id,
         sub_user_permissions=permissions,
         sub_user_limits=limits,
-        subscription="free",
+        subscription=SubscriptionPlan.FREE,
         tokens_remaining=limits.get("token_limit", 1000),
         tokens_used=0,
         monthly_limit=limits.get("token_limit", 1000),

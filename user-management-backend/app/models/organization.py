@@ -8,11 +8,11 @@ from beanie.odm.fields import Indexed
 
 
 class Organization(Document):
-    """Organization model for enterprise customers."""
+    """Organization model for ultra-tier customers."""
     
     name: str
     admin_user_id: PydanticObjectId
-    subscription_plan: str = "enterprise"
+    subscription_plan: str = "ultra"
     token_pool: int = 1000000
     tokens_used: int = 0
     monthly_limit: int = 1000000

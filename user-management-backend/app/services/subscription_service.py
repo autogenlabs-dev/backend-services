@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional, List
 from decimal import Decimal
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from ..models.user import User, SubscriptionPlan, UserSubscription
+from ..models.user import User, SubscriptionPlanModel, UserSubscription
 
 
 class SubscriptionService:
@@ -14,20 +14,20 @@ class SubscriptionService:
     def __init__(self, db: AsyncIOMotorDatabase):
         self.db = db
     
-    async def get_all_plans(self) -> List[SubscriptionPlan]:
+    async def get_all_plans(self) -> List[SubscriptionPlanModel]:
         """Get all active subscription plans."""
         # Use Beanie's find method instead of SQLAlchemy query
-        plans = await SubscriptionPlan.find(
-            SubscriptionPlan.is_active == True
+        plans = await SubscriptionPlanModel.find(
+            SubscriptionPlanModel.is_active == True
         ).sort("+price_monthly").to_list()
         return plans
     
-    async def get_plan_by_name(self, plan_name: str) -> Optional[SubscriptionPlan]:
+    async def get_plan_by_name(self, plan_name: str) -> Optional[SubscriptionPlanModel]:
         """Get a subscription plan by name."""
         # Use Beanie's find_one method
-        return await SubscriptionPlan.find_one(
-            SubscriptionPlan.name == plan_name,
-            SubscriptionPlan.is_active == True
+        return await SubscriptionPlanModel.find_one(
+            SubscriptionPlanModel.name == plan_name,
+            SubscriptionPlanModel.is_active == True
         )
     
     def get_user_subscription(self, user: User) -> Optional[UserSubscription]:
@@ -39,7 +39,7 @@ class SubscriptionService:
             .first()
         )
     
-    def get_user_plan(self, user: User) -> SubscriptionPlan:
+    def get_user_plan(self, user: User) -> SubscriptionPlanModel:
         """Get user's current plan, defaulting to free."""
         subscription = self.get_user_subscription(user)
         if subscription:
@@ -53,9 +53,9 @@ class SubscriptionService:
         
         return free_plan
     
-    def _create_default_free_plan(self) -> SubscriptionPlan:
+    def _create_default_free_plan(self) -> SubscriptionPlanModel:
         """Create a default free plan."""
-        free_plan = SubscriptionPlan(
+        free_plan = SubscriptionPlanModel(
             name="free",
             display_name="Free Plan",
             monthly_tokens=10000,

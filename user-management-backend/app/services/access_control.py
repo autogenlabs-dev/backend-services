@@ -5,7 +5,7 @@ Content Access Control Service for Marketplace
 from typing import Optional, Dict, Any, Tuple
 from datetime import datetime, timezone
 from enum import Enum
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.template import Template
 from app.models.component import Component
 from app.models.item_purchase import ItemPurchase, PurchaseStatus
@@ -73,8 +73,8 @@ class ContentAccessService:
             })
             return AccessLevel.OWNER_ACCESS, access_info
         
-        # Check if user is admin/superadmin (full access to everything)
-        if user.role in ["admin", "superadmin"]:
+        # Check if user is admin (full access to everything)
+        if user.role == UserRole.ADMIN:
             access_info.update({
                 "can_view_code": True,
                 "can_download": True,
@@ -172,7 +172,7 @@ class ContentAccessService:
             return {str(item_id): False for item_id in item_ids}
         
         # Admin gets access to everything
-        if user.role in ["admin", "superadmin"]:
+        if user.role == UserRole.ADMIN:
             return {str(item_id): True for item_id in item_ids}
         
         # Convert to ObjectId for query

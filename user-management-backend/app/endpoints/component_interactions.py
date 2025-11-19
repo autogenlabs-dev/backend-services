@@ -6,7 +6,7 @@ import math
 from collections import defaultdict
 
 from app.middleware.auth import require_auth, get_current_user_from_token
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.component import Component
 from app.models.component_interactions import (
     ComponentLike, ComponentComment, ComponentView, 
@@ -706,7 +706,7 @@ async def get_component_analytics(
             raise HTTPException(status_code=404, detail="Component not found")
         
         # Check permissions (component owner or admin)
-        if component.developer_id != str(current_user.id) and current_user.role != "Admin":
+        if str(component.user_id) != str(current_user.id) and current_user.role != UserRole.ADMIN:
             raise HTTPException(status_code=403, detail="Access denied")
         
         # Get analytics data

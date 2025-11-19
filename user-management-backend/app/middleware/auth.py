@@ -71,30 +71,32 @@ def require_admin(current_user: User = Depends(get_current_user_from_token)):
             status_code=401,
             detail="Authentication required"
         )
-    if current_user.role not in [UserRole.ADMIN, UserRole.SUPERADMIN]:
+    if current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=403,
             detail="Admin access required"
         )
     return current_user
 
-def require_developer_or_admin(current_user: User = Depends(get_current_user_from_token)):
-    """Dependency to require developer or admin role"""
+def require_creator_or_admin(current_user: User = Depends(get_current_user_from_token)):
+    """Require publishing capability (formerly developer) or admin role"""
     if not current_user:
         raise HTTPException(
             status_code=401,
             detail="Authentication required"
         )
-    if current_user.role not in [UserRole.DEVELOPER, UserRole.ADMIN, UserRole.SUPERADMIN]:
-        raise HTTPException(
-            status_code=403,
-            detail="Developer or Admin access required"
-        )
+    # Allow all authenticated users (merged user/developer access)
+    # if not (getattr(current_user, 'can_publish_content', False) or current_user.role == UserRole.ADMIN):
+    #     raise HTTPException(status_code=403, detail="Creator or Admin access required")
     return current_user
 
 async def require_developer(authorization: str = Header(None)) -> User:
-    """Require developer role or higher"""
-    return await require_role([UserRole.DEVELOPER, UserRole.ADMIN, UserRole.SUPERADMIN], authorization)
+    """Backward-compatible dependency for header-based checks: require creator capability or admin"""
+    user = await require_auth(authorization)
+    # Allow all authenticated users (merged user/developer access)
+    # if not (getattr(user, 'can_publish_content', False) or user.role == UserRole.ADMIN):
+    #     raise HTTPException(status_code=403, detail="Creator or Admin access required")
+    return user
 
 async def require_user(authorization: str = Header(None)) -> User:
     """Require any authenticated user"""
@@ -102,7 +104,7 @@ async def require_user(authorization: str = Header(None)) -> User:
 
 def check_content_ownership(user: User, content_user_id: str) -> bool:
     """Check if user owns the content or is admin"""
-    if user.role in [UserRole.ADMIN, UserRole.SUPERADMIN]:
+    if user.role == UserRole.ADMIN:
         return True
     return str(user.id) == content_user_id
 
@@ -112,7 +114,7 @@ def check_content_access(user: User, content) -> str:
     Returns: 'full_access', 'limited_access', 'owner_access', 'no_access'
     """
     # Admin always has full access
-    if user.role in [UserRole.ADMIN, UserRole.SUPERADMIN]:
+    if user.role == UserRole.ADMIN:
         return "full_access"
     
     # Owner access
@@ -143,6 +145,5 @@ class RoleChecker:
         return await require_role(self.allowed_roles, authorization)
 
 # Convenience instances
-AdminOnly = RoleChecker([UserRole.ADMIN, UserRole.SUPERADMIN])
-DeveloperOrAdmin = RoleChecker([UserRole.DEVELOPER, UserRole.ADMIN, UserRole.SUPERADMIN])
-AnyUser = RoleChecker([UserRole.USER, UserRole.DEVELOPER, UserRole.ADMIN, UserRole.SUPERADMIN])
+AdminOnly = RoleChecker([UserRole.ADMIN])
+AnyUser = RoleChecker([UserRole.USER, UserRole.ADMIN])

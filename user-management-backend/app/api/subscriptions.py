@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from ..database import get_database # Changed from get_db
 from ..auth.dependencies import get_current_user
 from ..auth.unified_auth import get_current_user_unified
-from ..models.user import SubscriptionPlan, UserSubscription, User
+from ..models.user import SubscriptionPlanModel, UserSubscription, User
 from ..services.subscription_service import SubscriptionService
 from ..services.stripe_service import StripeService
 from ..services.token_service import TokenService

@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Tuple, Dict, Any
 import secrets
 import hashlib
+import logging
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from beanie.odm.fields import PydanticObjectId
@@ -11,9 +12,13 @@ from beanie.odm.fields import PydanticObjectId
 # from sqlalchemy.orm import Session
 # from sqlalchemy import func, and_
 
-from ..models.user import User, UserOAuthAccount, OAuthProvider, UserSubscription, TokenUsageLog, ApiKey
+from ..models.user import User, UserOAuthAccount, OAuthProvider, UserSubscription, TokenUsageLog, ApiKey, ManagedApiKey, SubscriptionPlan
 from ..schemas.auth import UserCreate, UserUpdate, TokenUsageCreate, ApiKeyCreate
 from ..auth.jwt import get_password_hash, verify_password
+from .openrouter_keys import ensure_user_openrouter_key
+
+
+logger = logging.getLogger(__name__)
 
 
 async def get_user_by_id(db: AsyncIOMotorDatabase, user_id: PydanticObjectId) -> Optional[User]:
@@ -49,7 +54,7 @@ async def create_user_with_password(db: AsyncIOMotorDatabase, user_data: UserCre
         username=username,  # Set username field properly
         name=name,  # Use name from input or derived value
         is_active=True,
-        subscription="free", # Default subscription
+        subscription=SubscriptionPlan.FREE, # Default subscription
         tokens_remaining=10000, # Default tokens
         tokens_used=0,
         monthly_limit=10000, # Default monthly limit
@@ -90,7 +95,7 @@ async def create_user(db: AsyncIOMotorDatabase, user_data: UserCreate) -> User:
         # Beanie generates ID automatically
         email=user_data.email,
         is_active=True,
-        subscription="free", # Default subscription
+        subscription=SubscriptionPlan.FREE, # Default subscription
         tokens_remaining=10000, # Default tokens
         tokens_used=0,
         monthly_limit=10000, # Default monthly limit
@@ -150,6 +155,10 @@ async def update_user_last_login(db: AsyncIOMotorDatabase, user_id: PydanticObje
     if user:
         user.last_login_at = datetime.now(timezone.utc)
         await user.save()
+        try:
+            await ensure_user_openrouter_key(user)
+        except Exception as exc:  # noqa: BLE001 - log but don't block login
+            logger.warning("Unable to ensure OpenRouter key for user %s: %s", user.id, exc)
 
 
 async def update_user_last_logout(db: AsyncIOMotorDatabase, user_id: PydanticObjectId) -> None:
@@ -212,7 +221,7 @@ async def get_or_create_user_by_oauth(
             email=email,
             name=name or email.split('@')[0], # Use provided name or email prefix
             is_active=True,
-            subscription="free", # Default subscription
+            subscription=SubscriptionPlan.FREE, # Default subscription
             tokens_remaining=10000, # Default tokens
             tokens_used=0,
             monthly_limit=10000, # Default monthly limit
@@ -405,3 +414,94 @@ async def deactivate_api_key(db: AsyncIOMotorDatabase, user_id: PydanticObjectId
     api_key.is_active = False
     await api_key.save()
     return True
+
+
+# Managed API key helpers -------------------------------------------------
+
+async def admin_add_managed_api_keys(keys: List[str], label: Optional[str] = None) -> List[ManagedApiKey]:
+    """Store raw API keys that admins can later distribute to users."""
+    inserted: List[ManagedApiKey] = []
+    for raw_key in keys:
+        key_value = raw_key.strip()
+        if not key_value:
+            continue
+        managed_key = ManagedApiKey(
+            key_value=key_value,
+            key_preview=key_value[:8],
+            label=label,
+            is_active=True,
+            created_at=datetime.now(timezone.utc)
+        )
+        await managed_key.insert()
+        inserted.append(managed_key)
+    return inserted
+
+
+async def list_managed_api_keys(include_inactive: bool = False) -> List[ManagedApiKey]:
+    query = ManagedApiKey.find()
+    if not include_inactive:
+        query = query.find(ManagedApiKey.is_active == True)
+    return await query.sort("+created_at").to_list()
+
+
+async def deactivate_managed_api_key(key_id: PydanticObjectId) -> bool:
+    managed_key = await ManagedApiKey.get(key_id)
+    if not managed_key:
+        return False
+    managed_key.is_active = False
+    managed_key.assigned_user_id = None
+    managed_key.assigned_at = None
+    await managed_key.save()
+    return True
+
+
+async def _assign_new_managed_key(user: User) -> ManagedApiKey:
+    available_list = await ManagedApiKey.find(
+        ManagedApiKey.is_active == True,
+        ManagedApiKey.assigned_user_id == None
+    ).sort("+created_at").limit(1).to_list()
+    if not available_list:
+        raise ValueError("No managed API keys available. Please ask an admin to add more keys.")
+    available_key = available_list[0]
+
+    now = datetime.now(timezone.utc)
+    available_key.assigned_user_id = user.id
+    available_key.assigned_at = now
+    available_key.last_rotated_at = now
+    await available_key.save()
+
+    user.glm_api_key = available_key.key_value
+    user.updated_at = now
+    await user.save()
+    return available_key
+
+
+async def ensure_managed_api_key_for_user(user: User) -> ManagedApiKey:
+    """Return the currently assigned managed key for the user, assigning one if needed."""
+    existing = await ManagedApiKey.find_one(
+        ManagedApiKey.assigned_user_id == user.id,
+        ManagedApiKey.is_active == True
+    )
+    if existing:
+        if user.glm_api_key != existing.key_value:
+            user.glm_api_key = existing.key_value
+            user.updated_at = datetime.now(timezone.utc)
+            await user.save()
+        return existing
+    return await _assign_new_managed_key(user)
+
+
+async def refresh_managed_api_key_for_user(user: User) -> ManagedApiKey:
+    """Rotate the managed API key assigned to a user, returning the new key."""
+    # Release current key (if any)
+    current_key = await ManagedApiKey.find_one(
+        ManagedApiKey.assigned_user_id == user.id,
+        ManagedApiKey.is_active == True
+    )
+    if current_key:
+        current_key.assigned_user_id = None
+        current_key.assigned_at = None
+        current_key.last_rotated_at = datetime.now(timezone.utc)
+        await current_key.save()
+
+    return await _assign_new_managed_key(user)

@@ -75,6 +75,8 @@ class Settings(BaseSettings):
     
     # LLM Provider API Keys
     openrouter_api_key: str = "your_openrouter_api_key"
+    openrouter_provisioning_api_key: str = ""  # Provisioning key for per-user API keys
+    openrouter_api_base: str = "https://openrouter.ai/api/v1"
     glama_api_key: str = "your_glama_api_key"
     requesty_api_key: str = "your_requesty_api_key"
     aiml_api_key: str = "your_aiml_api_key"

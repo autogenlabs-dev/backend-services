@@ -176,16 +176,16 @@ async def add_to_cart(
         if not cart:
             cart = ShoppingCart(user_id=current_user.id)
         
-        # Get developer info
-        developer = await User.get(item.user_id)
-        developer_username = developer.username if developer else "Unknown"
+        # Get creator info
+        creator = await User.get(item.user_id)
+        creator_username = creator.username if creator else "Unknown"
         
         # Create cart item
         cart_item = CartItem(
             item_id=item.id,
             item_type=request.item_type,
             item_title=item.title,
-            developer_username=developer_username,
+            developer_username=creator_username,
             price_inr=item.pricing_inr,
             price_usd=item.pricing_usd
         )

@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from app.models.user import User, UserRole
 from app.models.developer_earnings import DeveloperEarnings, PayoutRequest, PayoutStatus, PayoutMethod
 from app.models.item_purchase import ItemPurchase, PurchaseStatus
-from app.middleware.auth import require_auth, require_admin, require_developer_or_admin
+from app.middleware.auth import require_auth, require_admin, require_creator_or_admin
 from app.utils.audit_logger import log_audit_event, ActionType
 
 
@@ -52,13 +52,10 @@ class PayoutRequestResponse(BaseModel):
 # Developer Earnings Endpoints
 @router.get("/developer/earnings", response_model=EarningsResponse)
 async def get_developer_earnings(
-    current_user: User = Depends(require_auth)
+    current_user: User = Depends(require_creator_or_admin)
 ):
     """Get developer's earnings dashboard with analytics"""
     try:
-        # Check if user is a developer
-        if current_user.role not in [UserRole.DEVELOPER, UserRole.ADMIN, UserRole.SUPERADMIN]:
-            raise HTTPException(status_code=403, detail="Only developers can access earnings")
         
         # Get or create earnings record
         earnings = await DeveloperEarnings.find_one({"developer_id": current_user.id})
@@ -116,13 +113,11 @@ async def get_developer_earnings(
 @router.post("/developer/payout-request", response_model=PayoutRequestResponse)
 async def create_payout_request(
     request: PayoutRequestCreate,
-    current_user: User = Depends(require_auth)
+    current_user: User = Depends(require_creator_or_admin)
 ):
     """Request earnings payout"""
     try:
-        # Check if user is a developer
-        if current_user.role not in [UserRole.DEVELOPER, UserRole.ADMIN, UserRole.SUPERADMIN]:
-            raise HTTPException(status_code=403, detail="Only developers can request payouts")
+        # Access controlled by dependency: creator or admin
         
         # Get earnings record
         earnings = await DeveloperEarnings.find_one({"developer_id": current_user.id})
@@ -218,13 +213,11 @@ async def get_payout_requests(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     status: Optional[PayoutStatus] = Query(None, description="Filter by status"),
-    current_user: User = Depends(require_auth)
+    current_user: User = Depends(require_creator_or_admin)
 ):
     """Get developer's payout request history"""
     try:
-        # Check if user is a developer
-        if current_user.role not in [UserRole.DEVELOPER, UserRole.ADMIN, UserRole.SUPERADMIN]:
-            raise HTTPException(status_code=403, detail="Only developers can access payout requests")
+        # Access controlled by dependency: creator or admin
         
         # Build query
         query = {"developer_id": current_user.id}
@@ -269,13 +262,11 @@ async def update_earnings_settings(
     bank_account_name: Optional[str] = None,
     upi_id: Optional[str] = None,
     paypal_email: Optional[str] = None,
-    current_user: User = Depends(require_auth)
+    current_user: User = Depends(require_creator_or_admin)
 ):
     """Update developer earnings settings"""
     try:
-        # Check if user is a developer
-        if current_user.role not in [UserRole.DEVELOPER, UserRole.ADMIN, UserRole.SUPERADMIN]:
-            raise HTTPException(status_code=403, detail="Only developers can update settings")
+        # Access controlled by dependency: creator or admin
         
         # Get earnings record
         earnings = await DeveloperEarnings.find_one({"developer_id": current_user.id})

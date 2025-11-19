@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional, Tuple
 from decimal import Decimal
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from ..models.user import User, TokenUsageLog, SubscriptionPlan, UserSubscription
+from ..models.user import User, TokenUsageLog, SubscriptionPlanModel, UserSubscription
 
 
 class TokenService:
@@ -14,7 +14,7 @@ class TokenService:
     def __init__(self, db: AsyncIOMotorDatabase):
         self.db = db
     
-    async def get_user_subscription_plan(self, user: User) -> SubscriptionPlan:
+    async def get_user_subscription_plan(self, user: User) -> SubscriptionPlanModel:
         """Get user's current subscription plan, defaulting to free."""
         subscription = await UserSubscription.find_one(
             UserSubscription.user_id == user.id,
@@ -22,18 +22,18 @@ class TokenService:
         )
         
         if subscription and subscription.plan_id:
-            plan = await SubscriptionPlan.get(subscription.plan_id)
+            plan = await SubscriptionPlanModel.get(subscription.plan_id)
             if plan:
                 return plan
         
         # Return free plan as default
-        free_plan = await SubscriptionPlan.find_one(
-            SubscriptionPlan.name == "free"
+        free_plan = await SubscriptionPlanModel.find_one(
+            SubscriptionPlanModel.name == "free"
         )
         
         if not free_plan:
             # Create default free plan if it doesn't exist
-            free_plan = SubscriptionPlan(
+            free_plan = SubscriptionPlanModel(
                 name="free",
                 display_name="Free Plan",
                 monthly_tokens=10000,
@@ -345,7 +345,7 @@ class TokenService:
                 "per_hour": 3000,
                 "per_day": 50000
             })
-        elif plan.name == "enterprise":
+        elif plan.name == "ultra":
             rate_limits.update({
                 "per_minute": 500,
                 "per_hour": 15000,

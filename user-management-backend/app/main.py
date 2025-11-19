@@ -11,6 +11,19 @@ from .config import settings
 from .auth.oauth import register_oauth_clients
 from .middleware.rate_limiting import rate_limit_middleware, add_rate_limit_headers
 from .api import auth, users, subscriptions, tokens, llm, admin, api_keys, payments, templates, extension_auth
+from .api import (
+    auth,
+    users,
+    subscriptions,
+    tokens,
+    llm,
+    admin,
+    api_keys,
+    payments,
+    templates,
+    components,
+    extension_auth,
+)
 from .api import debug
 from .api import verify
 from typing import Callable, Dict, Any
@@ -22,7 +35,7 @@ from app.models.user import (
     User,
     UserOAuthAccount,
     UserSubscription,
-    SubscriptionPlan,
+    SubscriptionPlanModel,
     OAuthProvider,
     TokenUsageLog,
     ApiKey
@@ -34,6 +47,9 @@ from app.models.template import (
     TemplateDownload,
     TemplateView,
     TemplateComment
+)
+from app.models.component import (
+    Component,
 )
 
 
@@ -54,7 +70,7 @@ async def lifespan(app: FastAPI):
                 User,
                 UserOAuthAccount,
                 UserSubscription,
-                SubscriptionPlan,
+                SubscriptionPlanModel,
                 OAuthProvider,
                 TokenUsageLog,
                 ApiKey,
@@ -64,6 +80,8 @@ async def lifespan(app: FastAPI):
                 TemplateDownload,
                 TemplateView,
                 TemplateComment
+                    ,
+                    Component
             ]
         )
         print("✅ Database connected and initialized")
@@ -194,6 +212,7 @@ app.include_router(admin.router, prefix="/api")
 app.include_router(api_keys.router, prefix="/api")
 app.include_router(payments.router, prefix="/api")
 app.include_router(templates.router, prefix="/api")
+app.include_router(components.router, prefix="/api")
 # Extension authentication endpoints (Clerk-compatible API)
 app.include_router(extension_auth.router, prefix="/api")
 app.include_router(debug.router, prefix="/api")

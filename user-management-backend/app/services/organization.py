@@ -40,7 +40,7 @@ class OrganizationService:
             slug=org_data.slug,
             description=org_data.description,
             owner_id=user_id,
-            subscription_plan="enterprise",
+            subscription_plan="ultra",
             monthly_token_limit=1000000,
             reset_date=datetime.now(timezone.utc).replace(day=1) + timedelta(days=32)
         )

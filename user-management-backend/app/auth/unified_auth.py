@@ -130,6 +130,28 @@ async def get_current_user_unified(
                             await user.insert()
 
                     if user:
+                        # Map Clerk public_metadata to local roles/capabilities (if present)
+                        try:
+                            public_md = payload.get("public_metadata") or payload.get("metadata") or {}
+                            if isinstance(public_md, str):
+                                import json as _json
+                                try:
+                                    public_md = _json.loads(public_md)
+                                except Exception:
+                                    public_md = {}
+
+                            role_md = public_md.get("role") or public_md.get("role_name")
+                            if role_md:
+                                from ..models.user import UserRole
+                                role_md_l = str(role_md).lower()
+                                if role_md_l == "admin" and user.role != UserRole.ADMIN:
+                                    user.role = UserRole.ADMIN
+                                    await user.save()
+                                if role_md_l in ("developer", "dev") and not getattr(user, 'can_publish_content', False):
+                                    user.can_publish_content = True
+                                    await user.save()
+                        except Exception:
+                            pass
                         if not getattr(user, "is_active", True):
                             auth_method += " - User found but inactive"
                     else:

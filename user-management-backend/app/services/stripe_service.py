@@ -7,7 +7,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from ..config import settings
-from ..models.user import User, SubscriptionPlan, UserSubscription
+from ..models.user import User, SubscriptionPlanModel, UserSubscription
 from .subscription_service import SubscriptionService
 
 

@@ -6,7 +6,7 @@ from beanie import PydanticObjectId
 from datetime import datetime, timezone
 
 from ..models.template import Template, TemplateView, TemplateLike, TemplateDownload
-from ..models.user import User
+from ..models.user import User, UserRole
 from ..auth.unified_auth import get_current_user_unified
 from pydantic import BaseModel
 
@@ -67,12 +67,12 @@ async def create_template(
     current_user: User = Depends(get_current_user_unified)
 ):
     """Create a new template."""
-    # Check if user has developer or admin role
-    if current_user.role not in ["developer", "admin", "superadmin"]:
-        raise HTTPException(
-            status_code=403,
-            detail="Developer or Admin access required"
-        )
+    # Allow all authenticated users to create templates
+    # if not (getattr(current_user, 'can_publish_content', False) or current_user.role == UserRole.ADMIN):
+    #     raise HTTPException(
+    #         status_code=403,
+    #         detail="Creator or Admin access required"
+    #     )
     
     try:
         # Create template document

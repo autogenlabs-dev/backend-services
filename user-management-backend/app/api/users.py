@@ -1,6 +1,6 @@
 """User management API endpoints."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from beanie.odm.fields import PydanticObjectId # Changed from UUID
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase # Added AsyncIOMotorDatabase
@@ -11,7 +11,7 @@ from ..database import get_database # Changed from get_db
 from ..schemas.auth import (
     UserResponse, UserProfile, UserUpdate, TokenUsageLogResponse,
     TokenUsageCreate, TokenUsageStats, ApiKeyCreate, ApiKeyResponse,
-    ApiKeyWithSecret
+    ApiKeyWithSecret, ManagedApiKeyAssignmentResponse
 )
 from ..auth.dependencies import get_current_user
 from ..auth.unified_auth import get_current_user_unified
@@ -19,8 +19,10 @@ from ..models.user import User
 from ..services.user_service import (
     get_user_by_id, update_user, get_user_oauth_accounts, get_user_subscription,
     log_token_usage, get_user_token_usage, get_user_token_usage_stats,
-    create_api_key, get_user_api_keys, deactivate_api_key
+    create_api_key, get_user_api_keys, deactivate_api_key,
+    ensure_managed_api_key_for_user, refresh_managed_api_key_for_user
 )
+from ..services.openrouter_keys import refresh_user_openrouter_key
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -54,9 +56,6 @@ async def get_my_profile(
             "last_used_at": account.last_used_at.isoformat() if account.last_used_at else None
         })
     
-    # Get subscription
-    subscription = await get_user_subscription(db, current_user.id)
-    
     # Get API keys
     api_keys = await get_user_api_keys(db, current_user.id)
     
@@ -80,9 +79,13 @@ async def get_my_profile(
         updated_at=current_user.updated_at,
         last_login_at=current_user.last_login_at,
         oauth_accounts=oauth_accounts,
-        subscription=subscription,
+        subscription=current_user.subscription.value if current_user.subscription else "free",  # Use enum value
         api_keys=api_keys_response,
-        glm_api_key=current_user.glm_api_key  # Include GLM API key
+        glm_api_key=current_user.glm_api_key,  # Include GLM API key
+        openrouter_api_key=current_user.openrouter_api_key,
+        role=getattr(current_user, 'role', 'user'),
+        # Always allow publishing content to merge user and developer roles
+        can_publish_content=True 
     )
 
 
@@ -93,9 +96,64 @@ async def set_glm_api_key(
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     """Set or update the user's GLM API key."""
+    if current_user.subscription not in {"pro", "ultra"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="GLM API key is available for paid plans only (pro or ultra)")
     current_user.glm_api_key = api_key
     await current_user.save()
     return {"message": "GLM API key updated successfully", "glm_api_key": api_key}
+
+
+@router.post("/me/openrouter-key/refresh")
+async def refresh_openrouter_key(
+    current_user: User = Depends(get_current_user_unified)
+):
+    """Generate a brand-new OpenRouter API key for the current user."""
+    try:
+        key_value = await refresh_user_openrouter_key(current_user)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+
+    return {"openrouter_api_key": key_value}
+
+
+@router.get("/me/managed-api-key", response_model=ManagedApiKeyAssignmentResponse)
+async def get_my_managed_api_key(
+    current_user: User = Depends(get_current_user_unified)
+):
+    """Return the admin-managed API key assigned to the current user."""
+    try:
+        managed_key = await ensure_managed_api_key_for_user(current_user)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
+
+    assigned_at = managed_key.assigned_at or datetime.now(timezone.utc)
+    return ManagedApiKeyAssignmentResponse(
+        managed_key_id=managed_key.id,
+        key_value=managed_key.key_value,
+        key_preview=managed_key.key_preview,
+        assigned_at=assigned_at,
+        label=managed_key.label
+    )
+
+
+@router.post("/me/managed-api-key/refresh", response_model=ManagedApiKeyAssignmentResponse)
+async def refresh_my_managed_api_key(
+    current_user: User = Depends(get_current_user_unified)
+):
+    """Rotate the managed API key for the current user."""
+    try:
+        managed_key = await refresh_managed_api_key_for_user(current_user)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
+
+    assigned_at = managed_key.assigned_at or datetime.now(timezone.utc)
+    return ManagedApiKeyAssignmentResponse(
+        managed_key_id=managed_key.id,
+        key_value=managed_key.key_value,
+        key_preview=managed_key.key_preview,
+        assigned_at=assigned_at,
+        label=managed_key.label
+    )
 
 
 @router.put("/me", response_model=UserResponse)
@@ -223,14 +281,12 @@ async def deactivate_my_api_key(
     return {"message": "API key deactivated successfully"}
 
 
-@router.get("/developer/name-matches", tags=["Developer"])
-async def developer_name_matches(
+@router.get("/user/name-matches", tags=["User"])
+async def user_name_matches(
     current_user: User = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database) # Changed from Session = Depends(get_db)
 ):
-    """Developer-only: Count users with the same name as the current user."""
-    if getattr(current_user, "role", "user") != "developer":
-        raise HTTPException(status_code=403, detail="Developer access required")
+    """User endpoint: Count users with the same name as the current user."""
     if not current_user.name:
         return {"count": 0, "message": "Current user has no name set."}
     count = await User.find(User.name == current_user.name).count() # Changed from db.query(User).filter(User.name == current_user.name).count()

@@ -3,11 +3,18 @@ from typing import List, Dict, Optional, Any
 from datetime import datetime, timedelta, timezone
 from beanie import PydanticObjectId
 from ..auth.unified_auth import get_current_user_unified
-from ..models.user import User, UserRole, TokenUsageLog, UserSubscription, SubscriptionPlan
+from ..models.user import User, UserRole, TokenUsageLog, UserSubscription, SubscriptionPlan, ManagedApiKey
 from ..models.template import Template
 from ..models.component import Component
 import logging
 from app.database import get_database
+from ..schemas.auth import ManagedApiKeyBulkCreate, ManagedApiKeyResponse
+from ..services.user_service import (
+    admin_add_managed_api_keys,
+    list_managed_api_keys,
+    deactivate_managed_api_key,
+    refresh_managed_api_key_for_user
+)
 
 # Temporary imports to avoid import errors - these need to be replaced with MongoDB aggregations
 try:
@@ -45,9 +52,72 @@ router = APIRouter(prefix="/admin", tags=["Admin"], include_in_schema=True)
 
 def require_admin(current_user: User = Depends(get_current_user_unified)):
     """Require admin role for access"""
-    if current_user.role not in [UserRole.ADMIN, UserRole.SUPERADMIN]:
+    if current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
+
+
+async def _serialize_managed_key(key: ManagedApiKey) -> Dict[str, Any]:
+    assigned_email = None
+    if key.assigned_user_id:
+        assigned_user = await User.get(key.assigned_user_id)
+        assigned_email = assigned_user.email if assigned_user else None
+    return ManagedApiKeyResponse(
+        id=key.id,
+        key_value=key.key_value,
+        key_preview=key.key_preview,
+        label=key.label,
+        is_active=key.is_active,
+        assigned_user_id=key.assigned_user_id,
+        assigned_user_email=assigned_email,
+        assigned_at=key.assigned_at,
+        created_at=key.created_at
+    )
+
+
+@router.post("/managed-api-keys", response_model=List[ManagedApiKeyResponse])
+async def add_managed_api_keys(
+    payload: ManagedApiKeyBulkCreate,
+    admin: User = Depends(require_admin)
+):
+    """Admin endpoint to bulk add managed API keys."""
+    created = await admin_add_managed_api_keys(payload.keys, payload.label)
+    return [await _serialize_managed_key(key) for key in created]
+
+
+@router.get("/managed-api-keys", response_model=List[ManagedApiKeyResponse])
+async def list_managed_keys(
+    include_inactive: bool = Query(False, description="Include inactive keys."),
+    admin: User = Depends(require_admin)
+):
+    keys = await list_managed_api_keys(include_inactive)
+    return [await _serialize_managed_key(key) for key in keys]
+
+
+@router.post("/managed-api-keys/{key_id}/deactivate")
+async def deactivate_managed_key(
+    key_id: PydanticObjectId,
+    admin: User = Depends(require_admin)
+):
+    success = await deactivate_managed_api_key(key_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Managed API key not found")
+    return {"message": "Managed API key deactivated"}
+
+
+@router.post("/users/{user_id}/managed-api-key/refresh")
+async def admin_refresh_user_managed_key(
+    user_id: PydanticObjectId,
+    admin: User = Depends(require_admin)
+):
+    user = await User.get(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    try:
+        new_key = await refresh_managed_api_key_for_user(user)
+    except ValueError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    return await _serialize_managed_key(new_key)
 
 @router.get("/users")
 async def get_users(
@@ -112,8 +182,8 @@ async def get_content(
             
             templates = await Template.find(template_query).skip(skip if not content_type else 0).limit(limit if not content_type else limit//2).to_list()
             for template in templates:
-                # Get developer info
-                developer = await User.get(template.user_id)
+                # Get creator info
+                creator = await User.get(template.user_id)
                 
                 template_dict = {
                     "id": str(template.id),
@@ -122,8 +192,8 @@ async def get_content(
                     "category": template.category,
                     "status": template.approval_status,  # Use approval_status mapped to status
                     "price_inr": template.pricing_inr,  
-                    "developer_name": developer.name if developer else "Unknown",
-                    "developer_email": developer.email if developer else "Unknown",
+                    "developer_name": creator.name if creator else "Unknown",
+                    "developer_email": creator.email if creator else "Unknown",
                     "created_at": template.created_at.isoformat(),
                     "download_count": template.downloads,
                     "like_count": template.likes,
@@ -141,8 +211,8 @@ async def get_content(
                 
             components = await Component.find(component_query).skip(skip if not content_type else 0).limit(limit if not content_type else limit//2).to_list()
             for component in components:
-                # Get developer info
-                developer = await User.get(component.user_id)
+                # Get creator info
+                creator = await User.get(component.user_id)
                 
                 component_dict = {
                     "id": str(component.id),
@@ -151,8 +221,8 @@ async def get_content(
                     "category": component.category,
                     "status": component.approval_status,  # Use approval_status mapped to status
                     "price_inr": component.pricing_inr,  
-                    "developer_name": developer.name if developer else "Unknown",
-                    "developer_email": developer.email if developer else "Unknown",
+                    "developer_name": creator.name if creator else "Unknown",
+                    "developer_email": creator.email if creator else "Unknown",
                     "created_at": component.created_at.isoformat(),
                     "download_count": component.downloads,
                     "like_count": component.likes,
@@ -188,7 +258,6 @@ async def get_analytics(admin: User = Depends(require_admin)):
         total_users = await User.find().count()
         active_users = await User.find(User.is_active == True).count()
         admin_users = await User.find(User.role == UserRole.ADMIN).count()
-        developer_users = await User.find(User.role == UserRole.DEVELOPER).count()
         regular_users = await User.find(User.role == UserRole.USER).count()
         
         # Get content statistics
@@ -233,7 +302,6 @@ async def get_analytics(admin: User = Depends(require_admin)):
             "recent_activity": recent_activity,
             "user_breakdown": {
                 "admin": admin_users,
-                "developer": developer_users,
                 "user": regular_users
             }
         }

@@ -1,6 +1,6 @@
 from datetime import datetime, UTC
-from typing import Optional, List, Dict, Any
-from pydantic import Field, EmailStr, ConfigDict
+from typing import Optional, List, Dict, Any, Union
+from pydantic import Field, EmailStr, ConfigDict, field_validator
 from beanie import Document, PydanticObjectId
 from beanie.odm.fields import Indexed # Import Indexed explicitly
 from enum import Enum
@@ -8,9 +8,13 @@ from enum import Enum
 class UserRole(str, Enum):
     """User role enumeration"""
     USER = "user"
-    DEVELOPER = "developer" 
     ADMIN = "admin"
-    SUPERADMIN = "superadmin"
+
+class SubscriptionPlan(str, Enum):
+    """Subscription plan enumeration"""
+    FREE = "free"
+    PRO = "pro"
+    ULTRA = "ultra"
 
 class User(Document):
     """User model for MongoDB"""
@@ -22,7 +26,7 @@ class User(Document):
     full_name: Optional[str] = None
     username: Optional[str] = None  # Added username field
     stripe_customer_id: Optional[str] = None
-    subscription: str = "free"  # free, pro, enterprise
+    subscription: SubscriptionPlan = SubscriptionPlan.FREE  # free, pro, ultra
     tokens_remaining: int = 10000
     tokens_used: int = 0
     monthly_limit: int = 10000
@@ -41,6 +45,11 @@ class User(Document):
     profile_image: Optional[str] = None
     wallet_balance: float = 0.0
     glm_api_key: Optional[str] = None  # User's GLM API key
+    openrouter_api_key: Optional[str] = None  # User-specific OpenRouter API key
+    openrouter_api_key_hash: Optional[str] = None
+    # Capability flags (preserve developer-like privileges while keeping two roles)
+    can_publish_content: bool = True
+    can_sell_content: bool = True
     
     # Sub-user management fields (references to other users by ID)
     parent_user_id: Optional[PydanticObjectId] = None
@@ -57,6 +66,22 @@ class User(Document):
             "created_at",
             "is_active"
         ]
+    
+    @field_validator('subscription', mode='before')
+    @classmethod
+    def validate_subscription(cls, v):
+        """Convert string subscription values to enum for backward compatibility"""
+        if isinstance(v, str):
+            # Handle old string values from database
+            if v == "free":
+                return SubscriptionPlan.FREE
+            elif v == "pro":
+                return SubscriptionPlan.PRO
+            elif v in ("ultra", "enterprise"):  # Map old "enterprise" to "ultra"
+                return SubscriptionPlan.ULTRA
+            # If it's already a valid enum string, let Pydantic handle it
+            return v
+        return v
 
     def __repr__(self):
         return f"<User(email='{self.email}')>"
@@ -131,9 +156,9 @@ class UserOAuthAccount(Document):
         return f"<UserOAuthAccount(user_id='{self.user_id}', provider_id='{self.provider_id}')>"
 
 
-class SubscriptionPlan(Document):
+class SubscriptionPlanModel(Document):
     """Subscription plan model for MongoDB"""
-    name: Indexed(str)  # "Free", "Pro", "Enterprise"
+    name: Indexed(str)  # "Free", "Pro", "Ultra"
     display_name: str
     monthly_tokens: int
     price_monthly: float
@@ -221,13 +246,36 @@ class ApiKey(Document):
         return f"<ApiKey(user_id='{self.user_id}', name='{self.name}', preview='{self.key_preview}...')>"
 
 
+class ManagedApiKey(Document):
+    """Admin-managed API keys that can be distributed to users."""
+    key_value: str
+    key_preview: str
+    label: Optional[str] = None
+    is_active: bool = True
+    assigned_user_id: Optional[PydanticObjectId] = None
+    assigned_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    last_rotated_at: Optional[datetime] = None
+
+    class Settings:
+        name = "managed_api_keys"
+        indexes = [
+            "is_active",
+            "assigned_user_id",
+            "created_at"
+        ]
+
+    def __repr__(self):
+        return f"<ManagedApiKey(label='{self.label}', preview='{self.key_preview}...')>"
+
+
 class Organization(Document):
-    """Organization model for enterprise features in MongoDB"""
+    """Organization model for ultra-tier features in MongoDB"""
     name: str
     slug: Indexed(str) # Corrected Indexed usage
     description: Optional[str] = None
     owner_id: PydanticObjectId
-    subscription_plan: str = "enterprise"
+    subscription_plan: str = "ultra"
     monthly_token_limit: int = 1000000
     tokens_used: int = 0
     reset_date: Optional[datetime] = None
