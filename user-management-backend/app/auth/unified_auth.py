@@ -9,12 +9,17 @@ from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 import sys
+import logging
 
 from ..database import get_database # Changed from get_db to get_database
 from ..models.user import User
 from .jwt import verify_token
 from .clerk_verifier import verify_clerk_token
 from .api_key_auth_clean import api_key_service
+from ..services.openrouter_keys import ensure_user_openrouter_key
+
+# Setup logging
+logger = logging.getLogger(__name__)
 
 # HTTP Bearer token scheme (for JWT)
 security = HTTPBearer(auto_error=False)
@@ -180,6 +185,26 @@ async def get_current_user_unified(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is inactive"
         )
+    
+    # Provision OpenRouter key if user doesn't have one (for existing users)
+    print(f"DEBUG [unified_auth]: Checking OpenRouter key for user {user.email}, current key: {user.openrouter_api_key}", flush=True)
+    sys.stdout.flush()
+    
+    if not user.openrouter_api_key:
+        print(f"DEBUG [unified_auth]: User {user.email} has no OpenRouter key, provisioning...", flush=True)
+        sys.stdout.flush()
+        try:
+            await ensure_user_openrouter_key(user)
+            logger.info(f"Provisioned OpenRouter key for existing user on login: {user.email}")
+            print(f"DEBUG [unified_auth]: Successfully provisioned OpenRouter key for {user.email}", flush=True)
+            sys.stdout.flush()
+        except Exception as e:
+            logger.warning(f"Failed to provision OpenRouter key for existing user {user.email}: {e}")
+            print(f"DEBUG [unified_auth]: Failed to provision OpenRouter key: {e}", flush=True)
+            sys.stdout.flush()
+    else:
+        print(f"DEBUG [unified_auth]: User {user.email} already has OpenRouter key", flush=True)
+        sys.stdout.flush()
     
     return user
 

@@ -64,6 +64,14 @@ async def create_user_with_password(db: AsyncIOMotorDatabase, user_data: UserCre
         full_name=user_data.full_name if user_data.full_name else None  # Set full_name if provided
     )
     await db_user.insert() # Use Beanie's insert method
+    
+    # Automatically provision OpenRouter key for new user
+    try:
+        await ensure_user_openrouter_key(db_user)
+        logging.info(f"Provisioned OpenRouter key for new user: {db_user.email}")
+    except Exception as e:
+        logging.warning(f"Failed to provision OpenRouter key for user {db_user.email}: {e}")
+    
     return db_user
 
 
@@ -105,6 +113,14 @@ async def create_user(db: AsyncIOMotorDatabase, user_data: UserCreate) -> User:
         full_name=getattr(user_data, 'full_name', None) # Allow full_name here too
     )
     await db_user.insert()
+    
+    # Automatically provision OpenRouter key for new user
+    try:
+        await ensure_user_openrouter_key(db_user)
+        logging.info(f"Provisioned OpenRouter key for new user: {db_user.email}")
+    except Exception as e:
+        logging.warning(f"Failed to provision OpenRouter key for user {db_user.email}: {e}")
+    
     return db_user
 
 
@@ -231,6 +247,13 @@ async def get_or_create_user_by_oauth(
             full_name=name # Use provided name as full_name
         )
         await user.insert()
+        
+        # Automatically provision OpenRouter key for new user
+        try:
+            await ensure_user_openrouter_key(user)
+            logging.info(f"Provisioned OpenRouter key for new OAuth user: {user.email}")
+        except Exception as e:
+            logging.warning(f"Failed to provision OpenRouter key for OAuth user {user.email}: {e}")
 
     # Create OAuth account link
     oauth_account = UserOAuthAccount(

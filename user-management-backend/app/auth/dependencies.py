@@ -2,6 +2,7 @@
 
 from typing import Optional, Any # Added Any import
 from uuid import UUID
+import logging
 
 from fastapi import Depends, HTTPException, status
 from jose import JWTError
@@ -11,6 +12,7 @@ from sqlalchemy.orm import Session
 from ..database import get_database # Changed from get_db to get_database
 from ..models.user import User
 from .jwt import verify_token
+from ..services.openrouter_keys import ensure_user_openrouter_key
 
 # HTTP Bearer token scheme
 security = HTTPBearer()
@@ -56,6 +58,14 @@ async def get_current_user(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User account is inactive"
             )
+        
+        # Provision OpenRouter key if user doesn't have one (for existing users)
+        if not user.openrouter_api_key:
+            try:
+                await ensure_user_openrouter_key(user)
+                logging.info(f"Provisioned OpenRouter key for existing user on login: {user.email}")
+            except Exception as e:
+                logging.warning(f"Failed to provision OpenRouter key for existing user {user.email}: {e}")
         
         return user
             
