@@ -122,6 +122,7 @@ app.add_middleware(
     allow_origins=[
         "https://codemurf.com",  # Production frontend
         "http://localhost:3000",   # Development frontend
+        "https://www.codemurf.com",  # Production frontend (www)
         "http://localhost:3001",   # Test frontend
         "http://localhost:8080"    # Alternative development port
     ],
