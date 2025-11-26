@@ -287,12 +287,33 @@ async def get_favorite_templates(
         )
 
 
+@router.get("/categories", response_model=Dict[str, Any])
+async def get_template_categories():
+    """Get all available template categories."""
+    try:
+        # Get distinct categories from templates
+        templates = await Template.find({"is_active": True}).to_list()
+        categories = list(set(template.category for template in templates if template.category))
+        categories.sort()
+        
+        return {
+            "success": True,
+            "categories": categories
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch categories: {str(e)}"
+        )
+
+
 @router.get("/{template_id}")
 async def get_template_by_id(template_id: str):
     """Get a specific template by ID."""
     try:
-        # Skip validation for special routes
-        if template_id in ['my', 'my-templates', 'favorites', 'categories', 'stats']:
+        # Skip validation for special routes (categories removed - has its own route)
+        if template_id in ['my', 'my-templates', 'favorites', 'stats']:
             raise HTTPException(status_code=404, detail="Route not found")
         
         # Convert string ID to ObjectId
@@ -300,7 +321,7 @@ async def get_template_by_id(template_id: str):
             raise HTTPException(status_code=400, detail="Invalid template ID")
         
         # Find template
-        template = await Template.get(PydanticObjectId(template_id))
+        template = await Template.find_one({"_id": PydanticObjectId(template_id)})
         
         if not template or not template.is_active:
             raise HTTPException(status_code=404, detail="Template not found")
@@ -308,10 +329,13 @@ async def get_template_by_id(template_id: str):
         # Increment view count
         await template.update({"$inc": {"views": 1}})
         
-        # Simple test response
+        # Verify ID matches
+        if str(template.id) != template_id:
+            raise HTTPException(status_code=500, detail="Database integrity error: ID mismatch")
+            
         return {
-            "git_repo_url": "https://github.com/test/repo",
-            "test_field": "this should work"
+            "success": True,
+            "template": template.to_dict()
         }
         
     except HTTPException:
@@ -336,7 +360,7 @@ async def update_template(
             raise HTTPException(status_code=400, detail="Invalid template ID")
         
         # Find template
-        template = await Template.get(PydanticObjectId(template_id))
+        template = await Template.find_one({"_id": PydanticObjectId(template_id)})
         
         if not template:
             raise HTTPException(status_code=404, detail="Template not found")
@@ -358,7 +382,7 @@ async def update_template(
         await template.update({"$set": update_data})
         
         # Fetch updated template
-        updated_template = await Template.get(PydanticObjectId(template_id))
+        updated_template = await Template.find_one({"_id": PydanticObjectId(template_id)})
         
         return {
             "success": True,
@@ -387,7 +411,7 @@ async def delete_template(
             raise HTTPException(status_code=400, detail="Invalid template ID")
         
         # Find template
-        template = await Template.get(PydanticObjectId(template_id))
+        template = await Template.find_one({"_id": PydanticObjectId(template_id)})
         
         if not template:
             raise HTTPException(status_code=404, detail="Template not found")
@@ -413,30 +437,12 @@ async def delete_template(
         )
 
 
-@router.get("/categories", response_model=Dict[str, Any])
-async def get_template_categories():
-    """Get all available template categories."""
-    try:
-        # Get distinct categories from templates
-        templates = await Template.find({"is_active": True}).to_list()
-        categories = list(set(template.category for template in templates if template.category))
-        categories.sort()
-        
-        return {
-            "success": True,
-            "categories": categories
-        }
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch categories: {str(e)}"
-        )
+
 
 
 @router.get("/categories/list", response_model=Dict[str, Any])
-async def get_template_categories():
-    """Get all available template categories."""
+async def get_template_categories_list():
+    """Get all available template categories (alternative endpoint)."""
     try:
         # Get unique categories from templates
         categories = await Template.distinct("category", {"is_active": True})

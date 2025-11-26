@@ -89,32 +89,59 @@ class Component(Document):
 
     def to_dict(self):
         """Convert component to dictionary for API responses"""
-        data = super().to_dict() if hasattr(super(), 'to_dict') else self.__dict__.copy()
-        data["status"] = self.approval_status
-        data["approval_status"] = self.approval_status
+        # Explicitly create dict to ensure all fields are properly serialized
+        # This matches the Template model pattern which works correctly
+        data = {
+            'id': str(self.id) if self.id else None,
+            'title': self.title,
+            'category': self.category,
+            'type': self.type,
+            'language': self.language,
+            'difficulty_level': self.difficulty_level,
+            'plan_type': self.plan_type,
+            'short_description': self.short_description,
+            'full_description': self.full_description,
+            'preview_images': self.preview_images or [],
+            'git_repo_url': self.git_repo_url,
+            'live_demo_url': self.live_demo_url,
+            'dependencies': self.dependencies or [],
+            'tags': self.tags or [],
+            'developer_name': self.developer_name,
+            'developer_experience': self.developer_experience,
+            'is_available_for_dev': self.is_available_for_dev,
+            'featured': self.featured,
+            'user_id': str(self.user_id) if self.user_id else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'is_active': self.is_active,
+            # Approval workflow fields
+            'status': self.approval_status,
+            'approval_status': self.approval_status,
+            'submitted_for_approval_at': self.submitted_for_approval_at.isoformat() if self.submitted_for_approval_at else None,
+            'approved_at': self.approved_at.isoformat() if self.approved_at else None,
+            'approved_by': str(self.approved_by) if self.approved_by else None,
+            'rejection_reason': self.rejection_reason,
+            # Purchase and interaction tracking
+            'is_purchasable': self.is_purchasable,
+            'purchase_count': self.purchase_count,
+            'rating': self.rating,
+            'downloads': self.downloads,
+            'views': self.views,
+            'likes': self.likes,
+            'average_rating': self.average_rating,
+            'total_ratings': self.total_ratings,
+            'comments_count': self.comments_count,
+            'last_comment_at': self.last_comment_at.isoformat() if self.last_comment_at else None,
+            'rating_distribution': self.rating_distribution,
+        }
         
-        # Convert ObjectId fields to strings
-        if hasattr(self, 'id'):
-            data["id"] = str(self.id)
-        if hasattr(self, 'user_id') and self.user_id:
-            data["user_id"] = str(self.user_id)
+        # Handle code field (preserve dict structure if it exists)
+        if self.code is not None:
+            data['code'] = self.code if isinstance(self.code, dict) else str(self.code)
+        else:
+            data['code'] = None
             
-        # Convert datetime fields to ISO strings
-        if hasattr(self, 'created_at') and self.created_at:
-            data["created_at"] = self.created_at.isoformat() if hasattr(self.created_at, 'isoformat') else str(self.created_at)
-        if hasattr(self, 'updated_at') and self.updated_at:
-            data["updated_at"] = self.updated_at.isoformat() if hasattr(self.updated_at, 'isoformat') else str(self.updated_at)
-        if hasattr(self, 'submitted_for_approval_at') and self.submitted_for_approval_at:
-            data["submitted_for_approval_at"] = self.submitted_for_approval_at.isoformat() if hasattr(self.submitted_for_approval_at, 'isoformat') else str(self.submitted_for_approval_at)
-        if hasattr(self, 'approved_at') and self.approved_at:
-            data["approved_at"] = self.approved_at.isoformat() if hasattr(self.approved_at, 'isoformat') else str(self.approved_at)
+        # Handle readme_content
+        data['readme_content'] = self.readme_content
         
-        # Ensure code field is properly handled (preserve dict structure if it exists)
-        if hasattr(self, 'code') and self.code is not None:
-            if isinstance(self.code, dict):
-                # Preserve dict structure for frontend to handle properly
-                data["code"] = self.code
-            else:
-                data["code"] = str(self.code)
-            
         return data

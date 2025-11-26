@@ -16,44 +16,42 @@ class SubscriptionService:
     
     async def get_all_plans(self) -> List[SubscriptionPlanModel]:
         """Get all active subscription plans."""
-        # Use Beanie's find method instead of SQLAlchemy query
-        plans = await SubscriptionPlanModel.find(
+        return await SubscriptionPlanModel.find(
             SubscriptionPlanModel.is_active == True
         ).sort("+price_monthly").to_list()
-        return plans
     
     async def get_plan_by_name(self, plan_name: str) -> Optional[SubscriptionPlanModel]:
         """Get a subscription plan by name."""
-        # Use Beanie's find_one method
         return await SubscriptionPlanModel.find_one(
             SubscriptionPlanModel.name == plan_name,
             SubscriptionPlanModel.is_active == True
         )
     
-    def get_user_subscription(self, user: User) -> Optional[UserSubscription]:
+    async def get_user_subscription(self, user: User) -> Optional[UserSubscription]:
         """Get user's current active subscription."""
-        return (
-            self.db.query(UserSubscription)
-            .filter(UserSubscription.user_id == user.id)
-            .filter(UserSubscription.status == "active")
-            .first()
+        return await UserSubscription.find_one(
+            UserSubscription.user_id == user.id,
+            UserSubscription.status == "active"
         )
     
-    def get_user_plan(self, user: User) -> SubscriptionPlanModel:
+    async def get_user_plan(self, user: User) -> SubscriptionPlanModel:
         """Get user's current plan, defaulting to free."""
-        subscription = self.get_user_subscription(user)
+        subscription = await self.get_user_subscription(user)
         if subscription:
-            return subscription.plan
+            # Need to fetch the plan details as UserSubscription only stores plan_id
+            plan = await SubscriptionPlanModel.get(subscription.plan_id)
+            if plan:
+                return plan
         
         # Return free plan as default
-        free_plan = self.get_plan_by_name("free")
+        free_plan = await self.get_plan_by_name("free")
         if not free_plan:
             # Create default free plan if it doesn't exist
-            free_plan = self._create_default_free_plan()
+            free_plan = await self._create_default_free_plan()
         
         return free_plan
     
-    def _create_default_free_plan(self) -> SubscriptionPlanModel:
+    async def _create_default_free_plan(self) -> SubscriptionPlanModel:
         """Create a default free plan."""
         free_plan = SubscriptionPlanModel(
             name="free",
@@ -68,22 +66,20 @@ class SubscriptionService:
             },
             is_active=True
         )
-        self.db.add(free_plan)
-        self.db.commit()
-        self.db.refresh(free_plan)
+        await free_plan.insert()
         return free_plan
     
-    def subscribe_user_to_plan(self, user: User, plan_name: str, stripe_subscription_id: Optional[str] = None) -> UserSubscription:
+    async def subscribe_user_to_plan(self, user: User, plan_name: str, stripe_subscription_id: Optional[str] = None) -> UserSubscription:
         """Subscribe user to a new plan."""
-        plan = self.get_plan_by_name(plan_name)
+        plan = await self.get_plan_by_name(plan_name)
         if not plan:
             raise ValueError(f"Plan '{plan_name}' not found")
         
         # Deactivate existing subscription
-        existing_subscription = self.get_user_subscription(user)
+        existing_subscription = await self.get_user_subscription(user)
         if existing_subscription:
             existing_subscription.status = "cancelled"
-            self.db.add(existing_subscription)
+            await existing_subscription.save()
         
         # Calculate billing period
         now = datetime.now(timezone.utc)
@@ -100,20 +96,17 @@ class SubscriptionService:
             current_period_end=period_end
         )
         
-        self.db.add(new_subscription)
-        self.db.commit()
-        self.db.refresh(new_subscription)
-        
+        await new_subscription.insert()
         return new_subscription
     
-    def upgrade_user_subscription(self, user: User, new_plan_name: str) -> UserSubscription:
+    async def upgrade_user_subscription(self, user: User, new_plan_name: str) -> UserSubscription:
         """Upgrade user's subscription to a higher plan."""
-        new_plan = self.get_plan_by_name(new_plan_name)
+        new_plan = await self.get_plan_by_name(new_plan_name)
         if not new_plan:
             raise ValueError(f"Plan '{new_plan_name}' not found")
         
-        current_subscription = self.get_user_subscription(user)
-        current_plan = self.get_user_plan(user)
+        current_subscription = await self.get_user_subscription(user)
+        current_plan = await self.get_user_plan(user)
         
         # Validate upgrade (new plan should be more expensive)
         if new_plan.price_monthly <= current_plan.price_monthly:
@@ -124,22 +117,20 @@ class SubscriptionService:
             current_subscription.plan_id = new_plan.id
             current_subscription.status = "active"
             # Keep the same billing period for simplicity
-            self.db.add(current_subscription)
-            self.db.commit()
-            self.db.refresh(current_subscription)
+            await current_subscription.save()
             return current_subscription
         else:
             # Create new subscription
-            return self.subscribe_user_to_plan(user, new_plan_name)
+            return await self.subscribe_user_to_plan(user, new_plan_name)
     
-    def downgrade_user_subscription(self, user: User, new_plan_name: str) -> UserSubscription:
+    async def downgrade_user_subscription(self, user: User, new_plan_name: str) -> UserSubscription:
         """Downgrade user's subscription to a lower plan."""
-        new_plan = self.get_plan_by_name(new_plan_name)
+        new_plan = await self.get_plan_by_name(new_plan_name)
         if not new_plan:
             raise ValueError(f"Plan '{new_plan_name}' not found")
         
-        current_subscription = self.get_user_subscription(user)
-        current_plan = self.get_user_plan(user)
+        current_subscription = await self.get_user_subscription(user)
+        current_plan = await self.get_user_plan(user)
         
         # Validate downgrade (new plan should be less expensive)
         if new_plan.price_monthly >= current_plan.price_monthly:
@@ -149,28 +140,25 @@ class SubscriptionService:
             # Update existing subscription
             current_subscription.plan_id = new_plan.id
             current_subscription.status = "active"
-            self.db.add(current_subscription)
-            self.db.commit()
-            self.db.refresh(current_subscription)
+            await current_subscription.save()
             return current_subscription
         else:
             # Create new subscription (shouldn't happen, but handle gracefully)
-            return self.subscribe_user_to_plan(user, new_plan_name)
+            return await self.subscribe_user_to_plan(user, new_plan_name)
     
-    def cancel_user_subscription(self, user: User) -> bool:
+    async def cancel_user_subscription(self, user: User) -> bool:
         """Cancel user's subscription (move to free plan)."""
-        current_subscription = self.get_user_subscription(user)
+        current_subscription = await self.get_user_subscription(user)
         if current_subscription:
             current_subscription.status = "cancelled"
-            self.db.add(current_subscription)
-            self.db.commit()
+            await current_subscription.save()
             return True
         return False
     
-    def get_subscription_status(self, user: User) -> Dict[str, Any]:
+    async def get_subscription_status(self, user: User) -> Dict[str, Any]:
         """Get detailed subscription status for a user."""
-        subscription = self.get_user_subscription(user)
-        plan = self.get_user_plan(user)
+        subscription = await self.get_user_subscription(user)
+        plan = await self.get_user_plan(user)
         
         if subscription:
             return {
@@ -208,7 +196,7 @@ class SubscriptionService:
     
     async def compare_plans(self) -> Dict[str, Any]:
         """Get a comparison of all available plans."""
-        plans = await self.get_all_plans()  # Added await
+        plans = await self.get_all_plans()
         
         comparison = {
             "plans": [],
@@ -235,10 +223,10 @@ class SubscriptionService:
         comparison["features"] = list(comparison["features"])
         return comparison
     
-    def get_upgrade_options(self, user: User) -> List[Dict[str, Any]]:
+    async def get_upgrade_options(self, user: User) -> List[Dict[str, Any]]:
         """Get available upgrade options for a user."""
-        current_plan = self.get_user_plan(user)
-        all_plans = self.get_all_plans()
+        current_plan = await self.get_user_plan(user)
+        all_plans = await self.get_all_plans()
         
         upgrade_options = []
         for plan in all_plans:
@@ -256,7 +244,7 @@ class SubscriptionService:
         
         return upgrade_options
     
-    def handle_subscription_webhook(self, event_type: str, event_data: Dict[str, Any]) -> bool:
+    async def handle_subscription_webhook(self, event_type: str, event_data: Dict[str, Any]) -> bool:
         """Handle Stripe webhook events (stub for now)."""
         # This would integrate with Stripe webhooks
         # For now, just log that we received the event

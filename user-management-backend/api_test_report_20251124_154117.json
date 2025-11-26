@@ -1,0 +1,259 @@
+{
+  "timestamp": "2025-11-24T15:41:17.493021",
+  "summary": {
+    "total": 36,
+    "passed": 2,
+    "failed": 34,
+    "errors": 0,
+    "skipped": 0,
+    "success_rate": 5.555555555555555
+  },
+  "results": [
+    {
+      "name": "Root Endpoint",
+      "status": "PASS",
+      "status_code": 200,
+      "expected_status": 200,
+      "response": "OK"
+    },
+    {
+      "name": "Health Check",
+      "status": "PASS",
+      "status_code": 200,
+      "expected_status": 200,
+      "response": "OK"
+    },
+    {
+      "name": "List OAuth Providers",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Register User",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Login User (JSON)",
+      "status": "FAIL"
+    },
+    {
+      "name": "Login User (Form)",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Get Current User Info",
+      "status": "FAIL",
+      "status_code": 401,
+      "expected_status": 200,
+      "response": "{\"detail\":\"401: Could not validate credentials using Authorization header present but missing credentials attribute. Please provide a valid JWT token or API key.\"}"
+    },
+    {
+      "name": "Get VS Code Configuration",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Get My Profile",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Update My Profile",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Get My API Keys",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Create My API Key",
+      "status": "FAIL"
+    },
+    {
+      "name": "List Subscription Plans",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Compare Plans",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Get Current Subscription",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Get Usage Stats",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Get Upgrade Options",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Get Payment Methods",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Get Token Balance",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Get Token Usage",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Get Token Limits",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Get Token Usage Stats",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Reserve Tokens",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Get Model Pricing",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "List LLM Providers",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "List LLM Models",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "LLM Health Check",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Get All Templates",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Get Template Categories",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Get Template Stats",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Get My Templates",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Get Favorite Templates",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Get Payment Config",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Get User Orders",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "List API Keys",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "Validate Current Key",
+      "status": "FAIL",
+      "status_code": 404,
+      "expected_status": 200,
+      "response": "{\"detail\":\"Not Found\"}"
+    }
+  ]
+}

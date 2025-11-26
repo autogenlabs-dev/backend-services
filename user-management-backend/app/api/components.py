@@ -1,5 +1,6 @@
 """Component API endpoints for UI component management (mirroring templates)."""
 
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List, Optional, Dict, Any
 from beanie import PydanticObjectId
@@ -12,6 +13,7 @@ from ..schemas.component import ComponentCreateRequest, ComponentUpdateRequest
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/components", tags=["Components"])
+logger = logging.getLogger(__name__)
 
 @router.post("/", response_model=Dict[str, Any])
 async def create_component(
@@ -34,9 +36,17 @@ async def create_component(
             updated_at=datetime.now(timezone.utc)
         )
         await component.insert()
+        
+        # Convert to dict for response
+        component_dict = component.to_dict()
+        component_id = component_dict.get('id')
+        
+        logger.info(f"Component created successfully: {component_id}")
+        logger.debug(f"Component data: {component_dict}")
+        
         return {
             "success": True,
-            "component": component.to_dict(),
+            "component": component_dict,
             "message": "Component created successfully"
         }
     except Exception as e:
@@ -57,6 +67,8 @@ async def get_all_components(
 ):
     """Get all components with optional filtering and pagination."""
     try:
+        logger.info(f"🔍 GET /api/components/ called with params: category={category}, plan_type={plan_type}, limit={limit}, page={page}")
+        
         # Build filter query
         filter_query = {"is_active": True}
         
@@ -76,17 +88,24 @@ async def get_all_components(
                 {"short_description": {"$regex": search, "$options": "i"}}
             ]
         
+        logger.debug(f"📋 Filter query: {filter_query}")
+        
         # Get total count for pagination
         total_count = await Component.find(filter_query).count()
+        logger.info(f"📊 Total count matching filter: {total_count}")
         
         # Get paginated results
         skip = (page - 1) * limit
+        logger.debug(f"📄 Pagination: skip={skip}, limit={limit}")
+        
         components = await Component.find(filter_query).sort("-created_at").skip(skip).limit(limit).to_list()
+        logger.info(f"✅ Retrieved {len(components)} components from database")
         
         # Convert to dictionary format
         component_list = [component.to_dict() for component in components]
+        logger.debug(f"📝 Converted {len(component_list)} components to dict format")
         
-        return {
+        result = {
             "success": True,
             "components": component_list,
             "total": total_count,
@@ -100,7 +119,11 @@ async def get_all_components(
             }
         }
         
+        logger.info(f"🎉 Returning response with {len(component_list)} components")
+        return result
+        
     except Exception as e:
+        logger.error(f"❌ Error in get_all_components: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Failed to fetch components: {str(e)}"
@@ -165,15 +188,52 @@ async def get_component(component_id: str):
         if component_id in ['my', 'my-components', 'favorites', 'categories', 'stats']:
             raise HTTPException(status_code=404, detail="Route not found")
         
+        logger.info(f"🔍 GET /components/{component_id} - Starting request")
+        logger.debug(f"   Request component_id type: {type(component_id)}, value: '{component_id}'")
+        
         # Convert string ID to ObjectId
         if not PydanticObjectId.is_valid(component_id):
+            logger.warning(f"❌ Invalid component ID format: {component_id}")
             raise HTTPException(status_code=400, detail="Invalid component ID")
         
-        component = await Component.get(PydanticObjectId(component_id))
+        logger.debug(f"✅ Component ID is valid format")
+        
+        # Convert to ObjectId
+        object_id = PydanticObjectId(component_id)
+        logger.debug(f"🔄 Converted to ObjectId: {object_id}")
+        logger.debug(f"   ObjectId type: {type(object_id)}")
+        
+        # Fetch component using Beanie's get method
+        logger.debug(f"📡 Calling Component.get({object_id})")
+        component = await Component.find_one({"_id": object_id})
+        
         if not component:
+            logger.warning(f"❌ Component not found for ID: {component_id}")
             raise HTTPException(status_code=404, detail="Component not found")
         
-        return {"success": True, "component": component.to_dict()}
+        # Log what we actually got back
+        logger.info(f"✅ Component.get() returned a document")
+        logger.info(f"   Returned component ID: {component.id}")
+        logger.info(f"   Returned component title: '{component.title}'")
+        logger.info(f"   Returned component type: '{component.type}'")
+        logger.info(f"   Returned component language: '{component.language}'")
+        
+        # Verify the ID matches
+        if str(component.id) != component_id:
+            logger.error(f"🚨 ID MISMATCH DETECTED!")
+            logger.error(f"   Requested ID: {component_id}")
+            logger.error(f"   Returned ID:  {component.id}")
+            logger.error(f"   This indicates Component.get() returned the wrong document!")
+            raise HTTPException(status_code=500, detail="Database integrity error: ID mismatch")
+        else:
+            logger.debug(f"✅ ID verification passed: {str(component.id)} == {component_id}")
+        
+        # Convert to dict
+        component_dict = component.to_dict()
+        logger.debug(f"📝 Converted to dict, ID in dict: {component_dict.get('id')}")
+        
+        logger.info(f"✅ Returning component: {component_id}")
+        return {"success": True, "component": component_dict}
         
     except HTTPException:
         raise
@@ -189,16 +249,25 @@ async def update_component(
     request: ComponentUpdateRequest,
     current_user: User = Depends(get_current_user_unified)
 ):
-    component = await Component.get(component_id)
+    """Update a component."""
+    # Validate and convert ID
+    if not PydanticObjectId.is_valid(component_id):
+        raise HTTPException(status_code=400, detail="Invalid component ID")
+    
+    # Get component with proper ID conversion
+    component = await Component.get(PydanticObjectId(component_id))
     if not component:
         raise HTTPException(status_code=404, detail="Component not found")
     if str(component.user_id) != str(current_user.id):
         raise HTTPException(status_code=403, detail="Not authorized to update this component")
+    
+    # Update component fields
     update_data = {k: v for k, v in request.dict().items() if v is not None}
     for k, v in update_data.items():
         setattr(component, k, v)
     component.updated_at = datetime.now(timezone.utc)
     await component.save()
+    
     return {"success": True, "component": component.to_dict(), "message": "Component updated successfully"}
 
 @router.delete("/{component_id}", response_model=Dict[str, Any])
@@ -206,10 +275,17 @@ async def delete_component(
     component_id: str,
     current_user: User = Depends(get_current_user_unified)
 ):
-    component = await Component.get(component_id)
+    """Delete a component."""
+    # Validate and convert ID
+    if not PydanticObjectId.is_valid(component_id):
+        raise HTTPException(status_code=400, detail="Invalid component ID")
+    
+    # Get component with proper ID conversion
+    component = await Component.get(PydanticObjectId(component_id))
     if not component:
         raise HTTPException(status_code=404, detail="Component not found")
     if str(component.user_id) != str(current_user.id):
         raise HTTPException(status_code=403, detail="Not authorized to delete this component")
+    
     await component.delete()
     return {"success": True, "message": "Component deleted successfully"}
