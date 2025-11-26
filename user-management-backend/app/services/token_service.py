@@ -148,7 +148,7 @@ class TokenService:
             return await self._consume_sub_user_tokens(user, tokens, model_name, request_metadata, api_key_id)
         
         # Regular user token consumption
-        return self._consume_regular_user_tokens(user, tokens, model_name, request_metadata, api_key_id)
+        return await self._consume_regular_user_tokens(user, tokens, model_name, request_metadata, api_key_id)
     
     async def _consume_sub_user_tokens(
         self,
@@ -208,7 +208,7 @@ class TokenService:
             "parent_remaining": parent_user.tokens_remaining
         }
     
-    def _consume_regular_user_tokens(
+    async def _consume_regular_user_tokens(
         self,
         user: User,
         tokens: int,
@@ -231,9 +231,9 @@ class TokenService:
         user.tokens_remaining = max(0, user.monthly_limit - user.tokens_used)
         
         # Log usage
-        self._log_token_usage(user, tokens, model_name, request_metadata, api_key_id)
+        await self._log_token_usage(user, tokens, model_name, request_metadata, api_key_id)
         
-        self.db.commit()
+        await user.save()
         
         return True, {
             "success": True,
@@ -466,13 +466,13 @@ class TokenService:
             raise ValueError(f"Reservation {reservation_id} not found")
         
         reservation = self._reservations[reservation_id]
-        user = self.db.query(User).filter(User.id == reservation["user_id"]).first()
+        user = await User.get(reservation["user_id"])
         
         if not user:
             raise ValueError("User not found for reservation")
         
         # Consume the actual tokens used
-        success, result = self.consume_tokens(
+        success, result = await self.consume_tokens(
             user=user,
             tokens=actual_tokens,
             model_name=reservation["metadata"].get("model", "unknown"),

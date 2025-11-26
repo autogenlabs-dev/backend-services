@@ -116,20 +116,25 @@ app.add_middleware(
     secret_key=settings.jwt_secret_key
 )
 
-# Add CORS middleware
+# Add CORS middleware with explicit origins and regex
+# Explicit origins for production domains
+allowed_origins = [
+    "https://codemurf.com",
+    "https://www.codemurf.com",
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:8080",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://codemurf.com",  # Production frontend
-        "http://localhost:3000",   # Development frontend
-        "https://www.codemurf.com",  # Production frontend (www)
-        "http://localhost:3001",   # Test frontend
-        "http://localhost:8080"    # Alternative development port
-    ],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_origins=allowed_origins,  # Explicit origins
+    allow_origin_regex=r"vscode-webview://.*",  # Allow vscode-webview
+    allow_credentials=True,  # Allow credentials for authenticated requests  
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
     expose_headers=["*"],
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
 
 # Custom middleware for performance monitoring and rate limit headers
@@ -218,6 +223,10 @@ app.include_router(components.router, prefix="/api")
 app.include_router(extension_auth.router, prefix="/api")
 app.include_router(debug.router, prefix="/api")
 app.include_router(verify.router, prefix="/api")
+
+# Backward compatibility: Mount components router without /api prefix for frontend
+# This allows frontend to call /components directly
+app.include_router(components.router, tags=["Components (Legacy)"])
 
 # Import interaction routers
 try:
