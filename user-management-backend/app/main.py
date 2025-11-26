@@ -116,27 +116,6 @@ app.add_middleware(
     secret_key=settings.jwt_secret_key
 )
 
-# Add CORS middleware with explicit origins and regex
-# Explicit origins for production domains
-allowed_origins = [
-    "https://codemurf.com",
-    "https://www.codemurf.com",
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://localhost:8080",
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,  # Explicit origins
-    allow_origin_regex=r"vscode-webview://.*",  # Allow vscode-webview
-    allow_credentials=True,  # Allow credentials for authenticated requests  
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-    max_age=3600,  # Cache preflight requests for 1 hour
-)
-
 # Custom middleware for performance monitoring and rate limit headers
 class PerformanceAndRateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(
@@ -151,8 +130,8 @@ class PerformanceAndRateLimitMiddleware(BaseHTTPMiddleware):
         # Track request timing
         start_time = time.time()
         
-        # Apply rate limiting for non-health endpoints
-        if not request.url.path in ["/", "/health", "/docs", "/redoc", "/openapi.json"]:
+        # Apply rate limiting for non-health endpoints AND skip OPTIONS requests
+        if request.method != "OPTIONS" and not request.url.path in ["/", "/health", "/docs", "/redoc", "/openapi.json"]:
             try:
                 from .database import get_database
                 from .middleware.rate_limiting import rate_limit_middleware
@@ -190,8 +169,29 @@ class PerformanceAndRateLimitMiddleware(BaseHTTPMiddleware):
         # Return the response
         return response
 
-# Add custom middleware
+# Add custom middleware (Inner middleware)
 app.add_middleware(PerformanceAndRateLimitMiddleware)
+
+# Add CORS middleware with explicit origins and regex (Outer middleware - runs first)
+# Explicit origins for production domains
+allowed_origins = [
+    "https://codemurf.com",
+    "https://www.codemurf.com",
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:8080",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,  # Explicit origins
+    allow_origin_regex=r"vscode-webview://.*",  # Allow vscode-webview
+    allow_credentials=True,  # Allow credentials for authenticated requests  
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,  # Cache preflight requests for 1 hour
+)
 
 # Register OAuth clients
 register_oauth_clients()
