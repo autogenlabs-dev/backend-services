@@ -173,14 +173,41 @@ class PerformanceAndRateLimitMiddleware(BaseHTTPMiddleware):
 app.add_middleware(PerformanceAndRateLimitMiddleware)
 
 # Add CORS middleware with explicit origins and regex (Outer middleware - runs first)
-# Explicit origins for production domains
-allowed_origins = [
-    "https://codemurf.com",
-    "https://www.codemurf.com",
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://localhost:8080",
-]
+# Start with origins from config
+allowed_origins = list(settings.backend_cors_origins)
+
+# Add common development ports if in debug mode
+if settings.debug:
+    dev_origins = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002",
+        "http://localhost:4200",  # Angular default
+        "http://localhost:5173",  # Vite default
+        "http://localhost:8080",
+        "http://localhost:8081",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:8080",
+    ]
+    for origin in dev_origins:
+        if origin not in allowed_origins:
+            allowed_origins.append(origin)
+
+# Allow environment variable to add additional origins (for production without code changes)
+import os
+extra_origins = os.getenv("CORS_EXTRA_ORIGINS", "")
+if extra_origins:
+    for origin in extra_origins.split(","):
+        origin = origin.strip()
+        if origin and origin not in allowed_origins:
+            allowed_origins.append(origin)
+
+# Log CORS origins for debugging
+print(f"🔧 CORS Configuration:")
+print(f"   - Allowed Origins: {allowed_origins}")
+print(f"   - Debug Mode: {settings.debug}")
 
 app.add_middleware(
     CORSMiddleware,
