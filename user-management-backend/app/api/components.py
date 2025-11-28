@@ -37,11 +37,22 @@ async def create_component(
         )
         await component.insert()
         
+        # Refresh to ensure ID is populated
+        await component.save()
+        
+        # Verify ID exists
+        if not component.id:
+            logger.error("❌ Component insert succeeded but ID is None")
+            raise HTTPException(
+                status_code=500,
+                detail="Component created but ID was not generated"
+            )
+        
         # Convert to dict for response
         component_dict = component.to_dict()
         component_id = component_dict.get('id')
         
-        logger.info(f"Component created successfully: {component_id}")
+        logger.info(f"✅ Component created successfully with ID: {component_id}")
         logger.debug(f"Component data: {component_dict}")
         
         return {
@@ -50,6 +61,7 @@ async def create_component(
             "message": "Component created successfully"
         }
     except Exception as e:
+        logger.error(f"❌ Component creation failed: {str(e)}")
         raise HTTPException(
             status_code=400,
             detail=f"Failed to create component: {str(e)}"
