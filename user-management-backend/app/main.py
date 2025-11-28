@@ -183,6 +183,17 @@ class PerformanceAndRateLimitMiddleware(BaseHTTPMiddleware):
 # Start with origins from config
 allowed_origins = list(settings.backend_cors_origins)
 
+# SIMPLE FIX: Add both www and non-www versions of production domains
+production_domains = [
+    "https://codemurf.com",
+    "https://www.codemurf.com",
+    "http://codemurf.com",
+    "http://www.codemurf.com",
+]
+for domain in production_domains:
+    if domain not in allowed_origins:
+        allowed_origins.append(domain)
+
 # Add common development ports if in debug mode
 if settings.debug:
     dev_origins = [
