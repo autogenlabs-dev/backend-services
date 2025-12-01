@@ -11,10 +11,10 @@ from sqlalchemy.orm import Session
 import sys
 import logging
 
+from ..config import settings
 from ..database import get_database # Changed from get_db to get_database
 from ..models.user import User
 from .jwt import verify_token
-from .clerk_verifier import verify_clerk_token
 from .api_key_auth_clean import api_key_service
 from ..services.openrouter_keys import ensure_user_openrouter_key
 
@@ -71,26 +71,19 @@ async def get_current_user_unified(
             if result:
                 user, _ = result
         
-        # Otherwise treat as JWT token
+        # Otherwise treat as JWT token (from NextAuth.js)
         else:
-            auth_method = "Authorization header (JWT)"
+            auth_method = "Authorization header (JWT - NextAuth)"
             try:
-                # First try local JWT verification
-                payload = verify_token(auth_header)
-
-                # If local JWT verification failed, try Clerk JWKS verification
-                if not payload:
-                    try:
-                        payload = verify_clerk_token(auth_header)
-                        auth_method += " (verified via Clerk JWKS)"
-                        print(f"DEBUG [unified_auth]: Clerk token verified, payload: {payload}")
-                    except HTTPException as e:
-                        auth_method += f" - Clerk verification failed (HTTPException): {e.detail}"
-                        print(f"DEBUG [unified_auth]: Clerk verification HTTPException: {e.detail}")
-                    except Exception as e:
-                        auth_method += f" - Clerk verification failed: {str(e)}"
-                        print(f"DEBUG [unified_auth]: Clerk verification Exception: {str(e)}")
-
+                # Verify NextAuth JWT with standard JWT decode
+                from jose import jwt as jose_jwt, JWTError
+                
+                payload = jose_jwt.decode(
+                    auth_header,
+                    settings.jwt_secret_key,  # Same secret as NEXTAUTH_SECRET
+                    algorithms=["HS256"]
+                )
+                
                 if payload:
                     # Prefer email-based lookup for external tokens
                     user_id = payload.get("sub")

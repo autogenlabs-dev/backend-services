@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.database import get_database as get_db
 from app.auth.dependencies import get_current_user
 from app.auth.unified_auth import get_current_user_unified
-from app.auth.api_key_auth import (
+from app.auth.api_key_auth_clean import (
     api_key_service,
     ApiKeyCreate,
     ApiKeyResponse,

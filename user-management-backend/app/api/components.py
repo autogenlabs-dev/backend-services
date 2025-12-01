@@ -21,6 +21,11 @@ async def create_component(
     current_user: User = Depends(get_current_user_unified)
 ):
     """Create a new component."""
+    logger.info(f"🔨 POST /api/components/ - Starting component creation")
+    logger.debug(f"   User ID: {current_user.id}")
+    logger.debug(f"   Component title: {request.title}")
+    logger.debug(f"   Component category: {request.category}")
+    
     # Allow all authenticated users to create components
     # if not (getattr(current_user, 'can_publish_content', False) or current_user.role == UserRole.ADMIN):
     #     raise HTTPException(
@@ -29,39 +34,66 @@ async def create_component(
     #     )
     
     try:
-        component = Component(
-            **request.dict(),
-            user_id=current_user.id,  # Keep as PydanticObjectId, not string
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc)
-        )
-        await component.insert()
+        # Create component with explicit field mapping
+        logger.debug("📦 Creating component instance...")
+        component_data = request.dict()
+        component_data['user_id'] = current_user.id
+        component_data['created_at'] = datetime.now(timezone.utc)
+        component_data['updated_at'] = datetime.now(timezone.utc)
         
-        # Refresh to ensure ID is populated
-        await component.save()
+        logger.debug(f"   Component data keys: {list(component_data.keys())}")
+        
+        component = Component(**component_data)
+        
+        # Log before insert
+        logger.debug("💾 Inserting component into database...")
+        logger.debug(f"   Collection: {Component.Settings.name}")
+        
+        # Use insert instead of save for new documents
+        result = await component.insert()
+        
+        logger.info(f"✅ Component inserted, checking result...")
+        logger.debug(f"   Insert result type: {type(result)}")
+        logger.debug(f"   Component ID after insert: {component.id}")
         
         # Verify ID exists
         if not component.id:
             logger.error("❌ Component insert succeeded but ID is None")
+            logger.error(f"   Component object: {component}")
             raise HTTPException(
                 status_code=500,
                 detail="Component created but ID was not generated"
             )
         
+        # Verify it was actually saved by fetching it back
+        logger.debug("🔍 Verifying component was saved...")
+        saved_component = await Component.get(component.id)
+        if not saved_component:
+            logger.error(f"❌ Component {component.id} was not found after insert!")
+            raise HTTPException(
+                status_code=500,
+                detail="Component insert reported success but document not found in database"
+            )
+        
+        logger.info(f"✅ Component verified in database with ID: {saved_component.id}")
+        
         # Convert to dict for response
-        component_dict = component.to_dict()
+        component_dict = saved_component.to_dict()
         component_id = component_dict.get('id')
         
         logger.info(f"✅ Component created successfully with ID: {component_id}")
-        logger.debug(f"Component data: {component_dict}")
+        logger.debug(f"   Component dict keys: {list(component_dict.keys())}")
         
         return {
             "success": True,
             "component": component_dict,
             "message": "Component created successfully"
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"❌ Component creation failed: {str(e)}")
+        logger.error(f"❌ Component creation failed: {str(e)}", exc_info=True)
+        logger.error(f"   Exception type: {type(e)}")
         raise HTTPException(
             status_code=400,
             detail=f"Failed to create component: {str(e)}"

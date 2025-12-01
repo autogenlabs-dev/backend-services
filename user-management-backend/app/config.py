@@ -90,10 +90,5 @@ class Settings(BaseSettings):
     pro_rate_limit_per_minute: int = 300
     enterprise_rate_limit_per_minute: int = 1000
 
-    # Clerk configuration (for verifying frontend tokens)
-    clerk_issuer: str = "https://api.clerk.com"
-    clerk_jwks_url: str = "https://api.clerk.com/.well-known/jwks.json"
-    clerk_secret_key: str | None = None  # Optional: required if using Clerk server SDK
-
 
 settings = Settings()

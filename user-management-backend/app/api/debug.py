@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from ..config import settings
-from app.auth.clerk_verifier import verify_clerk_token
+# from app.auth.clerk_verifier import verify_clerk_token  # Removed - not using Clerk
 
 router = APIRouter()
 
