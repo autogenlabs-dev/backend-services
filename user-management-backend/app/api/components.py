@@ -113,8 +113,8 @@ async def get_all_components(
     try:
         logger.info(f"🔍 GET /api/components/ called with params: category={category}, plan_type={plan_type}, limit={limit}, page={page}")
         
-        # Build filter query
-        filter_query = {"is_active": True}
+        # Build filter query - only show approved AND active components in public listing
+        filter_query = {"is_active": True, "approval_status": "approved"}
         
         if category:
             filter_query["category"] = category

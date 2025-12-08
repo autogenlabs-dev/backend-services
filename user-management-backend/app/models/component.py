@@ -31,6 +31,9 @@ class Component(Document):
     is_available_for_dev: bool = True
     featured: bool = False
     code: Optional[Union[str, Dict[str, str]]] = None
+    html_code: Optional[str] = None
+    css_code: Optional[str] = None
+    preview_code: Optional[str] = None
     readme_content: Optional[str] = None
     user_id: Optional[PydanticObjectId] = None
     
@@ -143,5 +146,10 @@ class Component(Document):
             
         # Handle readme_content
         data['readme_content'] = self.readme_content
+        
+        # Handle html_code and css_code for live preview
+        data['html_code'] = self.html_code
+        data['css_code'] = self.css_code
+        data['preview_code'] = self.preview_code
         
         return data
