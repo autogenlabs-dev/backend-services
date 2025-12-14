@@ -1,0 +1,15 @@
+time="2025-12-13T11:02:56+05:30" level=warning msg="C:\\Users\\Asus\\Desktop\\backend-services\\user-management-backend\\docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Network user_management_network  Creating
+ Network user_management_network  Created
+ Container user-management-backend-mongodb-1  Creating
+ Container user-management-backend-redis-1  Creating
+ Container user-management-backend-mongodb-1  Created
+ Container user-management-backend-redis-1  Created
+ Container user-management-backend-api-1  Creating
+ Container user-management-backend-api-1  Created
+ Container user-management-backend-redis-1  Starting
+ Container user-management-backend-mongodb-1  Starting
+ Container user-management-backend-redis-1  Started
+ Container user-management-backend-mongodb-1  Started
+ Container user-management-backend-api-1  Starting
+ Container user-management-backend-api-1  Started

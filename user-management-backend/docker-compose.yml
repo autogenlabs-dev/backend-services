@@ -7,14 +7,10 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=mongodb+srv://autogencodebuilder:DataOnline@autogen.jf0j0.mongodb.net/user_management_db?retryWrites=true&w=majority&connectTimeoutMS=60000&socketTimeoutMS=60000
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-production-secret-key-change-this}
+      - DATABASE_URL=mongodb://admin:password123@mongodb:27017/user_management_db?authSource=admin
+      - JWT_SECRET_KEY=your-super-secret-jwt-key-change-this-in-production
       - DEBUG=True
       - A4F_API_KEY=${A4F_API_KEY:-your-a4f-api-key}
-      # Clerk configuration for verifying frontend tokens (set to your instance)
-      - CLERK_JWKS_URL=${CLERK_JWKS_URL:-https://clerk.codemurf.com/.well-known/jwks.json}
-      - CLERK_ISSUER=${CLERK_ISSUER:-https://clerk.codemurf.com}
-      - CLERK_AUDIENCE=${CLERK_AUDIENCE:-http://codemurf.com}
       - REDIS_URL=redis://redis:6379
       # Google OAuth Configuration
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-37099745939-4v685b95lv9r2306l1edq4s7dpnk05vd.apps.googleusercontent.com}
@@ -25,6 +21,11 @@ services:
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-e26733526b95de417f77a5d924b142cf2f80dfd5}
       # OpenRouter OAuth Configuration
       - OPENROUTER_PROVISIONING_API_KEY=${OPENROUTER_PROVISIONING_API_KEY:-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}
+      # Razorpay Configuration (TEST MODE)
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-rzp_test_Rqxl4tVNxYqSuO}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-f6dpsDsOyxnl25UsTudmow1N}
+    volumes:
+      - .:/app
     depends_on:
       - mongodb
       - redis
@@ -38,10 +39,11 @@ services:
   # MongoDB Database
   mongodb:
     image: mongo:8.0
-    # Host port mapping removed to avoid conflicts with a host MongoDB service.
-    # The MongoDB container still listens on 27017 internally and is
-    # reachable by other services via the Docker network `user_management_network`.
+    ports:
+      - "27017:27017"
     environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password123
       - MONGO_INITDB_DATABASE=user_management_db
     volumes:
       - mongodb_data:/data/db
@@ -65,6 +67,21 @@ services:
       interval: 10s
       timeout: 3s
       retries: 3
+
+  # ngrok for local webhook testing (optional - comment out in production)
+  ngrok:
+    image: ngrok/ngrok:latest
+    restart: unless-stopped
+    command:
+      - "http"
+      - "api:8000"
+      - "--log=stdout"
+    ports:
+      - "4040:4040"  # ngrok web interface
+    depends_on:
+      - api
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN:-}  # Optional: add your ngrok auth token
 
 volumes:
   mongodb_data:

@@ -31,9 +31,9 @@ class Settings(BaseSettings):
     stripe_publishable_key: str = "pk_test_51RVi9b00tZAh2watbNFlPjw4jKS02yZbKHQ1t97GcyMTOGLwcL8QhzxDSGtGu2EAJP4DHcEWOkut5N0CCTnuqBgh00p44dvGCb"
     stripe_webhook_secret: str = "whsec_your_webhook_secret"
     
-    # Razorpay
-    razorpay_key_id: str = "rzp_test_1234567890"
-    razorpay_key_secret: str = "test_secret_key_1234567890"
+    # Razorpay (TEST MODE)
+    razorpay_key_id: str = "rzp_test_Rqxl4tVNxYqSuO"
+    razorpay_key_secret: str = "f6dpsDsOyxnl25UsTudmow1N"
     
     # Application
     app_name: str = "User Management Backend"

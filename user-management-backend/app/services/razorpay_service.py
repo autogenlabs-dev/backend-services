@@ -26,7 +26,7 @@ class RazorpayService:
     
     async def create_order(
         self, 
-        amount_usd: float, 
+        amount_inr: float, 
         plan_name: str, 
         user_email: str,
         user_id: str
@@ -35,7 +35,7 @@ class RazorpayService:
         Create a Razorpay order for a subscription plan.
         
         Args:
-            amount_usd: Amount in USD
+            amount_inr: Amount in INR
             plan_name: Name of the subscription plan
             user_email: User's email address
             user_id: User's ID
@@ -44,21 +44,18 @@ class RazorpayService:
             Dict containing order details
         """
         try:
-            # Convert USD to INR (approximate rate)
-            usd_to_inr_rate = 85  # This should be fetched from a live API in production
-            amount_inr = amount_usd * usd_to_inr_rate
-            amount_paisa = int(amount_inr * 100)  # Razorpay uses paisa
+            # Convert INR to paisa (Razorpay uses paisa)
+            amount_paisa = int(amount_inr * 100)
             
             # Create order data
             order_data = {
                 "amount": amount_paisa,
                 "currency": "INR",
-                "receipt": f"rcpt_{user_id}_{plan_name}_{int(datetime.now().timestamp())}",
+                "receipt": f"rcpt_{user_id[-8:]}_{plan_name[:10]}_{int(datetime.now().timestamp())}",
                 "notes": {
                     "plan_name": plan_name,
                     "user_email": user_email,
                     "user_id": user_id,
-                    "amount_usd": str(amount_usd),
                     "amount_inr": str(amount_inr)
                 }
             }
@@ -67,19 +64,27 @@ class RazorpayService:
             order = self.client.order.create(data=order_data)
             
             # Store order in database
-            await self._store_order(order, user_id, plan_name, amount_usd, amount_inr)
+            await self._store_order(order, user_id, plan_name, amount_inr)
             
             return {
                 "order_id": order["id"],
                 "amount": order["amount"],
                 "currency": order["currency"],
-                "amount_usd": amount_usd,
                 "amount_inr": amount_inr,
                 "key_id": settings.razorpay_key_id
             }
             
         except Exception as e:
-            logger.error(f"Failed to create Razorpay order: {str(e)}")
+            error_msg = f"Failed to create Razorpay order: {str(e)}"
+            logger.error(error_msg)
+            # Write to file for debugging
+            try:
+                with open("razorpay_error.log", "a") as f:
+                    f.write(f"{datetime.now()}: {error_msg}\n")
+                    import traceback
+                    f.write(traceback.format_exc() + "\n")
+            except:
+                pass
             raise Exception(f"Payment order creation failed: {str(e)}")
     
     async def verify_payment(
@@ -171,7 +176,6 @@ class RazorpayService:
         order: Dict[str, Any], 
         user_id: str, 
         plan_name: str, 
-        amount_usd: float, 
         amount_inr: float
     ):
         """Store order details in database."""
@@ -180,7 +184,6 @@ class RazorpayService:
                 "razorpay_order_id": order["id"],
                 "user_id": user_id,
                 "plan_name": plan_name,
-                "amount_usd": amount_usd,
                 "amount_inr": amount_inr,
                 "amount_paisa": order["amount"],
                 "currency": order["currency"],

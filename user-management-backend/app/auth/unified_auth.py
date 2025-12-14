@@ -71,93 +71,54 @@ async def get_current_user_unified(
             if result:
                 user, _ = result
         
-        # Otherwise treat as JWT token (from NextAuth.js)
+        # Otherwise treat as JWT token
         else:
-            auth_method = "Authorization header (JWT - NextAuth)"
+            auth_method = "Authorization header (JWT)"
             try:
-                # Verify NextAuth JWT with standard JWT decode
                 from jose import jwt as jose_jwt, JWTError
                 
                 payload = jose_jwt.decode(
                     auth_header,
-                    settings.jwt_secret_key,  # Same secret as NEXTAUTH_SECRET
+                    settings.jwt_secret_key,
                     algorithms=["HS256"]
                 )
                 
                 if payload:
-                    # Prefer email-based lookup for external tokens
                     user_id = payload.get("sub")
-                    user = None
-                    print(f"DEBUG [unified_auth]: Looking up user with sub: {user_id}")
-                    # Try by user id first when present
-                    if user_id:
+                    email = payload.get("email")
+                    print(f"DEBUG [unified_auth]: JWT payload - sub: {user_id}, email: {email}")
+                    
+                    # Try to find user by email first (most reliable)
+                    if email:
+                        user = await User.find_one(User.email == email)
+                        print(f"DEBUG [unified_auth]: User lookup by email result: {user}")
+                    
+                    # If not found by email, try by user_id
+                    if not user and user_id:
                         try:
                             user = await User.get(user_id)
                         except Exception:
                             user = None
-
-                    # If not found by id, try email (common for Clerk tokens)
+                    
+                    # Create user if not found (auto-registration)
+                    if not user and email:
+                        name = payload.get("name") or email.split("@")[0]
+                        user = User(
+                            email=email,
+                            name=name,
+                            is_active=True
+                        )
+                        await user.insert()
+                        print(f"DEBUG [unified_auth]: Created new user: {email}")
+                    
                     if not user:
-                        email = payload.get("email")
-                        print(f"DEBUG [unified_auth]: Email from payload: {email}")
-                        if email:
-                            user = await User.find_one(User.email == email)
-                            print(f"DEBUG [unified_auth]: User lookup by email result: {user}")
-                        
-                        # If no email in token, use placeholder email format (for Clerk tokens)
-                        if not email and user_id:
-                            placeholder_email = f"{user_id}@clerk.user"
-                            print(f"DEBUG [unified_auth]: Using placeholder email: {placeholder_email}")
-                            user = await User.find_one(User.email == placeholder_email)
-                            print(f"DEBUG [unified_auth]: User lookup by placeholder result: {user}")
-
-                    # If still not found, create a minimal user record
-                    if not user:
-                        email = payload.get("email")
-                        # Use placeholder email if no email in token (for Clerk)
-                        if not email and user_id:
-                            email = f"{user_id}@clerk.user"
-                        
-                        name = payload.get("name") or payload.get("full_name") or payload.get("preferred_username")
-                        if email:
-                            user = User(
-                                email=email,
-                                name=name or email.split("@")[0],
-                                is_active=True
-                            )
-                            await user.insert()
-
-                    if user:
-                        # Map Clerk public_metadata to local roles/capabilities (if present)
-                        try:
-                            public_md = payload.get("public_metadata") or payload.get("metadata") or {}
-                            if isinstance(public_md, str):
-                                import json as _json
-                                try:
-                                    public_md = _json.loads(public_md)
-                                except Exception:
-                                    public_md = {}
-
-                            role_md = public_md.get("role") or public_md.get("role_name")
-                            if role_md:
-                                from ..models.user import UserRole
-                                role_md_l = str(role_md).lower()
-                                if role_md_l == "admin" and user.role != UserRole.ADMIN:
-                                    user.role = UserRole.ADMIN
-                                    await user.save()
-                                if role_md_l in ("developer", "dev") and not getattr(user, 'can_publish_content', False):
-                                    user.can_publish_content = True
-                                    await user.save()
-                        except Exception:
-                            pass
-                        if not getattr(user, "is_active", True):
-                            auth_method += " - User found but inactive"
-                    else:
-                        auth_method += " - User not found or inactive"
+                        auth_method += " - User not found"
                 else:
                     auth_method += " - Token verification failed"
-            except (ValueError, TypeError) as e:
-                auth_method += f" - Exception during token processing: {str(e)}"
+            except JWTError as e:
+                auth_method += f" - JWT Error: {str(e)}"
+            except Exception as e:
+                auth_method += f" - Exception: {str(e)}"
     elif not user and credentials and not hasattr(credentials, 'credentials'):
         auth_method = "Authorization header present but missing credentials attribute"
     elif not user and not credentials:

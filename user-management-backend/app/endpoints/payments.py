@@ -12,7 +12,7 @@ from app.models.user import User
 from app.models.item_purchase import ItemPurchase, PurchaseStatus
 from app.models.shopping_cart import ShoppingCart, CartItem, CartItemType
 from app.services.payment_service import payment_service
-from app.middleware.auth import require_auth, get_current_user_from_token
+from app.auth.unified_auth import get_current_user_unified
 from app.utils.audit_logger import log_audit_event
 
 
@@ -55,7 +55,7 @@ class PurchaseHistoryResponse(BaseModel):
 @router.post("/payments/create-item-order")
 async def create_item_order(
     request: CreateItemOrderRequest,
-    current_user: User = Depends(require_auth)
+    current_user: User = Depends(get_current_user_unified)
 ):
     """Create Razorpay order for individual template/component purchase"""
     try:
@@ -81,7 +81,7 @@ async def create_item_order(
 @router.post("/payments/verify-item-purchase")
 async def verify_item_purchase(
     request: VerifyItemPurchaseRequest,
-    current_user: User = Depends(require_auth)
+    current_user: User = Depends(get_current_user_unified)
 ):
     """Verify Razorpay payment and grant access to purchased item"""
     try:
@@ -99,6 +99,8 @@ async def verify_item_purchase(
             "data": result
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to verify payment: {str(e)}")
 
@@ -108,7 +110,7 @@ async def get_user_purchased_items(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     item_type: Optional[str] = Query(None, description="Filter by item type"),
-    current_user: User = Depends(require_auth)
+    current_user: User = Depends(get_current_user_unified)
 ):
     """Get user's purchase history with pagination"""
     try:
@@ -141,7 +143,7 @@ async def get_user_purchased_items(
 @router.post("/cart/add", response_model=CartResponse)
 async def add_to_cart(
     request: AddToCartRequest,
-    current_user: User = Depends(require_auth)
+    current_user: User = Depends(get_current_user_unified)
 ):
     """Add item to shopping cart"""
     try:
@@ -155,21 +157,6 @@ async def add_to_cart(
         
         if not item:
             raise HTTPException(status_code=404, detail="Item not found")
-        
-        # Check if item is free
-        if item.plan_type.lower() == "free":
-            raise HTTPException(status_code=400, detail="Cannot add free items to cart")
-        
-        # Check if user already purchased this item
-        existing_purchase = await ItemPurchase.find_one({
-            "user_id": current_user.id,
-            "item_id": item.id,
-            "item_type": request.item_type,
-            "status": PurchaseStatus.COMPLETED
-        })
-        
-        if existing_purchase:
-            raise HTTPException(status_code=400, detail="Item already purchased")
         
         # Get or create cart
         cart = await ShoppingCart.find_one({"user_id": current_user.id})
@@ -225,7 +212,7 @@ async def add_to_cart(
 
 
 @router.get("/cart", response_model=CartResponse)
-async def get_cart(current_user: User = Depends(require_auth)):
+async def get_cart(current_user: User = Depends(get_current_user_unified)):
     """Get user's shopping cart"""
     try:
         cart = await ShoppingCart.find_one({"user_id": current_user.id})
@@ -253,7 +240,7 @@ async def get_cart(current_user: User = Depends(require_auth)):
 async def remove_from_cart(
     item_id: str,
     item_type: CartItemType,
-    current_user: User = Depends(require_auth)
+    current_user: User = Depends(get_current_user_unified)
 ):
     """Remove item from shopping cart"""
     try:
@@ -292,7 +279,7 @@ async def remove_from_cart(
 
 
 @router.post("/cart/checkout")
-async def checkout_cart(current_user: User = Depends(require_auth)):
+async def checkout_cart(current_user: User = Depends(get_current_user_unified)):
     """Process multiple item purchase from cart"""
     try:
         cart = await ShoppingCart.find_one({"user_id": current_user.id})
@@ -356,7 +343,7 @@ async def checkout_cart(current_user: User = Depends(require_auth)):
 @router.post("/cart/verify-purchase")
 async def verify_cart_purchase(
     request: VerifyItemPurchaseRequest,
-    current_user: User = Depends(require_auth)
+    current_user: User = Depends(get_current_user_unified)
 ):
     """Verify cart purchase payment"""
     try:
@@ -379,7 +366,7 @@ async def verify_cart_purchase(
 
 
 @router.post("/cart/clear")
-async def clear_cart(current_user: User = Depends(require_auth)):
+async def clear_cart(current_user: User = Depends(get_current_user_unified)):
     """Clear all items from cart"""
     try:
         cart = await ShoppingCart.find_one({"user_id": current_user.id})
@@ -407,7 +394,7 @@ async def clear_cart(current_user: User = Depends(require_auth)):
 
 
 @router.get("/cart/summary")
-async def get_cart_summary(current_user: User = Depends(require_auth)):
+async def get_cart_summary(current_user: User = Depends(get_current_user_unified)):
     """Get cart checkout summary"""
     try:
         cart = await ShoppingCart.find_one({"user_id": current_user.id})

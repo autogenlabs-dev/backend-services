@@ -26,6 +26,7 @@ from .api import (
 )
 from .api import debug
 from .api import verify
+from .api import admin_api_keys, webhooks
 from typing import Callable, Dict, Any
 import time
 import uvicorn
@@ -51,7 +52,11 @@ from app.models.template import (
 from app.models.component import (
     Component,
 )
-
+from app.models.item_purchase import ItemPurchase
+from app.models.developer_earnings import DeveloperEarnings, PayoutRequest
+from app.models.shopping_cart import ShoppingCart
+from app.models.audit_log import AuditLog
+from app.models.api_key_pool import ApiKeyPool
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -59,7 +64,7 @@ async def lifespan(app: FastAPI):
     # Startup: Initialize database and Beanie
     print("🔄 Connecting to database...")
     client = AsyncIOMotorClient(settings.database_url)
-    database = client["user_management_db"]  # Extract database name from URL
+    database = client.get_default_database()
     
     print("🔄 Initializing Beanie...")
     # Only import models that exist
@@ -79,9 +84,14 @@ async def lifespan(app: FastAPI):
                 TemplateLike,
                 TemplateDownload,
                 TemplateView,
-                TemplateComment
-                    ,
-                    Component
+                TemplateComment,
+                Component,
+                ItemPurchase,
+                DeveloperEarnings,
+                PayoutRequest,
+                ShoppingCart,
+                AuditLog,
+                ApiKeyPool
             ]
         )
         print("✅ Database connected and initialized")
@@ -268,14 +278,33 @@ app.include_router(api_keys.router, prefix="/api")
 app.include_router(payments.router, prefix="/api")
 app.include_router(templates.router, prefix="/api")
 app.include_router(components.router, prefix="/api")
+# Include item payments router (from endpoints)
+from .endpoints import payments as item_payments
+app.include_router(item_payments.router, prefix="/api")
 # Extension authentication endpoints (Clerk-compatible API)
 app.include_router(extension_auth.router, prefix="/api")
 app.include_router(debug.router, prefix="/api")
 app.include_router(verify.router, prefix="/api")
 
+# Admin API key pool management
+app.include_router(admin_api_keys.router, prefix="/api")
+
+# Webhook endpoints (no /api prefix for external access)
+app.include_router(webhooks.router)
+
 # Backward compatibility: Mount components router without /api prefix for frontend
 # This allows frontend to call /components directly
 app.include_router(components.router, tags=["Components (Legacy)"])
+
+# Legacy routes for frontend compatibility (without /api prefix)
+# Frontend calls /user/dashboard, /cart, /purchased-items directly
+app.include_router(users.router, prefix="", tags=["Users (Legacy)"])
+app.include_router(item_payments.router, prefix="", tags=["Payments (Legacy)"])
+
+# Additional legacy routes for exact path matching
+from .api import legacy as legacy_api
+app.include_router(legacy_api.router, prefix="", tags=["Legacy API"])
+
 
 # Import interaction routers
 try:

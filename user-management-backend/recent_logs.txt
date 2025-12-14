@@ -1,0 +1,89 @@
+﻿DEBUG [unified_auth]: Function called
+DEBUG [unified_auth]: credentials present: True
+DEBUG [unified_auth]: credentials.credentials[:20]: eyJhbGciOiJIUzI1NiIs
+DEBUG [unified_auth]: Looking up user with sub: 118026469208455084754
+DEBUG [unified_auth]: Email from payload: downshiftrides@gmail.com
+DEBUG [unified_auth]: User lookup by email result: downshiftrides@gmail.com
+DEBUG [unified_auth]: Checking OpenRouter key for user downshiftrides@gmail.com, current key: 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
+DEBUG [unified_auth]: User downshiftrides@gmail.com already has OpenRouter key
+INFO:     172.19.0.1:47396 - "POST /api/payments/create-order HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:51508 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33972 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37430 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40028 - "GET /api/templates HTTP/1.1" 307 Temporary Redirect
+INFO:     172.19.0.1:40040 - "GET /api/templates/ HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40028 - "GET /api/templates HTTP/1.1" 307 Temporary Redirect
+INFO:     172.19.0.1:40040 - "GET /api/templates/ HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40028 - "GET /api/templates HTTP/1.1" 307 Temporary Redirect
+INFO:     172.19.0.1:40040 - "GET /api/templates/ HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40028 - "GET /api/templates HTTP/1.1" 307 Temporary Redirect
+INFO:     172.19.0.1:40040 - "GET /api/templates/ HTTP/1.1" 200 OK
+INFO:     172.19.0.1:34946 - "GET /api/templates HTTP/1.1" 307 Temporary Redirect
+INFO:     172.19.0.1:34960 - "GET /api/templates/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36754 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:59844 - "GET /api/templates HTTP/1.1" 307 Temporary Redirect
+INFO:     172.19.0.1:59860 - "GET /api/templates/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:32988 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36846 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57838 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37778 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35612 - "GET /api/templates HTTP/1.1" 307 Temporary Redirect
+INFO:     172.19.0.1:35624 - "GET /api/templates/ HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35612 - "GET /api/templates HTTP/1.1" 307 Temporary Redirect
+INFO:     172.19.0.1:35612 - "GET /api/templates HTTP/1.1" 307 Temporary Redirect
+INFO:     172.19.0.1:35624 - "GET /api/templates/ HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35626 - "GET /api/templates/ HTTP/1.1" 200 OK
+INFO:     172.19.0.1:35612 - "GET /api/templates HTTP/1.1" 307 Temporary Redirect
+INFO:     172.19.0.1:35624 - "GET /api/templates/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49030 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60100 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34424 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:55860 - "GET /api/templates HTTP/1.1" 307 Temporary Redirect
+INFO:     172.19.0.1:55866 - "GET /api/templates/ HTTP/1.1" 200 OK
+DEBUG [unified_auth]: Function called
+DEBUG [unified_auth]: credentials present: True
+DEBUG [unified_auth]: credentials.credentials[:20]: eyJhbGciOiJIUzI1NiIs
+DEBUG [unified_auth]: Looking up user with sub: 118026469208455084754
+DEBUG [unified_auth]: Email from payload: downshiftrides@gmail.com
+DEBUG [unified_auth]: User lookup by email result: downshiftrides@gmail.com
+DEBUG [unified_auth]: Checking OpenRouter key for user downshiftrides@gmail.com, current key: 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
+DEBUG [unified_auth]: User downshiftrides@gmail.com already has OpenRouter key
+INFO:     172.19.0.1:34050 - "POST /api/payments/create-order HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:45054 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48522 - "GET /health HTTP/1.1" 200 OK
+≡ƒöä Closing database connection...
+Γ£à Database connection closed
+ΓÜá∩╕Å Redis connection failed: Error 111 connecting to localhost:6379. Connection refused.. Using fallback mode for rate limiting.
+≡ƒöº CORS Configuration:
+   - Allowed Origins: ['*', 'https://codemurf.com', 'https://www.codemurf.com', 'http://codemurf.com', 'http://www.codemurf.com', 'http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:4200', 'http://localhost:5173', 'http://localhost:8080', 'http://localhost:8081', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001', 'http://127.0.0.1:5173', 'http://127.0.0.1:8080']
+   - Debug Mode: True
+Γ£à OAuth clients registered
+Γ£à Static files mounted from /app/app/static
+Warning: Sub-users router not available
+≡ƒöä Connecting to database...
+≡ƒöä Initializing Beanie...
+Γ£à Database connected and initialized
+INFO:     127.0.0.1:43326 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54688 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:48038 - "GET /api/templates HTTP/1.1" 307 Temporary Redirect
+INFO:     172.19.0.1:48052 - "GET /api/templates/ HTTP/1.1" 200 OK
+INFO:     172.19.0.1:48038 - "GET /api/templates HTTP/1.1" 307 Temporary Redirect
+INFO:     172.19.0.1:48052 - "GET /api/templates/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44810 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38048 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39198 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.19.0.1:40824 - "GET /api/templates HTTP/1.1" 307 Temporary Redirect
+INFO:     172.19.0.1:40838 - "GET /api/templates/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38278 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43162 - "GET /health HTTP/1.1" 200 OK
+DEBUG [unified_auth]: Function called
+DEBUG [unified_auth]: credentials present: True
+DEBUG [unified_auth]: credentials.credentials[:20]: eyJhbGciOiJIUzI1NiIs
+DEBUG [unified_auth]: Looking up user with sub: 111714426223343664672
+DEBUG [unified_auth]: Email from payload: autogencodelabs@gmail.com
+DEBUG [unified_auth]: User lookup by email result: autogencodelabs@gmail.com
+DEBUG [unified_auth]: Checking OpenRouter key for user autogencodelabs@gmail.com, current key: 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
+DEBUG [unified_auth]: User autogencodelabs@gmail.com already has OpenRouter key
+INFO:     172.19.0.1:51410 - "POST /api/payments/create-order HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:45688 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45170 - "GET /health HTTP/1.1" 200 OK

@@ -19,6 +19,8 @@ class Component(Document):
     language: str
     difficulty_level: str
     plan_type: str
+    pricing_inr: int = 0
+    pricing_usd: int = 0
     short_description: str
     full_description: str
     preview_images: List[str] = Field(default_factory=list)

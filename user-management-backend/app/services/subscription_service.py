@@ -268,3 +268,192 @@ class SubscriptionService:
             pass
         
         return True
+
+
+# Plan-specific subscription handler
+class PlanSubscriptionService:
+    """
+    Enhanced subscription service for Codemurf payment plans.
+    Handles PAYG, Pro, Ultra subscriptions with API key management.
+    """
+    
+    PLAN_CONFIG = {
+        "payg": {
+            "price_inr": 850,
+            "price_usd": 10,
+            "openrouter_limit_usd": 10.0,
+            "requires_glm": False,
+            "requires_bytez": False,
+            "duration_days": None,  # Credits-based, no expiry
+        },
+        "pro": {
+            "price_inr": 299,
+            "price_usd": 3.50,
+            "openrouter_limit_usd": None,  # Unlimited
+            "requires_glm": True,
+            "requires_bytez": False,
+            "duration_days": 30,
+        },
+        "ultra": {
+            "price_inr": 899,
+            "price_usd": 10.50,
+            "openrouter_limit_usd": None,  # Unlimited
+            "requires_glm": True,
+            "requires_bytez": True,
+            "duration_days": 30,
+        }
+    }
+    
+    def __init__(self, db: AsyncIOMotorDatabase):
+        self.db = db
+    
+    async def activate_plan(self, user: User, plan_name: str, payment_id: str) -> Dict[str, Any]:
+        """
+        Activate a subscription plan for a user after successful payment.
+        
+        Returns activation result with api_keys status.
+        """
+        from ..models.api_key_pool import ApiKeyPool
+        from ..models.user import SubscriptionPlan
+        from .openrouter_keys import (
+            provision_openrouter_key_with_limit,
+            ensure_user_openrouter_key
+        )
+        
+        plan_name = plan_name.lower()
+        if plan_name not in self.PLAN_CONFIG:
+            raise ValueError(f"Invalid plan: {plan_name}")
+        
+        config = self.PLAN_CONFIG[plan_name]
+        now = datetime.now(timezone.utc)
+        
+        result = {
+            "plan": plan_name,
+            "api_keys": {"openrouter": False, "glm": False, "bytez": False}
+        }
+        
+        # Update user payment info
+        user.last_payment_id = payment_id
+        user.total_spent_inr += config["price_inr"]
+        user.subscription_plan = plan_name
+        
+        # Handle plan-specific logic
+        if plan_name == "payg":
+            # PAYG: Provision OpenRouter with $10 limit
+            # PAYG users stay on FREE tier but get credits
+            try:
+                await provision_openrouter_key_with_limit(user, limit_usd=config["openrouter_limit_usd"])
+                result["api_keys"]["openrouter"] = True
+                result["credits_added_usd"] = config["openrouter_limit_usd"]
+            except Exception as e:
+                print(f"Failed to provision PAYG OpenRouter key: {e}")
+        
+        elif plan_name in ["pro", "ultra"]:
+            # Set subscription dates
+            user.subscription_start_date = now
+            user.subscription_end_date = now + timedelta(days=config["duration_days"])
+            # Use proper enum value
+            user.subscription = SubscriptionPlan.PRO if plan_name == "pro" else SubscriptionPlan.ULTRA
+            
+            # Provision OpenRouter (unlimited)
+            try:
+                await ensure_user_openrouter_key(user)
+                result["api_keys"]["openrouter"] = True
+            except Exception as e:
+                print(f"Failed to provision OpenRouter key: {e}")
+            
+            # Assign GLM key from pool
+            if config["requires_glm"]:
+                glm_key = await self._assign_key_from_pool(user, "glm")
+                if glm_key:
+                    user.glm_api_key = glm_key
+                    result["api_keys"]["glm"] = True
+            
+            # Assign Bytez key from pool (Ultra only)
+            if config["requires_bytez"]:
+                bytez_key = await self._assign_key_from_pool(user, "bytez")
+                if bytez_key:
+                    user.bytez_api_key = bytez_key
+                    result["api_keys"]["bytez"] = True
+            
+            result["subscription_end_date"] = user.subscription_end_date.isoformat()
+        
+        user.updated_at = now
+        await user.save()
+        
+        result["role"] = plan_name
+        return result
+    
+    async def _assign_key_from_pool(self, user: User, key_type: str) -> Optional[str]:
+        """
+        Assign an API key to user from the pool.
+        Finds a key with capacity and assigns the user.
+        """
+        from ..models.api_key_pool import ApiKeyPool
+        
+        # Find available key with capacity
+        available_keys = await ApiKeyPool.find({
+            "key_type": key_type,
+            "is_active": True
+        }).to_list()
+        
+        for key in available_keys:
+            if key.has_capacity:
+                if key.assign_user(user.id):
+                    await key.save()
+                    return key.key_value
+        
+        # No available key found
+        print(f"Warning: No {key_type} key available for user {user.id}")
+        return None
+    
+    async def release_user_keys(self, user: User) -> None:
+        """
+        Release all API keys assigned to a user back to the pool.
+        Called when subscription expires.
+        """
+        from ..models.api_key_pool import ApiKeyPool
+        
+        # Find all keys assigned to this user
+        assigned_keys = await ApiKeyPool.find({
+            "assigned_user_ids": user.id
+        }).to_list()
+        
+        for key in assigned_keys:
+            key.release_user(user.id)
+            await key.save()
+        
+        # Clear user's API keys
+        user.glm_api_key = None
+        user.bytez_api_key = None
+        user.updated_at = datetime.now(timezone.utc)
+        await user.save()
+    
+    async def downgrade_user(self, user: User) -> None:
+        """
+        Downgrade user to free tier. Called when subscription expires.
+        """
+        from ..models.user import SubscriptionPlan
+        
+        # Release API keys back to pool
+        await self.release_user_keys(user)
+        
+        # Update user subscription
+        user.subscription = SubscriptionPlan.FREE
+        user.subscription_plan = None
+        user.subscription_start_date = None
+        user.subscription_end_date = None
+        user.updated_at = datetime.now(timezone.utc)
+        await user.save()
+    
+    async def get_expired_subscriptions(self) -> List[User]:
+        """Get all users with expired subscriptions."""
+        now = datetime.now(timezone.utc)
+        
+        expired_users = await User.find({
+            "subscription_end_date": {"$lt": now},
+            "subscription": {"$in": ["pro", "ultra"]}
+        }).to_list()
+        
+        return expired_users
+

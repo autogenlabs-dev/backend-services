@@ -180,6 +180,94 @@ class EmailNotificationService:
         #     return False
         
         return True
+    
+    # Subscription email notifications
+    async def send_subscription_activated_email(
+        self, 
+        user: User, 
+        plan_name: str,
+        end_date: Optional[str] = None
+    ) -> bool:
+        """Send email when subscription is activated."""
+        try:
+            user_name = getattr(user, 'name', None) or getattr(user, 'full_name', None) or user.email.split('@')[0]
+            if not self.smtp_configured:
+                print(f"\n📧 SUBSCRIPTION ACTIVATED (Mock)")
+                print(f"To: {user.email}")
+                print(f"Subject: Welcome to Codemurf {plan_name.upper()}! 🎉")
+                print(f"Hi {user_name},")
+                print(f"Your {plan_name.upper()} subscription is now active!")
+                if end_date:
+                    print(f"Valid until: {end_date}")
+                print(f"Enjoy your premium features!")
+                print(f"📧 END EMAIL\n")
+                return True
+            return True
+        except Exception as e:
+            print(f"Failed to send subscription activated email: {e}")
+            return False
+    
+    async def send_subscription_expiring_email(
+        self, 
+        user: User,
+        days_remaining: int = 3
+    ) -> bool:
+        """Send reminder email when subscription is about to expire."""
+        try:
+            user_name = getattr(user, 'name', None) or getattr(user, 'full_name', None) or user.email.split('@')[0]
+            if not self.smtp_configured:
+                print(f"\n📧 SUBSCRIPTION EXPIRING (Mock)")
+                print(f"To: {user.email}")
+                print(f"Subject: Your Codemurf subscription expires in {days_remaining} days")
+                print(f"Hi {user_name},")
+                print(f"Your subscription will expire in {days_remaining} days.")
+                print(f"Renew now to keep your premium features!")
+                print(f"📧 END EMAIL\n")
+                return True
+            return True
+        except Exception as e:
+            print(f"Failed to send subscription expiring email: {e}")
+            return False
+    
+    async def send_subscription_expired_email(self, user: User) -> bool:
+        """Send email when subscription has expired."""
+        try:
+            user_name = getattr(user, 'name', None) or getattr(user, 'full_name', None) or user.email.split('@')[0]
+            if not self.smtp_configured:
+                print(f"\n📧 SUBSCRIPTION EXPIRED (Mock)")
+                print(f"To: {user.email}")
+                print(f"Subject: Your Codemurf subscription has expired")
+                print(f"Hi {user_name},")
+                print(f"Your subscription has expired and you've been moved to the Free plan.")
+                print(f"Resubscribe anytime to regain access to premium features!")
+                print(f"📧 END EMAIL\n")
+                return True
+            return True
+        except Exception as e:
+            print(f"Failed to send subscription expired email: {e}")
+            return False
+    
+    async def send_payg_credits_added_email(
+        self, 
+        user: User, 
+        credits_usd: float
+    ) -> bool:
+        """Send email when PAYG credits are added."""
+        try:
+            user_name = getattr(user, 'name', None) or getattr(user, 'full_name', None) or user.email.split('@')[0]
+            if not self.smtp_configured:
+                print(f"\n📧 PAYG CREDITS ADDED (Mock)")
+                print(f"To: {user.email}")
+                print(f"Subject: ${credits_usd} credits added to your Codemurf account")
+                print(f"Hi {user_name},")
+                print(f"${credits_usd} has been added to your OpenRouter credits.")
+                print(f"Use them to access AI models on Codemurf!")
+                print(f"📧 END EMAIL\n")
+                return True
+            return True
+        except Exception as e:
+            print(f"Failed to send PAYG credits email: {e}")
+            return False
 
 
 # Global email service instance

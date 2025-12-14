@@ -56,6 +56,14 @@ class User(Document):
     is_sub_user: bool = False
     sub_user_permissions: Optional[Dict[str, Any]] = None
     sub_user_limits: Optional[Dict[str, Any]] = None
+    
+    # Payment and Subscription fields
+    bytez_api_key: Optional[str] = None  # Bytez API key for Ultra users
+    subscription_plan: Optional[str] = None  # "payg", "pro", "ultra"
+    subscription_start_date: Optional[datetime] = None
+    subscription_end_date: Optional[datetime] = None
+    last_payment_id: Optional[str] = None  # Last Razorpay payment ID
+    total_spent_inr: float = 0.0  # Total amount spent in INR
 
     class Settings:
         name = "users"

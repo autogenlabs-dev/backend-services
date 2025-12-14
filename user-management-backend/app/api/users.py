@@ -116,6 +116,30 @@ async def refresh_openrouter_key(
     return {"openrouter_api_key": key_value}
 
 
+@router.get("/me/credits")
+async def get_my_credits(
+    current_user: User = Depends(get_current_user_unified)
+):
+    """Get user's OpenRouter remaining credits (for PAYG users)."""
+    from ..services.openrouter_keys import get_openrouter_credits
+    
+    credits = await get_openrouter_credits(current_user)
+    
+    if credits is None:
+        return {
+            "success": True,
+            "has_credits": False,
+            "message": "No OpenRouter key found",
+            "credits": None
+        }
+    
+    return {
+        "success": True,
+        "has_credits": True,
+        "credits": credits
+    }
+
+
 @router.get("/me/managed-api-key", response_model=ManagedApiKeyAssignmentResponse)
 async def get_my_managed_api_key(
     current_user: User = Depends(get_current_user_unified)
@@ -291,3 +315,31 @@ async def user_name_matches(
         return {"count": 0, "message": "Current user has no name set."}
     count = await User.find(User.name == current_user.name).count() # Changed from db.query(User).filter(User.name == current_user.name).count()
     return {"count": count, "name": current_user.name}
+
+
+@router.get("/user/dashboard", tags=["User"])
+async def get_user_dashboard(
+    current_user: User = Depends(get_current_user_unified),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """Get user dashboard data including profile, subscription, and credits."""
+    from ..services.openrouter_keys import get_openrouter_credits
+    
+    # Get credits info
+    credits = await get_openrouter_credits(current_user)
+    
+    return {
+        "success": True,
+        "user": {
+            "id": str(current_user.id),
+            "email": current_user.email,
+            "name": current_user.name,
+            "subscription": current_user.subscription.value if current_user.subscription else "free",
+            "role": getattr(current_user, 'role', 'user'),
+            "is_active": current_user.is_active,
+            "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
+        },
+        "credits": credits,
+        "has_openrouter_key": bool(current_user.openrouter_api_key),
+        "has_glm_key": bool(current_user.glm_api_key),
+    }

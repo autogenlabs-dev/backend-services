@@ -75,12 +75,15 @@ async def log_audit_event(
         print(f"Traceback: {traceback.format_exc()}")
         
         # Return a mock audit log for consistency
+        # Return a mock audit log for consistency
+        # Use valid fields for AuditLog model
         return AuditLog(
-            user_id=user_id,
-            action=action,
-            resource_type=resource_type,
-            resource_id=resource_id,
-            details=details or {},
+            action_type=ActionType.CONTENT_APPROVED, # Default fallback
+            action_description=f"Fallback log: {action}",
+            actor_id=user_id,
+            target_type=resource_type,
+            target_id=resource_id,
+            metadata=details or {},
             severity=severity_enum,
             timestamp=datetime.now(timezone.utc)
         )

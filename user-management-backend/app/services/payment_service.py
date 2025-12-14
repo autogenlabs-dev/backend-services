@@ -29,9 +29,10 @@ class PaymentService:
     """Enhanced payment service for individual item purchases"""
     
     def __init__(self):
-        # Razorpay configuration
-        self.razorpay_key_id = os.getenv("RAZORPAY_KEY_ID", "rzp_test_your_key_id")
-        self.razorpay_key_secret = os.getenv("RAZORPAY_KEY_SECRET", "your_key_secret")
+        # Razorpay configuration - using settings from config.py
+        from ..config import settings
+        self.razorpay_key_id = settings.razorpay_key_id
+        self.razorpay_key_secret = settings.razorpay_key_secret
         
         # Initialize Razorpay client if available
         if RAZORPAY_AVAILABLE:
@@ -49,6 +50,7 @@ class PaymentService:
         """
         try:
             # Validate item exists and get item details
+            print(f"DEBUG: create_item_order called for item_id={item_id}, item_type={item_type}")
             if item_type == "template":
                 item = await Template.get(item_id)
                 ItemModel = Template
@@ -59,7 +61,9 @@ class PaymentService:
                 raise ValueError("Invalid item type")
             
             if not item:
+                print("DEBUG: Item not found")
                 raise ValueError("Item not found")
+            print(f"DEBUG: Item found: {item.title}, user_id={item.user_id}")
             
             # Check if user already purchased this item
             existing_purchase = await ItemPurchase.find_one({
@@ -70,19 +74,24 @@ class PaymentService:
             })
             
             if existing_purchase:
+                print("DEBUG: Item already purchased")
                 raise ValueError("Item already purchased")
             
             # Check if item is free
+            print(f"DEBUG: Checking plan type: {item.plan_type}")
             if item.plan_type.lower() == "free":
                 raise ValueError("Cannot create payment order for free item")
             
             # Get developer information
+            print(f"DEBUG: Fetching developer with id={item.user_id}")
             developer = await User.get(item.user_id)
             if not developer:
+                print("DEBUG: Developer not found")
                 raise ValueError("Developer not found")
+            print(f"DEBUG: Developer found: {developer.email}")
             
-            # Create unique purchase ID
-            purchase_id = f"PUR_{int(datetime.now(timezone.utc).timestamp())}_{uuid.uuid4().hex[:8]}"
+            # Create unique purchase ID (UUID to satisfy length requirements)
+            purchase_id = f"PUR_{uuid.uuid4()}"
             
             # Prepare order data
             amount_inr = item.pricing_inr * 100  # Razorpay expects amount in paisa
@@ -110,6 +119,10 @@ class PaymentService:
                     print(f"Razorpay order creation failed: {e}")
                     # Continue with mock order for development
             
+            # Calculate revenue split
+            developer_earnings_inr = int(item.pricing_inr * 0.70)
+            platform_fee_inr = item.pricing_inr - developer_earnings_inr
+            
             # Create purchase record
             purchase = ItemPurchase(
                 purchase_id=purchase_id,
@@ -123,12 +136,11 @@ class PaymentService:
                 original_price_usd=item.pricing_usd,
                 paid_amount_inr=item.pricing_inr,
                 paid_currency="INR",
+                developer_earnings_inr=developer_earnings_inr,
+                platform_fee_inr=platform_fee_inr,
                 razorpay_order_id=razorpay_order["id"] if razorpay_order else f"mock_order_{purchase_id}",
                 status=PurchaseStatus.PENDING
             )
-            
-            # Calculate revenue split
-            purchase.calculate_revenue_split()
             
             # Save purchase
             await purchase.insert()
@@ -164,7 +176,9 @@ class PaymentService:
             }
             
         except Exception as e:
-            print(f"Create item order error: {e}")
+            print(f"Create item order error: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return {
                 "success": False,
                 "error": str(e)
@@ -203,17 +217,18 @@ class PaymentService:
                     }
                     self.razorpay_client.utility.verify_payment_signature(params_dict)
                     
-                    # Get payment details from Razorpay
-                    payment_details = self.razorpay_client.payment.fetch(razorpay_payment_id)
-                    
-                    # Update purchase with payment details
-                    purchase.payment_gateway_response = payment_details
-                    purchase.payment_method = payment_details.get("method", "unknown")
+                    # Get payment details from Razorpay (skip for mock payments)
+                    if not razorpay_payment_id.startswith("pay_mock_"):
+                        payment_details = self.razorpay_client.payment.fetch(razorpay_payment_id)
+                        
+                        # Update purchase with payment details
+                        purchase.payment_gateway_response = payment_details
+                        purchase.payment_method = payment_details.get("method", "unknown")
                     
                 except Exception as e:
                     print(f"Razorpay verification failed: {e}")
                     # For development, allow mock payments to proceed
-                    if not razorpay_order_id.startswith("mock_"):
+                    if not razorpay_order_id.startswith("mock_") and not razorpay_payment_id.startswith("pay_mock_"):
                         raise ValueError("Payment verification failed")
             
             # Mark purchase as completed
@@ -353,7 +368,7 @@ class PaymentService:
                 "success": False,
                 "error": str(e)
             }
-    
+
     async def verify_cart_purchase(self, user: User, payment_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Verify cart purchase and grant access to all items
@@ -462,10 +477,10 @@ class PaymentService:
             skip = (page - 1) * page_size
             
             # Get total count
-            total_count = await ItemPurchase.count({
+            total_count = await ItemPurchase.find({
                 "user_id": user.id,
                 "status": PurchaseStatus.COMPLETED
-            })
+            }).count()
             
             # Get purchases
             purchases = await ItemPurchase.find({
@@ -474,10 +489,14 @@ class PaymentService:
             }).sort([("payment_completed_at", -1)]).skip(skip).limit(page_size).to_list()
             
             # Calculate stats
-            total_spent = await ItemPurchase.aggregate([
-                {"$match": {"user_id": user.id, "status": PurchaseStatus.COMPLETED}},
-                {"$group": {"_id": None, "total": {"$sum": "$paid_amount_inr"}}}
-            ]).to_list()
+            try:
+                total_spent = await ItemPurchase.aggregate([
+                    {"$match": {"user_id": user.id, "status": PurchaseStatus.COMPLETED}},
+                    {"$group": {"_id": None, "total": {"$sum": "$paid_amount_inr"}}}
+                ]).to_list(length=None)
+            except Exception as e:
+                print(f"Aggregation error: {e}")
+                total_spent = []
             
             total_spent_amount = total_spent[0]["total"] if total_spent else 0
             

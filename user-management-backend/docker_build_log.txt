@@ -1,0 +1,331 @@
+time="2025-12-13T10:59:33+05:30" level=warning msg="C:\\Users\\Asus\\Desktop\\backend-services\\user-management-backend\\docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+#1 [internal] load local bake definitions
+#1 reading from stdin 632B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 551B done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/python:3.12-slim
+#3 ...
+
+#4 [auth] library/python:pull token for registry-1.docker.io
+#4 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/python:3.12-slim
+#3 DONE 4.3s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 2B done
+#5 DONE 0.0s
+
+#6 [1/7] FROM docker.io/library/python:3.12-slim@sha256:fa48eefe2146644c2308b909d6bb7651a768178f84fc9550dcd495e4d6d84d01
+#6 resolve docker.io/library/python:3.12-slim@sha256:fa48eefe2146644c2308b909d6bb7651a768178f84fc9550dcd495e4d6d84d01 0.0s done
+#6 CACHED
+
+#7 [internal] load build context
+#7 transferring context: 47.21kB 0.0s done
+#7 DONE 0.1s
+
+#8 [2/7] RUN apt-get update &&     apt-get install -y curl ca-certificates &&     update-ca-certificates &&     rm -rf /var/lib/apt/lists/*
+#8 1.022 Hit:1 http://deb.debian.org/debian trixie InRelease
+#8 1.146 Get:2 http://deb.debian.org/debian trixie-updates InRelease [47.3 kB]
+#8 1.486 Get:3 http://deb.debian.org/debian-security trixie-security InRelease [43.4 kB]
+#8 1.646 Get:4 http://deb.debian.org/debian trixie/main amd64 Packages [9670 kB]
+#8 67.84 Ign:4 http://deb.debian.org/debian trixie/main amd64 Packages
+#8 83.46 Get:5 http://deb.debian.org/debian trixie-updates/main amd64 Packages [5412 B]
+#8 83.49 Get:6 http://deb.debian.org/debian-security trixie-security/main amd64 Packages [82.1 kB]
+#8 83.79 Get:4 http://deb.debian.org/debian trixie/main amd64 Packages [9670 kB]
+#8 102.9 Fetched 4598 kB in 1min 42s (44.9 kB/s)
+#8 102.9 Reading package lists...
+#8 103.6 Reading package lists...
+#8 104.3 Building dependency tree...
+#8 104.5 Reading state information...
+#8 104.7 ca-certificates is already the newest version (20250419).
+#8 104.7 The following additional packages will be installed:
+#8 104.7   bash-completion krb5-locales libbrotli1 libcom-err2 libcurl4t64
+#8 104.7   libgnutls30t64 libgssapi-krb5-2 libidn2-0 libk5crypto3 libkeyutils1
+#8 104.7   libkrb5-3 libkrb5support0 libldap-common libldap2 libnghttp2-14 libnghttp3-9
+#8 104.7   libp11-kit0 libpsl5t64 librtmp1 libsasl2-2 libsasl2-modules
+#8 104.7   libsasl2-modules-db libssh2-1t64 libtasn1-6 libunistring5 publicsuffix
+#8 104.7 Suggested packages:
+#8 104.7   gnutls-bin krb5-doc krb5-user libsasl2-modules-gssapi-mit
+#8 104.7   | libsasl2-modules-gssapi-heimdal libsasl2-modules-ldap libsasl2-modules-otp
+#8 104.7   libsasl2-modules-sql
+#8 104.8 The following NEW packages will be installed:
+#8 104.8   bash-completion curl krb5-locales libbrotli1 libcom-err2 libcurl4t64
+#8 104.8   libgnutls30t64 libgssapi-krb5-2 libidn2-0 libk5crypto3 libkeyutils1
+#8 104.8   libkrb5-3 libkrb5support0 libldap-common libldap2 libnghttp2-14 libnghttp3-9
+#8 104.8   libp11-kit0 libpsl5t64 librtmp1 libsasl2-2 libsasl2-modules
+#8 104.8   libsasl2-modules-db libssh2-1t64 libtasn1-6 libunistring5 publicsuffix
+#8 105.6 0 upgraded, 27 newly installed, 0 to remove and 0 not upgraded.
+#8 105.6 Need to get 5700 kB of archives.
+#8 105.6 After this operation, 18.3 MB of additional disk space will be used.
+#8 105.6 Get:1 http://deb.debian.org/debian trixie/main amd64 bash-completion all 1:2.16.0-7 [319 kB]
+#8 106.7 Get:2 http://deb.debian.org/debian trixie/main amd64 krb5-locales all 1.21.3-5 [101 kB]
+#8 107.2 Get:3 http://deb.debian.org/debian trixie/main amd64 libbrotli1 amd64 1.1.0-2+b7 [307 kB]
+#8 107.8 Get:4 http://deb.debian.org/debian trixie/main amd64 libkrb5support0 amd64 1.21.3-5 [33.0 kB]
+#8 107.8 Get:5 http://deb.debian.org/debian trixie/main amd64 libcom-err2 amd64 1.47.2-3+b3 [25.0 kB]
+#8 108.0 Get:6 http://deb.debian.org/debian trixie/main amd64 libk5crypto3 amd64 1.21.3-5 [81.5 kB]
+#8 108.1 Get:7 http://deb.debian.org/debian trixie/main amd64 libkeyutils1 amd64 1.6.3-6 [9456 B]
+#8 108.1 Get:8 http://deb.debian.org/debian trixie/main amd64 libkrb5-3 amd64 1.21.3-5 [326 kB]
+#8 109.3 Get:9 http://deb.debian.org/debian trixie/main amd64 libgssapi-krb5-2 amd64 1.21.3-5 [138 kB]
+#8 109.6 Get:10 http://deb.debian.org/debian trixie/main amd64 libunistring5 amd64 1.3-2 [477 kB]
+#8 110.8 Get:11 http://deb.debian.org/debian trixie/main amd64 libidn2-0 amd64 2.3.8-2 [109 kB]
+#8 115.2 Get:12 http://deb.debian.org/debian trixie/main amd64 libsasl2-modules-db amd64 2.1.28+dfsg1-9 [19.8 kB]
+#8 115.2 Get:13 http://deb.debian.org/debian trixie/main amd64 libsasl2-2 amd64 2.1.28+dfsg1-9 [57.5 kB]
+#8 115.4 Get:14 http://deb.debian.org/debian trixie/main amd64 libldap2 amd64 2.6.10+dfsg-1 [194 kB]
+#8 115.7 Get:15 http://deb.debian.org/debian trixie/main amd64 libnghttp2-14 amd64 1.64.0-1.1 [76.0 kB]
+#8 115.9 Get:16 http://deb.debian.org/debian trixie/main amd64 libnghttp3-9 amd64 1.8.0-1 [67.7 kB]
+#8 116.0 Get:17 http://deb.debian.org/debian trixie/main amd64 libpsl5t64 amd64 0.21.2-1.1+b1 [57.2 kB]
+#8 116.2 Get:18 http://deb.debian.org/debian trixie/main amd64 libp11-kit0 amd64 0.25.5-3 [425 kB]
+#8 117.3 Get:19 http://deb.debian.org/debian trixie/main amd64 libtasn1-6 amd64 4.20.0-2 [49.9 kB]
+#8 117.4 Get:20 http://deb.debian.org/debian trixie/main amd64 libgnutls30t64 amd64 3.8.9-3 [1465 kB]
+#8 120.2 Get:21 http://deb.debian.org/debian trixie/main amd64 librtmp1 amd64 2.4+20151223.gitfa8646d.1-2+b5 [58.8 kB]
+#8 120.9 Get:22 http://deb.debian.org/debian trixie/main amd64 libssh2-1t64 amd64 1.11.1-1 [245 kB]
+#8 121.7 Get:23 http://deb.debian.org/debian trixie/main amd64 libcurl4t64 amd64 8.14.1-2+deb13u2 [391 kB]
+#8 123.2 Get:24 http://deb.debian.org/debian trixie/main amd64 curl amd64 8.14.1-2+deb13u2 [270 kB]
+#8 123.8 Get:25 http://deb.debian.org/debian trixie/main amd64 libldap-common all 2.6.10+dfsg-1 [35.1 kB]
+#8 125.3 Get:26 http://deb.debian.org/debian trixie/main amd64 libsasl2-modules amd64 2.1.28+dfsg1-9 [66.7 kB]
+#8 125.6 Get:27 http://deb.debian.org/debian trixie/main amd64 publicsuffix all 20250328.1952-0.1 [296 kB]
+#8 126.5 debconf: unable to initialize frontend: Dialog
+#8 126.5 debconf: (TERM is not set, so the dialog frontend is not usable.)
+#8 126.5 debconf: falling back to frontend: Readline
+#8 126.5 debconf: unable to initialize frontend: Readline
+#8 126.5 debconf: (Can't locate Term/ReadLine.pm in @INC (you may need to install the Term::ReadLine module) (@INC entries checked: /etc/perl /usr/local/lib/x86_64-linux-gnu/perl/5.40.1 /usr/local/share/perl/5.40.1 /usr/lib/x86_64-linux-gnu/perl5/5.40 /usr/share/perl5 /usr/lib/x86_64-linux-gnu/perl-base /usr/lib/x86_64-linux-gnu/perl/5.40 /usr/share/perl/5.40 /usr/local/lib/site_perl) at /usr/share/perl5/Debconf/FrontEnd/Readline.pm line 8, <STDIN> line 27.)
+#8 126.5 debconf: falling back to frontend: Teletype
+#8 126.5 debconf: unable to initialize frontend: Teletype
+#8 126.5 debconf: (This frontend requires a controlling tty.)
+#8 126.5 debconf: falling back to frontend: Noninteractive
+#8 127.2 Fetched 5700 kB in 21s (265 kB/s)
+#8 127.3 Selecting previously unselected package bash-completion.
+#8 127.3 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 5644 files and directories currently installed.)
+#8 127.3 Preparing to unpack .../00-bash-completion_1%3a2.16.0-7_all.deb ...
+#8 127.3 Unpacking bash-completion (1:2.16.0-7) ...
+#8 127.5 Selecting previously unselected package krb5-locales.
+#8 127.5 Preparing to unpack .../01-krb5-locales_1.21.3-5_all.deb ...
+#8 127.5 Unpacking krb5-locales (1.21.3-5) ...
+#8 127.5 Selecting previously unselected package libbrotli1:amd64.
+#8 127.5 Preparing to unpack .../02-libbrotli1_1.1.0-2+b7_amd64.deb ...
+#8 127.5 Unpacking libbrotli1:amd64 (1.1.0-2+b7) ...
+#8 127.6 Selecting previously unselected package libkrb5support0:amd64.
+#8 127.6 Preparing to unpack .../03-libkrb5support0_1.21.3-5_amd64.deb ...
+#8 127.6 Unpacking libkrb5support0:amd64 (1.21.3-5) ...
+#8 127.7 Selecting previously unselected package libcom-err2:amd64.
+#8 127.7 Preparing to unpack .../04-libcom-err2_1.47.2-3+b3_amd64.deb ...
+#8 127.7 Unpacking libcom-err2:amd64 (1.47.2-3+b3) ...
+#8 127.7 Selecting previously unselected package libk5crypto3:amd64.
+#8 127.7 Preparing to unpack .../05-libk5crypto3_1.21.3-5_amd64.deb ...
+#8 127.7 Unpacking libk5crypto3:amd64 (1.21.3-5) ...
+#8 127.8 Selecting previously unselected package libkeyutils1:amd64.
+#8 127.8 Preparing to unpack .../06-libkeyutils1_1.6.3-6_amd64.deb ...
+#8 127.8 Unpacking libkeyutils1:amd64 (1.6.3-6) ...
+#8 127.8 Selecting previously unselected package libkrb5-3:amd64.
+#8 127.8 Preparing to unpack .../07-libkrb5-3_1.21.3-5_amd64.deb ...
+#8 127.8 Unpacking libkrb5-3:amd64 (1.21.3-5) ...
+#8 127.9 Selecting previously unselected package libgssapi-krb5-2:amd64.
+#8 127.9 Preparing to unpack .../08-libgssapi-krb5-2_1.21.3-5_amd64.deb ...
+#8 127.9 Unpacking libgssapi-krb5-2:amd64 (1.21.3-5) ...
+#8 127.9 Selecting previously unselected package libunistring5:amd64.
+#8 127.9 Preparing to unpack .../09-libunistring5_1.3-2_amd64.deb ...
+#8 128.0 Unpacking libunistring5:amd64 (1.3-2) ...
+#8 128.0 Selecting previously unselected package libidn2-0:amd64.
+#8 128.0 Preparing to unpack .../10-libidn2-0_2.3.8-2_amd64.deb ...
+#8 128.0 Unpacking libidn2-0:amd64 (2.3.8-2) ...
+#8 128.1 Selecting previously unselected package libsasl2-modules-db:amd64.
+#8 128.1 Preparing to unpack .../11-libsasl2-modules-db_2.1.28+dfsg1-9_amd64.deb ...
+#8 128.1 Unpacking libsasl2-modules-db:amd64 (2.1.28+dfsg1-9) ...
+#8 128.1 Selecting previously unselected package libsasl2-2:amd64.
+#8 128.1 Preparing to unpack .../12-libsasl2-2_2.1.28+dfsg1-9_amd64.deb ...
+#8 128.1 Unpacking libsasl2-2:amd64 (2.1.28+dfsg1-9) ...
+#8 128.2 Selecting previously unselected package libldap2:amd64.
+#8 128.2 Preparing to unpack .../13-libldap2_2.6.10+dfsg-1_amd64.deb ...
+#8 128.2 Unpacking libldap2:amd64 (2.6.10+dfsg-1) ...
+#8 128.2 Selecting previously unselected package libnghttp2-14:amd64.
+#8 128.2 Preparing to unpack .../14-libnghttp2-14_1.64.0-1.1_amd64.deb ...
+#8 128.2 Unpacking libnghttp2-14:amd64 (1.64.0-1.1) ...
+#8 128.2 Selecting previously unselected package libnghttp3-9:amd64.
+#8 128.3 Preparing to unpack .../15-libnghttp3-9_1.8.0-1_amd64.deb ...
+#8 128.3 Unpacking libnghttp3-9:amd64 (1.8.0-1) ...
+#8 128.3 Selecting previously unselected package libpsl5t64:amd64.
+#8 128.3 Preparing to unpack .../16-libpsl5t64_0.21.2-1.1+b1_amd64.deb ...
+#8 128.3 Unpacking libpsl5t64:amd64 (0.21.2-1.1+b1) ...
+#8 128.4 Selecting previously unselected package libp11-kit0:amd64.
+#8 128.4 Preparing to unpack .../17-libp11-kit0_0.25.5-3_amd64.deb ...
+#8 128.4 Unpacking libp11-kit0:amd64 (0.25.5-3) ...
+#8 128.4 Selecting previously unselected package libtasn1-6:amd64.
+#8 128.4 Preparing to unpack .../18-libtasn1-6_4.20.0-2_amd64.deb ...
+#8 128.4 Unpacking libtasn1-6:amd64 (4.20.0-2) ...
+#8 128.5 Selecting previously unselected package libgnutls30t64:amd64.
+#8 128.5 Preparing to unpack .../19-libgnutls30t64_3.8.9-3_amd64.deb ...
+#8 128.5 Unpacking libgnutls30t64:amd64 (3.8.9-3) ...
+#8 128.5 Selecting previously unselected package librtmp1:amd64.
+#8 128.5 Preparing to unpack .../20-librtmp1_2.4+20151223.gitfa8646d.1-2+b5_amd64.deb ...
+#8 128.6 Unpacking librtmp1:amd64 (2.4+20151223.gitfa8646d.1-2+b5) ...
+#8 128.6 Selecting previously unselected package libssh2-1t64:amd64.
+#8 128.6 Preparing to unpack .../21-libssh2-1t64_1.11.1-1_amd64.deb ...
+#8 128.6 Unpacking libssh2-1t64:amd64 (1.11.1-1) ...
+#8 128.6 Selecting previously unselected package libcurl4t64:amd64.
+#8 128.6 Preparing to unpack .../22-libcurl4t64_8.14.1-2+deb13u2_amd64.deb ...
+#8 128.7 Unpacking libcurl4t64:amd64 (8.14.1-2+deb13u2) ...
+#8 128.7 Selecting previously unselected package curl.
+#8 128.7 Preparing to unpack .../23-curl_8.14.1-2+deb13u2_amd64.deb ...
+#8 128.7 Unpacking curl (8.14.1-2+deb13u2) ...
+#8 128.7 Selecting previously unselected package libldap-common.
+#8 128.7 Preparing to unpack .../24-libldap-common_2.6.10+dfsg-1_all.deb ...
+#8 128.8 Unpacking libldap-common (2.6.10+dfsg-1) ...
+#8 128.8 Selecting previously unselected package libsasl2-modules:amd64.
+#8 128.8 Preparing to unpack .../25-libsasl2-modules_2.1.28+dfsg1-9_amd64.deb ...
+#8 128.8 Unpacking libsasl2-modules:amd64 (2.1.28+dfsg1-9) ...
+#8 128.8 Selecting previously unselected package publicsuffix.
+#8 128.8 Preparing to unpack .../26-publicsuffix_20250328.1952-0.1_all.deb ...
+#8 128.9 Unpacking publicsuffix (20250328.1952-0.1) ...
+#8 128.9 Setting up libkeyutils1:amd64 (1.6.3-6) ...
+#8 128.9 Setting up libbrotli1:amd64 (1.1.0-2+b7) ...
+#8 128.9 Setting up libsasl2-modules:amd64 (2.1.28+dfsg1-9) ...
+#8 128.9 Setting up libnghttp2-14:amd64 (1.64.0-1.1) ...
+#8 129.0 Setting up krb5-locales (1.21.3-5) ...
+#8 129.0 Setting up libcom-err2:amd64 (1.47.2-3+b3) ...
+#8 129.0 Setting up libldap-common (2.6.10+dfsg-1) ...
+#8 129.0 Setting up libkrb5support0:amd64 (1.21.3-5) ...
+#8 129.0 Setting up libsasl2-modules-db:amd64 (2.1.28+dfsg1-9) ...
+#8 129.0 Setting up bash-completion (1:2.16.0-7) ...
+#8 129.1 Setting up libp11-kit0:amd64 (0.25.5-3) ...
+#8 129.1 Setting up libunistring5:amd64 (1.3-2) ...
+#8 129.1 Setting up libk5crypto3:amd64 (1.21.3-5) ...
+#8 129.1 Setting up libsasl2-2:amd64 (2.1.28+dfsg1-9) ...
+#8 129.1 Setting up libnghttp3-9:amd64 (1.8.0-1) ...
+#8 129.1 Setting up libtasn1-6:amd64 (4.20.0-2) ...
+#8 129.1 Setting up libkrb5-3:amd64 (1.21.3-5) ...
+#8 129.1 Setting up libssh2-1t64:amd64 (1.11.1-1) ...
+#8 129.2 Setting up publicsuffix (20250328.1952-0.1) ...
+#8 129.2 Setting up libldap2:amd64 (2.6.10+dfsg-1) ...
+#8 129.2 Setting up libidn2-0:amd64 (2.3.8-2) ...
+#8 129.2 Setting up libgssapi-krb5-2:amd64 (1.21.3-5) ...
+#8 129.2 Setting up libgnutls30t64:amd64 (3.8.9-3) ...
+#8 129.2 Setting up libpsl5t64:amd64 (0.21.2-1.1+b1) ...
+#8 129.3 Setting up librtmp1:amd64 (2.4+20151223.gitfa8646d.1-2+b5) ...
+#8 129.3 Setting up libcurl4t64:amd64 (8.14.1-2+deb13u2) ...
+#8 129.3 Setting up curl (8.14.1-2+deb13u2) ...
+#8 129.3 Processing triggers for libc-bin (2.41-12) ...
+#8 129.4 Updating certificates in /etc/ssl/certs...
+#8 130.3 0 added, 0 removed; done.
+#8 130.3 Running hooks in /etc/ca-certificates/update.d...
+#8 130.3 done.
+#8 DONE 130.4s
+
+#9 [3/7] WORKDIR /app
+#9 DONE 0.1s
+
+#10 [4/7] COPY requirements.txt .
+#10 DONE 0.1s
+
+#11 [5/7] RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+#11 2.500 Requirement already satisfied: pip in /usr/local/lib/python3.12/site-packages (25.0.1)
+#11 12.51 Collecting pip
+#11 19.53   Downloading pip-25.3-py3-none-any.whl.metadata (4.7 kB)
+#11 21.55 Collecting setuptools
+#11 21.91   Downloading setuptools-80.9.0-py3-none-any.whl.metadata (6.6 kB)
+#11 22.62 Collecting wheel
+#11 23.20   Downloading wheel-0.45.1-py3-none-any.whl.metadata (2.3 kB)
+#11 23.83 Downloading pip-25.3-py3-none-any.whl (1.8 MB)
+#11 44.35                                             0.0/1.8 MB ? eta -:--:--
+#11 64.42 ERROR: Exception:
+#11 64.42 Traceback (most recent call last):
+#11 64.42   File "/usr/local/lib/python3.12/site-packages/pip/_vendor/urllib3/response.py", line 438, in _error_catcher
+#11 64.42     yield
+#11 64.42   File "/usr/local/lib/python3.12/site-packages/pip/_vendor/urllib3/response.py", line 561, in read
+#11 64.42     data = self._fp_read(amt) if not fp_closed else b""
+#11 64.42            ^^^^^^^^^^^^^^^^^^
+#11 64.42   File "/usr/local/lib/python3.12/site-packages/pip/_vendor/urllib3/response.py", line 527, in _fp_read
+#11 64.42     return self._fp.read(amt) if amt is not None else self._fp.read()
+#11 64.42            ^^^^^^^^^^^^^^^^^^
+#11 64.42   File "/usr/local/lib/python3.12/http/client.py", line 479, in read
+#11 64.42     s = self.fp.read(amt)
+#11 64.42         ^^^^^^^^^^^^^^^^^
+#11 64.42   File "/usr/local/lib/python3.12/socket.py", line 720, in readinto
+#11 64.42     return self._sock.recv_into(b)
+#11 64.42            ^^^^^^^^^^^^^^^^^^^^^^^
+#11 64.42   File "/usr/local/lib/python3.12/ssl.py", line 1251, in recv_into
+#11 64.42     return self.read(nbytes, buffer)
+#11 64.42            ^^^^^^^^^^^^^^^^^^^^^^^^^
+#11 64.42   File "/usr/local/lib/python3.12/ssl.py", line 1103, in read
+#11 64.42     return self._sslobj.read(len, buffer)
+#11 64.42            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#11 64.42 TimeoutError: The read operation timed out
+#11 64.42 
+#11 64.42 During handling of the above exception, another exception occurred:
+#11 64.42 
+#11 64.42 Traceback (most recent call last):
+#11 64.42   File "/usr/local/lib/python3.12/site-packages/pip/_internal/cli/base_command.py", line 106, in _run_wrapper
+#11 64.42     status = _inner_run()
+#11 64.42              ^^^^^^^^^^^^
+#11 64.42   File "/usr/local/lib/python3.12/site-packages/pip/_internal/cli/base_command.py", line 97, in _inner_run
+#11 64.42     return self.run(options, args)
+#11 64.42            ^^^^^^^^^^^^^^^^^^^^^^^
+#11 64.42   File "/usr/local/lib/python3.12/site-packages/pip/_internal/cli/req_command.py", line 67, in wrapper
+#11 64.42     return func(self, options, args)
+#11 64.42            ^^^^^^^^^^^^^^^^^^^^^^^^^
+#11 64.42   File "/usr/local/lib/python3.12/site-packages/pip/_internal/commands/install.py", line 386, in run
+#11 64.42     requirement_set = resolver.resolve(
+#11 64.42                       ^^^^^^^^^^^^^^^^^
+#11 64.42   File "/usr/local/lib/python3.12/site-packages/pip/_internal/resolution/resolvelib/resolver.py", line 179, in resolve
+#11 64.42     self.factory.preparer.prepare_linked_requirements_more(reqs)
+#11 64.42   File "/usr/local/lib/python3.12/site-packages/pip/_internal/operations/prepare.py", line 554, in prepare_linked_requirements_more
+#11 64.42     self._complete_partial_requirements(
+#11 64.42   File "/usr/local/lib/python3.12/site-packages/pip/_internal/operations/prepare.py", line 469, in _complete_partial_requirements
+#11 64.42     for link, (filepath, _) in batch_download:
+#11 64.42                                ^^^^^^^^^^^^^^
+#11 64.42   File "/usr/local/lib/python3.12/site-packages/pip/_internal/network/download.py", line 184, in __call__
+#11 64.42     for chunk in chunks:
+#11 64.42                  ^^^^^^
+#11 64.42   File "/usr/local/lib/python3.12/site-packages/pip/_internal/cli/progress_bars.py", line 55, in _rich_progress_bar
+#11 64.42     for chunk in iterable:
+#11 64.42                  ^^^^^^^^
+#11 64.42   File "/usr/local/lib/python3.12/site-packages/pip/_internal/network/utils.py", line 65, in response_chunks
+#11 64.42     for chunk in response.raw.stream(
+#11 64.42                  ^^^^^^^^^^^^^^^^^^^^
+#11 64.42   File "/usr/local/lib/python3.12/site-packages/pip/_vendor/urllib3/response.py", line 622, in stream
+#11 64.42     data = self.read(amt=amt, decode_content=decode_content)
+#11 64.42            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#11 64.42   File "/usr/local/lib/python3.12/site-packages/pip/_vendor/urllib3/response.py", line 560, in read
+#11 64.42     with self._error_catcher():
+#11 64.42          ^^^^^^^^^^^^^^^^^^^^^
+#11 64.42   File "/usr/local/lib/python3.12/contextlib.py", line 158, in __exit__
+#11 64.42     self.gen.throw(value)
+#11 64.42   File "/usr/local/lib/python3.12/site-packages/pip/_vendor/urllib3/response.py", line 443, in _error_catcher
+#11 64.42     raise ReadTimeoutError(self._pool, None, "Read timed out.")
+#11 64.42 pip._vendor.urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='files.pythonhosted.org', port=443): Read timed out.
+#11 ERROR: process "/bin/sh -c pip install --no-cache-dir --upgrade pip setuptools wheel" did not complete successfully: exit code: 2
+------
+ > [5/7] RUN pip install --no-cache-dir --upgrade pip setuptools wheel:
+64.42     data = self.read(amt=amt, decode_content=decode_content)
+64.42            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+64.42   File "/usr/local/lib/python3.12/site-packages/pip/_vendor/urllib3/response.py", line 560, in read
+64.42     with self._error_catcher():
+64.42          ^^^^^^^^^^^^^^^^^^^^^
+64.42   File "/usr/local/lib/python3.12/contextlib.py", line 158, in __exit__
+64.42     self.gen.throw(value)
+64.42   File "/usr/local/lib/python3.12/site-packages/pip/_vendor/urllib3/response.py", line 443, in _error_catcher
+64.42     raise ReadTimeoutError(self._pool, None, "Read timed out.")
+64.42 pip._vendor.urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='files.pythonhosted.org', port=443): Read timed out.
+------
+Dockerfile:13
+
+--------------------
+
+  11 |     
+
+  12 |     COPY requirements.txt .
+
+  13 | >>> RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+  14 |     RUN pip install --no-cache-dir -r requirements.txt
+
+  15 |     
+
+--------------------
+
+failed to solve: process "/bin/sh -c pip install --no-cache-dir --upgrade pip setuptools wheel" did not complete successfully: exit code: 2
+
