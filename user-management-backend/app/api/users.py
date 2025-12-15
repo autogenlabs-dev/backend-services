@@ -4,9 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from beanie.odm.fields import PydanticObjectId # Changed from UUID
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase # Added AsyncIOMotorDatabase
-
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-
 from ..database import get_database # Changed from get_db
 from ..schemas.auth import (
     UserResponse, UserProfile, UserUpdate, TokenUsageLogResponse,
@@ -82,6 +80,7 @@ async def get_my_profile(
         subscription=current_user.subscription.value if current_user.subscription else "free",  # Use enum value
         api_keys=api_keys_response,
         glm_api_key=current_user.glm_api_key,  # Include GLM API key
+        bytez_api_key=current_user.bytez_api_key,  # Include Bytez API key
         openrouter_api_key=current_user.openrouter_api_key,
         role=getattr(current_user, 'role', 'user'),
         # Always allow publishing content to merge user and developer roles
@@ -335,9 +334,14 @@ async def get_user_dashboard(
             "email": current_user.email,
             "name": current_user.name,
             "subscription": current_user.subscription.value if current_user.subscription else "free",
+            "subscription_end_date": current_user.subscription_end_date.isoformat() if current_user.subscription_end_date else None,
             "role": getattr(current_user, 'role', 'user'),
             "is_active": current_user.is_active,
             "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
+            # Include actual API keys for display
+            "glm_api_key": current_user.glm_api_key,
+            "openrouter_api_key": current_user.openrouter_api_key,
+            "bytez_api_key": current_user.bytez_api_key,
         },
         "credits": credits,
         "has_openrouter_key": bool(current_user.openrouter_api_key),

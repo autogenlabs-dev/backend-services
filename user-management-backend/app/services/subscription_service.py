@@ -301,6 +301,7 @@ class PlanSubscriptionService:
             "requires_glm": True,
             "requires_bytez": True,
             "duration_days": 30,
+            "auto_assign_keys": False,  # No auto-assignment for Ultra
         }
     }
     
@@ -363,14 +364,14 @@ class PlanSubscriptionService:
                 print(f"Failed to provision OpenRouter key: {e}")
             
             # Assign GLM key from pool
-            if config["requires_glm"]:
+            if config["requires_glm"] and config.get("auto_assign_keys", True):
                 glm_key = await self._assign_key_from_pool(user, "glm")
                 if glm_key:
                     user.glm_api_key = glm_key
                     result["api_keys"]["glm"] = True
             
             # Assign Bytez key from pool (Ultra only)
-            if config["requires_bytez"]:
+            if config["requires_bytez"] and config.get("auto_assign_keys", True):
                 bytez_key = await self._assign_key_from_pool(user, "bytez")
                 if bytez_key:
                     user.bytez_api_key = bytez_key

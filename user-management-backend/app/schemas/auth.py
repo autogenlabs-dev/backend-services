@@ -230,6 +230,7 @@ class UserProfile(BaseModel):  # Changed to inherit from BaseModel instead of Us
     subscription: Optional[str] = None  # Subscription plan: "free", "pro", or "ultra"
     api_keys: List[ApiKeyResponse]
     glm_api_key: Optional[str] = None  # User's GLM API key
+    bytez_api_key: Optional[str] = None  # User's Bytez API key
     openrouter_api_key: Optional[str] = None
     role: str
     can_publish_content: bool = False

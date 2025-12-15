@@ -488,17 +488,18 @@ class PaymentService:
                 "status": PurchaseStatus.COMPLETED
             }).sort([("payment_completed_at", -1)]).skip(skip).limit(page_size).to_list()
             
-            # Calculate stats
+            # Calculate stats - fix for async aggregation
+            total_spent_amount = 0
             try:
-                total_spent = await ItemPurchase.aggregate([
-                    {"$match": {"user_id": user.id, "status": PurchaseStatus.COMPLETED}},
-                    {"$group": {"_id": None, "total": {"$sum": "$paid_amount_inr"}}}
-                ]).to_list(length=None)
+                # Use Python calculation instead of MongoDB aggregation to avoid async cursor issues
+                all_completed_purchases = await ItemPurchase.find({
+                    "user_id": user.id,
+                    "status": PurchaseStatus.COMPLETED
+                }).to_list()
+                total_spent_amount = sum(p.paid_amount_inr or 0 for p in all_completed_purchases)
             except Exception as e:
-                print(f"Aggregation error: {e}")
-                total_spent = []
-            
-            total_spent_amount = total_spent[0]["total"] if total_spent else 0
+                print(f"Stats calculation error: {e}")
+                total_spent_amount = 0
             
             return {
                 "success": True,

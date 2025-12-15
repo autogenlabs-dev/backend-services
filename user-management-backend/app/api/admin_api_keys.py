@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 
 from app.models.user import User, UserRole
 from app.models.api_key_pool import ApiKeyPool
-from app.middleware.auth import require_auth
+from app.auth.unified_auth import get_current_user_unified
 from app.utils.audit_logger import log_audit_event
 
 
@@ -40,7 +40,7 @@ class KeyPoolStats(BaseModel):
 
 
 # Helper function to check admin role
-async def require_admin(current_user: User = Depends(require_auth)) -> User:
+async def require_admin(current_user: User = Depends(get_current_user_unified)) -> User:
     """Require admin role for access."""
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -259,11 +259,27 @@ async def get_key_users(
         for user_id in key.assigned_user_ids:
             user = await User.get(user_id)
             if user:
+                # Calculate days remaining
+                days_left = 0
+                if user.subscription_end_date:
+                    try:
+                        now = datetime.now(timezone.utc)
+                        end_date = user.subscription_end_date
+                        if end_date.tzinfo is None:
+                            end_date = end_date.replace(tzinfo=timezone.utc)
+                        
+                        if end_date > now:
+                            delta = end_date - now
+                            days_left = delta.days
+                    except Exception:
+                        pass  # Fallback to 0 if calculation fails
+
                 users.append({
                     "id": str(user.id),
                     "email": user.email,
                     "name": user.name,
-                    "subscription": user.subscription.value if user.subscription else "free"
+                    "subscription": user.subscription.value if user.subscription else "free",
+                    "days_left": days_left
                 })
         
         return {
@@ -275,3 +291,145 @@ async def get_key_users(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get users: {str(e)}")
+
+
+class ReassignUserRequest(BaseModel):
+    user_id: str = Field(..., description="User ID to reassign")
+    target_key_id: str = Field(..., description="Target key ID to assign to")
+
+
+@router.post("/pool/{key_id}/reassign")
+async def reassign_user(
+    key_id: str,
+    request: ReassignUserRequest,
+    current_user: User = Depends(require_admin)
+):
+    """Reassign a user from one API key to another."""
+    try:
+        from beanie import PydanticObjectId
+        
+        # Get source key
+        source_key = await ApiKeyPool.get(key_id)
+        if not source_key:
+            raise HTTPException(status_code=404, detail="Source key not found")
+        
+        # Get target key
+        target_key = await ApiKeyPool.get(request.target_key_id)
+        if not target_key:
+            raise HTTPException(status_code=404, detail="Target key not found")
+        
+        # Validate same key type
+        if source_key.key_type != target_key.key_type:
+            raise HTTPException(status_code=400, detail="Cannot reassign to different key type")
+        
+        # Check target capacity
+        if not target_key.has_capacity:
+            raise HTTPException(status_code=400, detail="Target key at capacity")
+        
+        # Get user
+        user = await User.get(request.user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        user_oid = PydanticObjectId(request.user_id)
+        
+        # Remove from source key
+        if not source_key.release_user(user_oid):
+            raise HTTPException(status_code=400, detail="User not assigned to source key")
+        
+        # Add to target key
+        if not target_key.assign_user(user_oid):
+            # Rollback source change
+            source_key.assign_user(user_oid)
+            raise HTTPException(status_code=400, detail="Failed to assign to target key")
+        
+        # Update user's API key field
+        if source_key.key_type == "glm":
+            user.glm_api_key = target_key.key_value
+        elif source_key.key_type == "bytez":
+            user.bytez_api_key = target_key.key_value
+        
+        # Save all changes
+        await source_key.save()
+        await target_key.save()
+        await user.save()
+        
+        # Log audit event
+        await log_audit_event(
+            user_id=str(current_user.id),
+            action="REASSIGN_USER_API_KEY",
+            resource_type="api_key_pool",
+            resource_id=key_id,
+            details={
+                "user_id": request.user_id,
+                "from_key_id": key_id,
+                "to_key_id": request.target_key_id,
+                "key_type": source_key.key_type
+            }
+        )
+        
+        return {
+            "success": True,
+            "message": f"User reassigned from {source_key.label} to {target_key.label}",
+            "source_key": source_key.to_dict(),
+            "target_key": target_key.to_dict()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to reassign: {str(e)}")
+
+
+@router.delete("/pool/{key_id}/users/{user_id}")
+async def unassign_user(
+    key_id: str,
+    user_id: str,
+    current_user: User = Depends(require_admin)
+):
+    """Unassign a user from an API key."""
+    try:
+        from beanie import PydanticObjectId
+        
+        # Get key
+        key = await ApiKeyPool.get(key_id)
+        if not key:
+            raise HTTPException(status_code=404, detail="Key not found")
+        
+        user_oid = PydanticObjectId(user_id)
+        
+        # Remove user
+        if not key.release_user(user_oid):
+            raise HTTPException(status_code=404, detail="User not assigned to this key")
+        
+        await key.save()
+        
+        # Also clear the user's key field in their profile
+        user = await User.get(user_id)
+        if user:
+            if key.key_type == "glm" and user.glm_api_key == key.key_value:
+                user.glm_api_key = None
+                await user.save()
+            elif key.key_type == "bytez" and user.bytez_api_key == key.key_value:
+                user.bytez_api_key = None
+                await user.save()
+        
+        # Log audit event
+        await log_audit_event(
+            user_id=str(current_user.id),
+            action="UNASSIGN_USER_FROM_POOL_KEY",
+            resource_type="api_key_pool",
+            resource_id=key_id,
+            details={
+                "unassigned_user_id": user_id,
+                "key_type": key.key_type
+            }
+        )
+        
+        return {
+            "success": True,
+            "message": "User unassigned successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to unassign user: {str(e)}")
