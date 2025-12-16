@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 
 from app.models.user import User, UserRole
 from app.models.api_key_pool import ApiKeyPool
-from app.middleware.auth import require_auth
+from app.auth.unified_auth import get_current_user_unified
 from app.utils.audit_logger import log_audit_event
 
 
@@ -40,7 +40,7 @@ class KeyPoolStats(BaseModel):
 
 
 # Helper function to check admin role
-async def require_admin(current_user: User = Depends(require_auth)) -> User:
+async def require_admin(current_user: User = Depends(get_current_user_unified)) -> User:
     """Require admin role for access."""
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -275,3 +275,91 @@ async def get_key_users(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get users: {str(e)}")
+
+
+class ReassignUserRequest(BaseModel):
+    user_id: str = Field(..., description="User ID to reassign")
+    target_key_id: str = Field(..., description="Target key ID to assign to")
+
+
+@router.post("/pool/{key_id}/reassign")
+async def reassign_user(
+    key_id: str,
+    request: ReassignUserRequest,
+    current_user: User = Depends(require_admin)
+):
+    """Reassign a user from one API key to another."""
+    try:
+        from beanie import PydanticObjectId
+        
+        # Get source key
+        source_key = await ApiKeyPool.get(key_id)
+        if not source_key:
+            raise HTTPException(status_code=404, detail="Source key not found")
+        
+        # Get target key
+        target_key = await ApiKeyPool.get(request.target_key_id)
+        if not target_key:
+            raise HTTPException(status_code=404, detail="Target key not found")
+        
+        # Validate same key type
+        if source_key.key_type != target_key.key_type:
+            raise HTTPException(status_code=400, detail="Cannot reassign to different key type")
+        
+        # Check target capacity
+        if not target_key.has_capacity:
+            raise HTTPException(status_code=400, detail="Target key at capacity")
+        
+        # Get user
+        user = await User.get(request.user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        user_oid = PydanticObjectId(request.user_id)
+        
+        # Remove from source key
+        if not source_key.release_user(user_oid):
+            raise HTTPException(status_code=400, detail="User not assigned to source key")
+        
+        # Add to target key
+        if not target_key.assign_user(user_oid):
+            # Rollback source change
+            source_key.assign_user(user_oid)
+            raise HTTPException(status_code=400, detail="Failed to assign to target key")
+        
+        # Update user's API key field
+        if source_key.key_type == "glm":
+            user.glm_api_key = target_key.key_value
+        elif source_key.key_type == "bytez":
+            user.bytez_api_key = target_key.key_value
+        
+        # Save all changes
+        await source_key.save()
+        await target_key.save()
+        await user.save()
+        
+        # Log audit event
+        await log_audit_event(
+            user_id=str(current_user.id),
+            action="REASSIGN_USER_API_KEY",
+            resource_type="api_key_pool",
+            resource_id=key_id,
+            details={
+                "user_id": request.user_id,
+                "from_key_id": key_id,
+                "to_key_id": request.target_key_id,
+                "key_type": source_key.key_type
+            }
+        )
+        
+        return {
+            "success": True,
+            "message": f"User reassigned from {source_key.label} to {target_key.label}",
+            "source_key": source_key.to_dict(),
+            "target_key": target_key.to_dict()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to reassign: {str(e)}")
+
