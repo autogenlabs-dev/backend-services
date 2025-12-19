@@ -231,6 +231,7 @@ class UserProfile(BaseModel):  # Changed to inherit from BaseModel instead of Us
     api_keys: List[ApiKeyResponse]
     glm_api_key: Optional[str] = None  # User's GLM API key
     openrouter_api_key: Optional[str] = None
+    bytez_api_key: Optional[str] = None  # Bytez API key for Ultra users
     role: str
     can_publish_content: bool = False
     

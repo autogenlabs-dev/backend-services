@@ -83,6 +83,7 @@ async def get_my_profile(
         api_keys=api_keys_response,
         glm_api_key=current_user.glm_api_key,  # Include GLM API key
         openrouter_api_key=current_user.openrouter_api_key,
+        bytez_api_key=current_user.bytez_api_key,  # Include Bytez API key for Ultra users
         role=getattr(current_user, 'role', 'user'),
         # Always allow publishing content to merge user and developer roles
         can_publish_content=True 

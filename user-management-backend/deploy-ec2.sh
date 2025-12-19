@@ -66,7 +66,7 @@ if [ ! -f .env ]; then
 # Minimal Configuration
 DATABASE_URL=mongodb://localhost:27017/user_management_db
 REDIS_URL=redis://localhost:6379
-JWT_SECRET_KEY=$(openssl rand -hex 32)
+JWT_SECRET_KEY=0b1ae784667db0d6e1c241624640f3b23fc909adf1b03760b6a1568ac96392f2d39513e651dbaa8d435661953ac8eaed6712aa8ed3071747c210cb990e08f2b4
 JWT_ALGORITHM=HS256
 ENVIRONMENT=production
 DEBUG=false
