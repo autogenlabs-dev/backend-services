@@ -240,7 +240,7 @@ print(f"   - Debug Mode: {settings.debug}")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,  # Explicit origins
-    allow_origin_regex=r"vscode-webview://.*",  # Allow vscode-webview
+    allow_origin_regex=r"https://.*\.codemurf\.com|vscode-webview://.*",  # Allow all codemurf subdomains and vscode-webview
     allow_credentials=True,  # Allow credentials for authenticated requests  
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
@@ -291,6 +291,10 @@ app.include_router(admin_api_keys.router, prefix="/api")
 
 # Webhook endpoints (no /api prefix for external access)
 app.include_router(webhooks.router)
+
+# Screenshot service for template/component previews
+from .services.screenshot_service import router as screenshot_router
+app.include_router(screenshot_router, prefix="/api", tags=["Screenshots"])
 
 # Backward compatibility: Mount components router without /api prefix for frontend
 # This allows frontend to call /components directly
