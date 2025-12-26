@@ -88,7 +88,7 @@ async def chat_completions_proxy(
         
         # CODEMURF: Map frontend model IDs to Z.AI model IDs
         model_mapping = {
-            "glm-4.7": "glm-4-flash", # Sanity check: free model
+            "glm-4.7": "codegeex-4", # Map to CodeGeeX-4 (Coding Model)
             "glm-4.6": "glm-4-0520",
             "glm-4.5": "glm-4",
             "glm-4": "glm-4",
