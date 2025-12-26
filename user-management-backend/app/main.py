@@ -23,6 +23,7 @@ from .api import (
     templates,
     components,
     extension_auth,
+    chat_proxy,  # GLM model proxy
 )
 from .api import debug
 from .api import verify
@@ -299,6 +300,8 @@ from .endpoints import payments as item_payments
 app.include_router(item_payments.router, prefix="/api")
 # Extension authentication endpoints (Clerk-compatible API)
 app.include_router(extension_auth.router, prefix="/api")
+# Chat completions proxy for GLM models
+app.include_router(chat_proxy.router, prefix="/api")
 app.include_router(debug.router, prefix="/api")
 app.include_router(verify.router, prefix="/api")
 
