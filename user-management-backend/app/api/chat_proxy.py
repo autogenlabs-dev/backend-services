@@ -14,6 +14,31 @@ router = APIRouter(prefix="/chat", tags=["Chat Proxy"])
 # Z.AI Configuration (GLM models)
 ZAI_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
 
+import time
+import jwt
+
+def generate_zai_token(apikey: str, exp_seconds: int = 3600) -> str:
+    """
+    Generate signed JWT for Z.AI API from the raw API key (id.secret).
+    """
+    try:
+        id, secret = apikey.split(".")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Invalid GLM API Key format")
+
+    payload = {
+        "api_key": id,
+        "exp": int(round(time.time() * 1000)) + exp_seconds * 1000,
+        "timestamp": int(round(time.time() * 1000)),
+    }
+
+    return jwt.encode(
+        payload,
+        secret,
+        algorithm="HS256",
+        headers={"alg": "HS256", "sign_type": "SIGN"},
+    )
+
 
 async def get_user_glm_key(user: User) -> Optional[str]:
     """
@@ -88,8 +113,10 @@ async def chat_completions_proxy(
                 )
         
         # Prepare headers for Z.AI
+        # Generate JWT from the raw key
+        zai_token = generate_zai_token(glm_key)
         headers = {
-            "Authorization": f"Bearer {glm_key}",
+            "Authorization": f"Bearer {zai_token}",
             "Content-Type": "application/json"
         }
         
