@@ -11,7 +11,7 @@ services:
       - JWT_SECRET_KEY=wazn5RgTljhqBq1Mt7egWI/ywc7TLZx/gE5S39vAGuA=
       - DEBUG=False
       - ENVIRONMENT=production
-      - DISABLE_CORS_MIDDLEWARE=false
+      - DISABLE_CORS_MIDDLEWARE=true
       - A4F_API_KEY=${A4F_API_KEY:-your-a4f-api-key}
       - REDIS_URL=redis://redis:6379
       # Google OAuth Configuration
