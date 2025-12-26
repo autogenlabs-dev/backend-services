@@ -382,8 +382,19 @@ class PlanSubscriptionService:
         user.updated_at = now
         await user.save()
         
+        # CRITICAL FIX: Reload user from DB to ensure we have the absolute latest state
+        refreshed_user = await User.get(user.id)
+        if not refreshed_user:
+            refreshed_user = user  # Fallback
+            
+        print(f"✅ Plan activated for user {refreshed_user.email}: {plan_name}")
+        print(f"   - Subscription: {refreshed_user.subscription}")
+        print(f"   - End Date: {refreshed_user.subscription_end_date}")
+        
         result["role"] = plan_name
-        return result
+        
+        # Return tuple with refreshed user object
+        return result, refreshed_user
     
     async def _assign_key_from_pool(self, user: User, key_type: str) -> Optional[str]:
         """

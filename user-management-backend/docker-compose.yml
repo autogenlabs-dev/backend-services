@@ -8,7 +8,7 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=mongodb://admin:password123@mongodb:27017/user_management_db?authSource=admin
-      - JWT_SECRET_KEY=0b1ae784667db0d6e1c241624640f3b23fc909adf1b03760b6a1568ac96392f2d39513e651dbaa8d435661953ac8eaed6712aa8ed3071747c210cb990e08f2b4
+      - JWT_SECRET_KEY=wazn5RgTljhqBq1Mt7egWI/ywc7TLZx/gE5S39vAGuA=
       - DEBUG=False
       - ENVIRONMENT=production
       - DISABLE_CORS_MIDDLEWARE=true

@@ -105,15 +105,17 @@ async def verify_payment(
         if verification_result["verified"]:
             # Payment verified successfully, activate subscription using new service
             print(f"DEBUG [verify-payment]: Activating plan '{request.plan_name}' for user {current_user.email}...", flush=True)
-            activation_result = await plan_service.activate_plan(
+            # Activate plan and get updated user object
+            activation_result, updated_user = await plan_service.activate_plan(
                 user=current_user,
                 plan_name=request.plan_name,
                 payment_id=request.razorpay_payment_id
             )
             print(f"DEBUG [verify-payment]: Activation result: {activation_result}", flush=True)
             
-            # Refresh user to get updated subscription
-            await current_user.sync()
+            # Use the returned updated_user instead of relying on current_user.sync()
+            # This fixes the issue where current_user reference becomes stale
+            current_user = updated_user
             print(f"DEBUG [verify-payment]: Updated subscription: {current_user.subscription}", flush=True)
             sys.stdout.flush()
             

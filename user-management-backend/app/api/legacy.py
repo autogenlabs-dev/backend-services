@@ -24,7 +24,7 @@ async def legacy_user_dashboard(
     
     credits = await get_openrouter_credits(current_user)
     
-    # Get purchase stats
+    # Get marketplace purchase stats
     try:
         purchase_history = await payment_service.get_user_purchase_history(
             user=current_user,
@@ -33,16 +33,34 @@ async def legacy_user_dashboard(
         )
         purchases = purchase_history.get("purchases", [])
         
-        total_purchases = len(purchases)
-        total_spent_inr = sum(p.get("price_paid_inr", 0) for p in purchases)
+        marketplace_purchases = len(purchases)
+        marketplace_spent = sum(p.get("price_paid_inr", 0) for p in purchases)
         templates_owned = len([p for p in purchases if p.get("item_type") == "template"])
         components_owned = len([p for p in purchases if p.get("item_type") == "component"])
     except Exception as e:
         print(f"Error fetching purchase stats: {e}")
-        total_purchases = 0
-        total_spent_inr = 0
+        marketplace_purchases = 0
+        marketplace_spent = 0
         templates_owned = 0
         components_owned = 0
+    
+    # Get subscription purchase stats
+    subscription_purchases = 0
+    subscription_spent = 0
+    try:
+        # user_id in razorpay_orders is stored as string
+        subscription_orders = await db.razorpay_orders.find({
+            "user_id": str(current_user.id),
+            "status": "completed"
+        }).to_list(length=100)
+        subscription_purchases = len(subscription_orders)
+        subscription_spent = sum(o.get("amount_inr", 0) for o in subscription_orders)
+    except Exception as e:
+        print(f"Error fetching subscription stats: {e}")
+    
+    # Combined stats
+    total_purchases = marketplace_purchases + subscription_purchases
+    total_spent_inr = marketplace_spent + subscription_spent
     
     return {
         "success": True,
@@ -63,11 +81,12 @@ async def legacy_user_dashboard(
         "credits": credits,
         "has_openrouter_key": bool(current_user.openrouter_api_key),
         "has_glm_key": bool(current_user.glm_api_key),
-        # Purchase stats
+        # Purchase stats (combined)
         "total_purchases": total_purchases,
         "total_spent_inr": total_spent_inr,
         "templates_owned": templates_owned,
         "components_owned": components_owned,
+        "subscription_purchases": subscription_purchases,
     }
 
 
@@ -77,13 +96,54 @@ async def legacy_purchased_items(
     current_user: User = Depends(get_current_user_unified),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
-    """Legacy: Get user's purchased items."""
+    """Legacy: Get user's purchased items including subscriptions."""
     from ..services.payment_service import payment_service
     
+    # Get marketplace purchases
     result = await payment_service.get_user_purchase_history(
         user=current_user,
         page=1,
         page_size=limit
     )
     
-    return result
+    purchases = result.get("purchases", [])
+    
+    # Also get subscription purchases from razorpay_orders
+    try:
+        # user_id in razorpay_orders is stored as string
+        subscription_orders = await db.razorpay_orders.find({
+            "user_id": str(current_user.id),
+            "status": "completed"
+        }).sort("created_at", -1).to_list(length=limit)
+        
+        for order in subscription_orders:
+            plan_name = order.get("plan_name", "subscription").capitalize()
+            purchases.append({
+                "id": str(order.get("_id")),
+                "item_type": "subscription",
+                "item_title": f"{plan_name} Plan Subscription",
+                "price_paid_inr": order.get("amount_inr", 0),
+                "purchase_date": order.get("created_at").isoformat() if order.get("created_at") else None,
+                "status": "completed",
+                "razorpay_order_id": order.get("razorpay_order_id"),
+                "plan_name": order.get("plan_name")
+            })
+    except Exception as e:
+        print(f"Error fetching subscription orders: {e}")
+    
+    # Sort all purchases by date (newest first)
+    purchases.sort(key=lambda x: x.get("purchase_date") or "", reverse=True)
+    
+    # Update stats
+    total_purchases = len(purchases)
+    total_spent_inr = sum(p.get("price_paid_inr", 0) for p in purchases)
+    
+    return {
+        "success": True,
+        "purchases": purchases[:limit],
+        "statistics": {
+            "total_purchases": total_purchases,
+            "total_spent_inr": total_spent_inr
+        }
+    }
+
