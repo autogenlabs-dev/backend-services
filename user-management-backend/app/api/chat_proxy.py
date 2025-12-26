@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from typing import Dict, Any, Optional
 import httpx
-from ..auth.oauth import get_current_user_unified
+from ..auth.unified_auth import get_current_user_unified
 from ..models.user import User
 
 router = APIRouter(prefix="/chat", tags=["Chat Proxy"])
