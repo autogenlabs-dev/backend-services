@@ -64,8 +64,7 @@ async def chat_completions_proxy(
         # Validate GLM model access
         if model_id.startswith("glm-"):
             # Check if user has Pro/Ultra subscription
-            subscription = await current_user.get_subscription()
-            tier = subscription.tier if subscription else "free"
+            tier = current_user.subscription_plan or "free"
             
             if tier not in ["pro", "ultra"]:
                 raise HTTPException(
@@ -121,9 +120,8 @@ async def chat_completions_proxy(
                         yield chunk
         
         # Get user subscription info for headers
-        subscription = await current_user.get_subscription()
-        tier = subscription.tier if subscription else "free"
-        expires = subscription.end_date.isoformat() if subscription and subscription.end_date else None
+        tier = current_user.subscription_plan or "free"
+        expires = current_user.subscription_end_date.isoformat() if current_user.subscription_end_date else None
         
         # Return streaming response with subscription headers
         return StreamingResponse(
@@ -153,8 +151,7 @@ async def chat_proxy_status(current_user: User = Depends(get_current_user_unifie
     Check chat proxy status and user's subscription tier.
     Also shows if user has a GLM key assigned.
     """
-    subscription = await current_user.get_subscription()
-    tier = subscription.tier if subscription else "free"
+    tier = current_user.subscription_plan or "free"
     
     # Check if user has GLM key assigned
     glm_key = await get_user_glm_key(current_user)
