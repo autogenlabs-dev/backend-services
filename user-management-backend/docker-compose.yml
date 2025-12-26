@@ -9,7 +9,9 @@ services:
     environment:
       - DATABASE_URL=mongodb://admin:password123@mongodb:27017/user_management_db?authSource=admin
       - JWT_SECRET_KEY=your-super-secret-jwt-key-change-this-in-production
-      - DEBUG=True
+      - DEBUG=False
+      - ENVIRONMENT=production
+      - DISABLE_CORS_MIDDLEWARE=true
       - A4F_API_KEY=${A4F_API_KEY:-your-a4f-api-key}
       - REDIS_URL=redis://redis:6379
       # Google OAuth Configuration
