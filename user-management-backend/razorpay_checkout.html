@@ -1,0 +1,50 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Razorpay Test Payment</title>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+    <h1>Razorpay Test Payment</h1>
+    <p>Order ID: order_Rta63YP4bfZ5Zg</p>
+    <p>Amount: ₹25415.0</p>
+    <button id="pay-btn">Pay Now</button>
+    
+    <script>
+        var options = {
+            "key": "rzp_test_RtZyDR8hJ0EOhx",
+            "amount": "2541500",
+            "currency": "INR",
+            "name": "CodeMurf",
+            "description": "Pro Plan Subscription",
+            "order_id": "order_Rta63YP4bfZ5Zg",
+            "handler": function (response) {
+                alert("Payment successful!\n\nPayment ID: " + response.razorpay_payment_id + 
+                      "\nOrder ID: " + response.razorpay_order_id + 
+                      "\nSignature: " + response.razorpay_signature);
+                console.log("Payment Response:", response);
+                
+                // Copy to clipboard
+                var text = JSON.stringify(response, null, 2);
+                navigator.clipboard.writeText(text).then(function() {
+                    console.log('Copied to clipboard');
+                });
+            },
+            "prefill": {
+                "name": "Abhishek",
+                "email": "autogencodelabs@gmail.com"
+            },
+            "theme": {
+                "color": "#3399cc"
+            }
+        };
+        
+        var rzp = new Razorpay(options);
+        document.getElementById('pay-btn').onclick = function(e) {
+            rzp.open();
+            e.preventDefault();
+        };
+    </script>
+</body>
+</html>

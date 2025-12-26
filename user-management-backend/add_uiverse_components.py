@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 load_dotenv()
 
-MONGODB_URL = os.getenv("DATABASE_URL", "mongodb://localhost:27017/user_management_db")
+MONGODB_URL = "mongodb://admin:password123@localhost:27017/user_management_db?authSource=admin"
 
 # UIverse-style components with HTML and CSS code
 UIVERSE_COMPONENTS = [
@@ -527,8 +527,15 @@ async def add_uiverse_components():
             "name": comp["name"],
             "title": comp["name"],
             "category": comp["category"],
+            "type": comp["category"],  # Required field
+            "language": comp["framework"],  # Required field
+            "difficulty_level": "Beginner",  # Required field
+            "plan_type": "Free",  # Required field
             "description": comp["description"],
             "short_description": comp["description"],
+            "full_description": comp["description"],  # Required field
+            "developer_name": "UIverse Community",  # Required field
+            "developer_experience": "5 years",  # Required field
             "framework": comp["framework"],
             "html_code": comp["html_code"],
             "css_code": comp["css_code"],

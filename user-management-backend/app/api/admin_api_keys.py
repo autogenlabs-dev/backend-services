@@ -433,3 +433,4 @@ async def unassign_user(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to unassign user: {str(e)}")
+

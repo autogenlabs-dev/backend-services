@@ -22,8 +22,8 @@ services:
       # OpenRouter OAuth Configuration
       - OPENROUTER_PROVISIONING_API_KEY=${OPENROUTER_PROVISIONING_API_KEY:-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}
       # Razorpay Configuration (TEST MODE)
-      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-rzp_test_Rqxl4tVNxYqSuO}
-      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-f6dpsDsOyxnl25UsTudmow1N}
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-rzp_test_RtZyDR8hJ0EOhx}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-5DLMyLZXEPtQkCjEK139XJm3}
     volumes:
       - .:/app
     depends_on:

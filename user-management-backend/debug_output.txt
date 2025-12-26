@@ -1,0 +1,23 @@
+DEBUG LOG START
+2025-12-19 19:02:47.005662: Starting Razorpay Debug...
+2025-12-19 19:02:47.007344: Initializing client with Key: rzp_test_Rqxl4tVNxYqSuO
+2025-12-19 19:02:47.009047: Client initialized.
+2025-12-19 19:02:47.010352: Creating order with data: {'amount': 29900, 'currency': 'INR', 'receipt': 'debug_rcpt_1766170967', 'notes': {'plan_name': 'pro', 'debug': 'true'}}
+2025-12-19 19:02:47.290512: ERROR: Authentication failed
+2025-12-19 19:02:47.294760: Traceback (most recent call last):
+  File "/app/debug_razorpay_order.py", line 47, in test_razorpay
+    order = client.order.create(data=order_data)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/razorpay/resources/order.py", line 71, in create
+    return self.post_url(url, data, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/razorpay/resources/base.py", line 20, in post_url
+    return self.client.post(url, data, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/razorpay/client.py", line 252, in post
+    return self.request('post', path, data=data, **options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/site-packages/razorpay/client.py", line 200, in request
+    raise BadRequestError(msg)
+razorpay.errors.BadRequestError: Authentication failed
+
