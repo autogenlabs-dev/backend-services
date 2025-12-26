@@ -82,8 +82,6 @@ services:
       - "4040:4040"  # ngrok web interface
     depends_on:
       - api
-    environment:
-      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN:-}  # Optional: add your ngrok auth token
 
 volumes:
   mongodb_data:
