@@ -80,9 +80,8 @@ async def get_my_profile(
         subscription=current_user.subscription.value if current_user.subscription else "free",  # Use enum value
         api_keys=api_keys_response,
         glm_api_key=current_user.glm_api_key,  # Include GLM API key
-        bytez_api_key=current_user.bytez_api_key,  # Include Bytez API key
-        openrouter_api_key=current_user.openrouter_api_key,
         bytez_api_key=current_user.bytez_api_key,  # Include Bytez API key for Ultra users
+        openrouter_api_key=current_user.openrouter_api_key,
         role=getattr(current_user, 'role', 'user'),
         # Always allow publishing content to merge user and developer roles
         can_publish_content=True 
