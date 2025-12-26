@@ -84,7 +84,23 @@ async def chat_completions_proxy(
     try:
         # Parse request body
         body = await request.json()
-        model_id = body.get("model", "")
+        model_id = body.get("model")
+        
+        # CODEMURF: Map frontend model IDs to Z.AI model IDs
+        model_mapping = {
+            "glm-4.7": "glm-4-plus",
+            "glm-4.6": "glm-4-0520",
+            "glm-4.5": "glm-4",
+            "glm-4": "glm-4",
+            "glm-4-air": "glm-4-air",
+            "glm-4-flash": "glm-4-flash"
+        }
+        
+        # Use mapped ID or fallback to original
+        actual_model_id = model_mapping.get(model_id, model_id)
+        body["model"] = actual_model_id
+        
+        print(f"Proxying request for model: {model_id} -> {actual_model_id}") # Debug log
         
         # Validate GLM model access
         if model_id.startswith("glm-"):
@@ -137,9 +153,11 @@ async def chat_completions_proxy(
                     # Check for errors
                     if response.status_code != 200:
                         error_text = await response.aread()
+                        error_msg = error_text.decode()
+                        print(f"Z.AI API Error ({response.status_code}): {error_msg}") # Debug log
                         raise HTTPException(
                             status_code=response.status_code,
-                            detail=f"Z.AI API error: {error_text.decode()}"
+                            detail=f"Z.AI API error: {error_msg}"
                         )
                     
                     # Stream chunks back to client
