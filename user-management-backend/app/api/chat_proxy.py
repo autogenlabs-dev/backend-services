@@ -11,8 +11,8 @@ from ..models.user import User
 
 router = APIRouter(prefix="/chat", tags=["Chat Proxy"])
 
-# Z.AI Configuration
-ZAI_BASE_URL = "https://api.z.ai/api/paas/v4"
+# Z.AI Configuration (GLM models)
+ZAI_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
 
 
 async def get_user_glm_key(user: User) -> Optional[str]:
