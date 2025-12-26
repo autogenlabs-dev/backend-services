@@ -154,12 +154,13 @@ async def chat_completions_proxy(
                     if response.status_code != 200:
                         error_text = await response.aread()
                         error_msg = error_text.decode()
-                        print(f"Z.AI API Error ({response.status_code}): {error_msg}") # Debug log
-                        raise HTTPException(
-                            status_code=response.status_code,
-                            detail=f"Z.AI API error: {error_msg}"
-                        )
-                    
+                        print(f"Z.AI API Error ({response.status_code}): {error_msg}")
+                        # Yield error as a JSON chunk so client sees it
+                        import json
+                        error_json = json.dumps({"error": {"message": f"Z.AI Error: {error_msg}", "code": response.status_code}})
+                        yield f"data: {error_json}\n\n".encode('utf-8')
+                        return
+
                     # Stream chunks back to client
                     async for chunk in response.aiter_bytes():
                         yield chunk
