@@ -136,9 +136,7 @@ async def chat_completions_proxy(
             "Content-Type": "application/json"
         }
         
-        # Enable context caching if not explicitly disabled
-        if "cache" not in body:
-            body["cache"] = True
+
         
         # Create streaming response
         async def stream_response():
