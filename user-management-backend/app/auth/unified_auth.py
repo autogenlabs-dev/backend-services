@@ -81,7 +81,12 @@ async def get_current_user_unified(
                 try:
                     header = jose_jwt.get_unverified_header(auth_header)
                     print(f"DEBUG [JWT]: Token header: {header}")
-                    unverified = jose_jwt.decode(auth_header, options={"verify_signature": False})
+                    unverified = jose_jwt.decode(
+                        auth_header,
+                        settings.jwt_secret_key,
+                        algorithms=["HS256"],
+                        options={"verify_signature": False}
+                    )
                     print(f"DEBUG [JWT]: Unverified payload sub={unverified.get('sub')}, email={unverified.get('email')}")
                 except Exception as dbg_e:
                     print(f"DEBUG [JWT]: Pre-decode error: {dbg_e}")
