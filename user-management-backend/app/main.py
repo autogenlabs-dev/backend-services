@@ -245,8 +245,7 @@ print(f"   - Debug Mode: {settings.debug}")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,  # Explicit origins
-    allow_origin_regex=r"https?://(.*\.)?codemurf\.com|vscode-webview://.*",  # Allow all codemurf subdomains (http/https) and vscode-webview
+    allow_origins=allowed_origins,  # Explicit origins only - no regex to avoid duplicate headers
     allow_credentials=True,  # Allow credentials for authenticated requests  
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
