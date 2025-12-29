@@ -6,26 +6,9 @@ services:
     build: .
     ports:
       - "8000:8000"
-    environment:
-      - DATABASE_URL=mongodb://admin:password123@mongodb:27017/user_management_db?authSource=admin
-      - JWT_SECRET_KEY=wazn5RgTljhqBq1Mt7egWI/ywc7TLZx/gE5S39vAGuA=
-      - DEBUG=False
-      - ENVIRONMENT=production
-      - DISABLE_CORS_MIDDLEWARE=true
-      - A4F_API_KEY=${A4F_API_KEY:-your-a4f-api-key}
-      - REDIS_URL=redis://redis:6379
-      # Google OAuth Configuration
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-37099745939-4v685b95lv9r2306l1edq4s7dpnk05vd.apps.googleusercontent.com}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-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}
-      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-https://api.codemurf.com/api/auth/google/callback}
-      # GitHub OAuth Configuration
-      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-Ov23li9jfiByvkoGx6Ih}
-      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-e26733526b95de417f77a5d924b142cf2f80dfd5}
-      # OpenRouter OAuth Configuration
-      - OPENROUTER_PROVISIONING_API_KEY=${OPENROUTER_PROVISIONING_API_KEY:-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}
-      # Razorpay Configuration (TEST MODE)
-      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-rzp_test_RtZyDR8hJ0EOhx}
-      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-5DLMyLZXEPtQkCjEK139XJm3}
+    # Load secrets from .env.production file (NOT committed to git)
+    env_file:
+      - .env.production
     volumes:
       - .:/app
     depends_on:

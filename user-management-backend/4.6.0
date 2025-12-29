@@ -1,2 +1,0 @@
-Requirement already satisfied: pymongo in c:\users\asus\music\clean-backend\user-management-backend\.venv\lib\site-packages (4.13.2)
-Requirement already satisfied: dnspython<3.0.0,>=1.16.0 in c:\users\asus\music\clean-backend\user-management-backend\.venv\lib\site-packages (from pymongo) (2.7.0)

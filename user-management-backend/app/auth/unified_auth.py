@@ -41,13 +41,7 @@ async def get_current_user_unified(
     This unified approach allows VS Code extensions to use persistent API keys
     while still supporting web applications using JWT tokens.
     """
-    print(f"DEBUG [unified_auth]: Function called", flush=True)
-    sys.stdout.flush()
-    print(f"DEBUG [unified_auth]: credentials present: {credentials is not None}", flush=True)
-    sys.stdout.flush()
-    if credentials:
-        print(f"DEBUG [unified_auth]: credentials.credentials[:20]: {credentials.credentials[:20] if hasattr(credentials, 'credentials') else 'NO CREDENTIALS ATTR'}", flush=True)
-        sys.stdout.flush()
+    logger.debug("Unified auth called")
     
     user = None
     auth_method = "unknown"
@@ -77,20 +71,6 @@ async def get_current_user_unified(
             try:
                 from jose import jwt as jose_jwt, JWTError
                 
-                # Debug: Print token header and try unverified decode
-                try:
-                    header = jose_jwt.get_unverified_header(auth_header)
-                    print(f"DEBUG [JWT]: Token header: {header}")
-                    unverified = jose_jwt.decode(
-                        auth_header,
-                        settings.jwt_secret_key,
-                        algorithms=["HS256"],
-                        options={"verify_signature": False}
-                    )
-                    print(f"DEBUG [JWT]: Unverified payload sub={unverified.get('sub')}, email={unverified.get('email')}")
-                except Exception as dbg_e:
-                    print(f"DEBUG [JWT]: Pre-decode error: {dbg_e}")
-                
                 payload = jose_jwt.decode(
                     auth_header,
                     settings.jwt_secret_key,
@@ -100,12 +80,11 @@ async def get_current_user_unified(
                 if payload:
                     user_id = payload.get("sub")
                     email = payload.get("email")
-                    print(f"DEBUG [unified_auth]: JWT payload - sub: {user_id}, email: {email}")
+                    logger.debug(f"JWT decoded for email: {email}")
                     
                     # Try to find user by email first (most reliable)
                     if email:
                         user = await User.find_one(User.email == email)
-                        print(f"DEBUG [unified_auth]: User lookup by email result: {user}")
                     
                     # If not found by email, try by user_id
                     if not user and user_id:
@@ -123,17 +102,17 @@ async def get_current_user_unified(
                             is_active=True
                         )
                         await user.insert()
-                        print(f"DEBUG [unified_auth]: Created new user: {email}")
+                        logger.info(f"Created new user via JWT: {email}")
                     
                     if not user:
                         auth_method += " - User not found"
                 else:
                     auth_method += " - Token verification failed"
             except JWTError as e:
-                print(f"DEBUG [JWT]: JWTError type={type(e).__name__}, msg={str(e)}")
-                auth_method += f" - JWT Error: {str(e)}"
+                logger.warning(f"JWT validation failed: {type(e).__name__}")
+                auth_method += f" - JWT Error"
             except Exception as e:
-                auth_method += f" - Exception: {str(e)}"
+                auth_method += f" - Exception"
     elif not user and credentials and not hasattr(credentials, 'credentials'):
         auth_method = "Authorization header present but missing credentials attribute"
     elif not user and not credentials:
@@ -156,24 +135,12 @@ async def get_current_user_unified(
         )
     
     # Provision OpenRouter key if user doesn't have one (for existing users)
-    print(f"DEBUG [unified_auth]: Checking OpenRouter key for user {user.email}, current key: {user.openrouter_api_key}", flush=True)
-    sys.stdout.flush()
-    
     if not user.openrouter_api_key:
-        print(f"DEBUG [unified_auth]: User {user.email} has no OpenRouter key, provisioning...", flush=True)
-        sys.stdout.flush()
         try:
             await ensure_user_openrouter_key(user)
-            logger.info(f"Provisioned OpenRouter key for existing user on login: {user.email}")
-            print(f"DEBUG [unified_auth]: Successfully provisioned OpenRouter key for {user.email}", flush=True)
-            sys.stdout.flush()
+            logger.info(f"Provisioned OpenRouter key for user: {user.email}")
         except Exception as e:
-            logger.warning(f"Failed to provision OpenRouter key for existing user {user.email}: {e}")
-            print(f"DEBUG [unified_auth]: Failed to provision OpenRouter key: {e}", flush=True)
-            sys.stdout.flush()
-    else:
-        print(f"DEBUG [unified_auth]: User {user.email} already has OpenRouter key", flush=True)
-        sys.stdout.flush()
+            logger.warning(f"Failed to provision OpenRouter key: {e}")
     
     return user
 

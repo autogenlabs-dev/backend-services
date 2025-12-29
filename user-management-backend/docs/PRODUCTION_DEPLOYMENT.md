@@ -1,255 +1,314 @@
-# Production Deployment Guide - EC2 with Docker
+# 🚀 Production Deployment Checklist
 
-## 📍 Where GLM API Keys Are Stored
+## Pre-Deployment Preparation
 
-**IMPORTANT**: GLM API keys are **NOT stored in environment variables**. They are stored in **MongoDB** in the `User.glm_api_key` field.
+### 1. Environment Configuration ✅
 
-### How It Works:
-1. Users set their GLM API key via API:
-   ```bash
-   POST /api/users/me/glm-api-key?api_key=ghp_xxxxx
-   Authorization: Bearer <clerk_token>
-   ```
+Create `.env.production` file with the following **CRITICAL** settings:
 
-2. The key is stored in MongoDB in the user's document
-3. The key is returned in the user profile:
-   ```bash
-   GET /api/users/me
-   Response: { "glm_api_key": "ghp_xxxxx", ... }
-   ```
-
-### Database Location:
-- **Collection**: `users`
-- **Field**: `glm_api_key` (String, Optional)
-- **Model**: `app/models/user.py` (line 43)
-
----
-
-## 🚀 EC2 Deployment Steps
-
-### 1. Prepare Your EC2 Instance
-
+#### **Must Configure:**
 ```bash
-# SSH into your EC2 instance
-ssh -i your-key.pem ubuntu@your-ec2-ip
+# 1. Generate secure JWT secret
+openssl rand -hex 32
+# Add to: JWT_SECRET_KEY=<generated_key>
 
-# Update system
-sudo apt update && sudo apt upgrade -y
+# 2. Update Clerk credentials (from dashboard.clerk.com)
+CLERK_ISSUER=https://your-instance.clerk.accounts.dev
+CLERK_JWKS_URL=https://your-instance.clerk.accounts.dev/.well-known/jwks.json
+CLERK_SECRET_KEY=sk_live_xxxxx
 
-# Install Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-sudo usermod -aG docker $USER
+# 3. OpenRouter Provisioning Key (CRITICAL for user API keys)
+OPENROUTER_PROVISIONING_API_KEY=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
 
-# Install Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
+# 4. Update Production URLs
+PRODUCTION_BACKEND_URL=https://api.codemurf.com
+PRODUCTION_FRONTEND_URL=https://codemurf.com
+API_ENDPOINT=https://api.codemurf.com
 
-# Logout and login again for docker group to take effect
-exit
-```
+# 5. CORS Origins (add your production domains)
+BACKEND_CORS_ORIGINS=["https://codemurf.com","https://www.codemurf.com","https://api.codemurf.com"]
 
-### 2. Clone Your Repository
-
-```bash
-# Clone your repo (or use git pull if already cloned)
-git clone https://github.com/your-username/backend-services.git
-cd backend-services/user-management-backend
-```
-
-### 3. Create Production Environment File
-
-```bash
-# Copy example to .env
-cp .env.example .env
-
-# Edit with your production values
-nano .env
-```
-
-### 4. Required Environment Variables
-
-Edit `.env` with these **MANDATORY** values:
-
-```bash
-# CRITICAL - Change these!
-JWT_SECRET_KEY=$(openssl rand -hex 32)  # Generate strong key
+# 6. Set Production Mode
 DEBUG=False
 ENVIRONMENT=production
-
-# Clerk Configuration (from Clerk Dashboard)
-CLERK_JWKS_URL=https://your-clerk-instance.clerk.accounts.dev/.well-known/jwks.json
-CLERK_ISSUER=https://your-clerk-instance.clerk.accounts.dev
-CLERK_AUDIENCE=https://your-production-domain.com
-
-# Database (Docker internal URLs)
-DATABASE_URL=mongodb://mongodb:27017/user_management_db
-REDIS_URL=redis://redis:6379
-
-# OAuth Providers (update with your production credentials)
-GOOGLE_CLIENT_ID=your-prod-google-client-id
-GOOGLE_CLIENT_SECRET=your-prod-google-client-secret
-GOOGLE_REDIRECT_URI=https://your-domain.com/api/auth/google/callback
-
-GITHUB_CLIENT_ID=your-prod-github-client-id
-GITHUB_CLIENT_SECRET=your-prod-github-client-secret
-
-# CORS - Add your frontend domain
-ALLOWED_ORIGINS=https://your-frontend-domain.com
 ```
 
-### 5. Deploy with Docker Compose
+### 2. Database Setup ✅
 
+Your current MongoDB Atlas connection is already configured:
+```
+DATABASE_URL=mongodb+srv://autogencodebuilder:DataOnline@autogen.jf0j0.mongodb.net/user_management_db
+```
+
+**Verify:**
+- [ ] Database user has proper read/write permissions
+- [ ] Network access allows production server IPs
+- [ ] Connection string includes retry and timeout parameters
+
+### 3. Clerk Configuration (Frontend & Backend) ✅
+
+**Clerk Dashboard Setup:**
+1. Go to https://dashboard.clerk.com
+2. Select your production application
+3. Navigate to **API Keys** section
+4. Copy these values:
+   - **Publishable Key** (for frontend): `pk_live_xxx`
+   - **Secret Key** (for backend): `sk_live_xxx`
+   - **JWKS URL**: Should be `https://your-instance.clerk.accounts.dev/.well-known/jwks.json`
+
+5. **Important:** Configure allowed redirect URLs in Clerk:
+   - Add: `https://codemurf.com/*`
+   - Add: `https://api.codemurf.com/api/auth/clerk/callback`
+
+**Frontend Configuration:**
+Update your Next.js `.env.local`:
+```env
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_xxxxx
+CLERK_SECRET_KEY=sk_live_xxxxx
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/dashboard
+```
+
+### 4. Security Checklist ✅
+
+- [ ] Generate new JWT secret (don't use development key)
+- [ ] Update Clerk keys to production keys
+- [ ] Set `DEBUG=False`
+- [ ] Configure HTTPS redirects
+- [ ] Set up SSL certificates (Let's Encrypt recommended)
+- [ ] Enable CORS only for trusted domains
+- [ ] Review and update rate limiting settings
+
+### 5. Infrastructure Setup ✅
+
+**Docker Deployment (Recommended):**
 ```bash
-# Build and start services
-docker-compose -f docker-compose.production.yml up --build -d
+# 1. Copy production environment file
+cp .env.production.example .env.production
+# Edit .env.production with your values
 
-# Check logs
+# 2. Build production container
+docker-compose -f docker-compose.production.yml build
+
+# 3. Start services
+docker-compose -f docker-compose.production.yml up -d
+
+# 4. Check logs
 docker-compose -f docker-compose.production.yml logs -f api
-
-# Check status
-docker-compose -f docker-compose.production.yml ps
 ```
 
-### 6. Configure Security Groups (AWS Console)
+**Or EC2/VPS Deployment:**
+```bash
+# 1. Clone repository
+git clone <your-repo>
+cd user-management-backend
 
-Allow these ports in your EC2 Security Group:
-- **Port 80** (HTTP)
-- **Port 443** (HTTPS)
-- **Port 8000** (API - optional, if not using nginx)
-- **Port 22** (SSH - restrict to your IP)
+# 2. Setup environment
+cp .env.production.example .env.production
+# Edit .env.production
 
-### 7. Set Up SSL (Optional but Recommended)
+# 3. Install dependencies
+pip install -r requirements-production.txt
 
+# 4. Run with Gunicorn
+gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
+```
+
+### 6. DNS & SSL Configuration ✅
+
+**Required DNS Records:**
+```
+api.codemurf.com    A    <your-server-ip>
+www.codemurf.com    A    <your-server-ip>
+codemurf.com        A    <your-server-ip>
+```
+
+**SSL Certificate (Let's Encrypt):**
 ```bash
 # Install Certbot
-sudo apt install certbot
+sudo apt-get install certbot python3-certbot-nginx
 
-# Get SSL certificate
-sudo certbot certonly --standalone -d your-domain.com
-
-# Certificates will be in /etc/letsencrypt/live/your-domain.com/
+# Generate certificate
+sudo certbot --nginx -d api.codemurf.com -d codemurf.com -d www.codemurf.com
 ```
 
-### 8. Update CORS Settings
+### 7. Nginx Reverse Proxy Configuration ✅
 
-Edit `app/main.py` and update CORS origins:
+Create `/etc/nginx/sites-available/api.codemurf.com`:
+```nginx
+server {
+    listen 80;
+    server_name api.codemurf.com;
+    
+    # Redirect HTTP to HTTPS
+    return 301 https://$server_name$request_uri;
+}
 
-```python
-allow_origins=[
-    "https://your-production-domain.com",
-    "https://www.your-production-domain.com"
-]
-```
+server {
+    listen 443 ssl http2;
+    server_name api.codemurf.com;
 
----
+    ssl_certificate /etc/letsencrypt/live/api.codemurf.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.codemurf.com/privkey.pem;
 
-## 🔄 Updating Deployment
+    # Security headers
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
 
-```bash
-# Pull latest changes
-git pull origin main
-
-# Rebuild and restart
-docker-compose -f docker-compose.production.yml up --build -d
-
-# View logs
-docker-compose -f docker-compose.production.yml logs -f api
-```
-
----
-
-## 🔍 Monitoring & Logs
-
-```bash
-# View API logs
-docker-compose -f docker-compose.production.yml logs -f api
-
-# View MongoDB logs
-docker-compose -f docker-compose.production.yml logs -f mongodb
-
-# View Redis logs
-docker-compose -f docker-compose.production.yml logs -f redis
-
-# Check service health
-curl http://localhost:8000/health
-
-# Check database connection
-docker exec -it user-management-backend-mongodb-1 mongosh
-```
-
----
-
-## 🛡️ Security Checklist
-
-- [x] Changed `JWT_SECRET_KEY` to secure random value
-- [x] Set `DEBUG=False` in production
-- [x] Updated Clerk URLs to production instance
-- [x] Configured CORS with actual frontend domains
-- [x] Using HTTPS (SSL certificates)
-- [x] Restricted Security Group ports
-- [x] `.env` file is in `.gitignore`
-- [x] OAuth redirect URIs updated to production URLs
-- [x] Database has proper backups configured
-
----
-
-## 📊 API Endpoints
-
-### Health Check
-```bash
-GET http://your-domain.com/health
-```
-
-### User Profile (includes GLM API key)
-```bash
-GET /api/users/me
-Authorization: Bearer <clerk_token>
-
-Response:
-{
-  "id": "...",
-  "email": "...",
-  "glm_api_key": "ghp_xxxxx",  // User's GLM key
-  "api_keys": [],
-  ...
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Timeouts
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
 }
 ```
 
-### Set GLM API Key
+Enable the site:
 ```bash
-POST /api/users/me/glm-api-key?api_key=ghp_xxxxx
-Authorization: Bearer <clerk_token>
+sudo ln -s /etc/nginx/sites-available/api.codemurf.com /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
 ```
 
 ---
 
-## 🐛 Troubleshooting
+## Post-Deployment Verification
 
-### Container won't start
+### 1. Health Check ✅
 ```bash
-docker-compose -f docker-compose.production.yml logs api
+curl https://api.codemurf.com/health
+# Expected: {"status":"ok"}
 ```
 
-### Database connection issues
+### 2. Test Authentication ✅
 ```bash
-# Check MongoDB is running
-docker-compose -f docker-compose.production.yml ps mongodb
-
-# Test connection
-docker exec -it user-management-backend-mongodb-1 mongosh
+# Get a fresh Clerk token from your frontend
+curl -H "Authorization: Bearer <clerk_token>" https://api.codemurf.com/api/users/me
 ```
 
-### 401 Unauthorized errors
-- Check Clerk configuration (JWKS URL, Issuer, Audience)
-- Verify token is being sent in `Authorization: Bearer <token>` header
-- Check logs: `docker-compose logs api | grep -i clerk`
+### 3. Test OpenRouter Key Provisioning ✅
+```bash
+curl -X POST https://api.codemurf.com/api/users/me/openrouter-key/refresh \
+  -H "Authorization: Bearer <clerk_token>"
+# Should return: {"openrouter_api_key": "sk-or-v1-xxx..."}
+```
+
+### 4. Verify Subscription Plans ✅
+```bash
+curl -H "Authorization: Bearer <clerk_token>" https://api.codemurf.com/api/users/me | jq '.subscription'
+# Expected: "free" (default for new users)
+```
+
+### 5. Monitor Logs
+```bash
+# Docker deployment
+docker-compose logs -f api
+
+# Or systemd service
+sudo journalctl -u user-management-backend -f
+```
 
 ---
 
-## 📞 Support
+## Environment Variables Summary
 
-For issues, check:
-1. Docker logs: `docker-compose logs -f api`
-2. Environment variables: `docker-compose config`
-3. Health endpoint: `curl http://localhost:8000/health`
+### **CRITICAL - Must Change:**
+1. ✅ `JWT_SECRET_KEY` - Generate with `openssl rand -hex 32`
+2. ✅ `CLERK_ISSUER` - Your Clerk instance URL
+3. ✅ `CLERK_JWKS_URL` - Your Clerk JWKS endpoint
+4. ✅ `CLERK_SECRET_KEY` - Production secret key from Clerk
+5. ✅ `OPENROUTER_PROVISIONING_API_KEY` - Already have: `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`
+6. ✅ `DEBUG=False`
+7. ✅ `ENVIRONMENT=production`
+
+### **Important - Should Update:**
+- `BACKEND_CORS_ORIGINS` - Add production domains
+- `PRODUCTION_BACKEND_URL` - Your API domain
+- `PRODUCTION_FRONTEND_URL` - Your frontend domain
+- `DATABASE_URL` - Already configured with MongoDB Atlas
+
+### **Optional - Add if Using:**
+- OAuth: `GOOGLE_CLIENT_ID`, `GITHUB_CLIENT_ID`
+- Payments: `STRIPE_SECRET_KEY`, `RAZORPAY_KEY_ID`
+- Other LLM providers: `GLAMA_API_KEY`, etc.
+
+---
+
+## Quick Deployment Commands
+
+```bash
+# 1. Copy and configure environment
+cp .env.production.example .env.production
+nano .env.production  # Edit with your values
+
+# 2. Deploy with Docker
+docker-compose -f docker-compose.production.yml up -d --build
+
+# 3. Check status
+docker-compose ps
+curl https://api.codemurf.com/health
+
+# 4. View logs
+docker-compose logs -f api
+```
+
+---
+
+## Monitoring & Maintenance
+
+### Health Checks
+- Health endpoint: `https://api.codemurf.com/health`
+- API docs: `https://api.codemurf.com/docs` (disable in production if sensitive)
+
+### Database Backups
+```bash
+# MongoDB Atlas automated backups are enabled by default
+# Verify in Atlas dashboard: Data Storage > Backup
+```
+
+### Log Rotation
+```bash
+# For Docker logs
+docker-compose logs --tail=100 api > api.log
+```
+
+---
+
+## Troubleshooting
+
+### Issue: "Token has expired"
+- Check Clerk token expiration settings
+- Verify frontend is using correct Clerk instance
+- Ensure system time is synchronized (NTP)
+
+### Issue: "OpenRouter key returns null"
+- Verify `OPENROUTER_PROVISIONING_API_KEY` is set
+- Check container logs for provisioning errors
+- Test provisioning key manually with curl
+
+### Issue: "CORS error"
+- Add frontend domain to `BACKEND_CORS_ORIGINS`
+- Verify Nginx proxy headers are set correctly
+- Check browser console for exact CORS error
+
+---
+
+## Need Help?
+
+1. Check logs: `docker-compose logs -f api`
+2. Verify environment: `docker-compose config`
+3. Test connectivity: `curl -v https://api.codemurf.com/health`

@@ -131,17 +131,8 @@ class PerformanceAndRateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: Callable
     ) -> JSONResponse:
-        # Debug logging for /api/users/me
-        if request.url.path == "/api/users/me":
-            print(f"DEBUG [middleware]: Request to /api/users/me")
-            print(f"DEBUG [middleware]: Authorization header: {request.headers.get('authorization', 'NOT PRESENT')}")
-            print(f"DEBUG [middleware]: All headers: {dict(request.headers)}")
-        
-        
-        # Debug logging for CORS
-        origin = request.headers.get("origin")
-        if origin or "dashboard" in request.url.path:
-            print(f"DEBUG [middleware]: Request Origin: {origin}, Method: {request.method}, Path: {request.url.path}", flush=True)
+        # Note: Debug logging removed for production security
+        # Sensitive headers should never be logged
 
         # Track request timing
         start_time = time.time()
@@ -296,7 +287,11 @@ from .endpoints import payments as item_payments
 app.include_router(item_payments.router, prefix="/api")
 # Extension authentication endpoints (Clerk-compatible API)
 app.include_router(extension_auth.router, prefix="/api")
-app.include_router(debug.router, prefix="/api")
+
+# Debug router - ONLY in debug mode
+if settings.debug:
+    app.include_router(debug.router, prefix="/api")
+
 app.include_router(verify.router, prefix="/api")
 
 # Admin API key pool management

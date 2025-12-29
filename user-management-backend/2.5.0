@@ -1,7 +1,0 @@
-Requirement already satisfied: pydantic[email] in c:\users\asus\music\clean-backend\user-management-backend\.venv\lib\site-packages (2.5.0)
-Requirement already satisfied: annotated-types>=0.4.0 in c:\users\asus\music\clean-backend\user-management-backend\.venv\lib\site-packages (from pydantic[email]) (0.7.0)
-Requirement already satisfied: pydantic-core==2.14.1 in c:\users\asus\music\clean-backend\user-management-backend\.venv\lib\site-packages (from pydantic[email]) (2.14.1)
-Requirement already satisfied: typing-extensions>=4.6.1 in c:\users\asus\music\clean-backend\user-management-backend\.venv\lib\site-packages (from pydantic[email]) (4.14.0)
-Requirement already satisfied: email-validator>=2.0.0 in c:\users\asus\music\clean-backend\user-management-backend\.venv\lib\site-packages (from pydantic[email]) (2.2.0)
-Requirement already satisfied: dnspython>=2.0.0 in c:\users\asus\music\clean-backend\user-management-backend\.venv\lib\site-packages (from email-validator>=2.0.0->pydantic[email]) (2.7.0)
-Requirement already satisfied: idna>=2.0.0 in c:\users\asus\music\clean-backend\user-management-backend\.venv\lib\site-packages (from email-validator>=2.0.0->pydantic[email]) (3.10)

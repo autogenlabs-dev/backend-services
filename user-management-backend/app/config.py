@@ -11,33 +11,33 @@ class Settings(BaseSettings):
         extra="ignore"  # This will ignore extra environment variables
     )
     
-    # Database
-    database_url: str = "mongodb+srv://autogencodebuilder:DataOnline@autogen.jf0j0.mongodb.net/user_management_db?retryWrites=true&w=majority&connectTimeoutMS=60000&socketTimeoutMS=60000"
-    redis_url: str = "redis://localhost:6379"
+    # Database - MUST be set via environment variables in production
+    database_url: str = "mongodb://mongodb:27017/user_management_db"  # Docker default
+    redis_url: str = "redis://redis:6379"  # Docker default
     
     # Redis Configuration
     redis_host: str = "localhost"
     redis_port: int = 6379
     redis_password: str = ""
     
-    # JWT
-    jwt_secret_key: str = "your-super-secret-jwt-key-change-in-production"
+    # JWT - jwt_secret_key MUST be set via environment variable in production
+    jwt_secret_key: str = ""  # REQUIRED: Set JWT_SECRET_KEY env var
     jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 30
+    access_token_expire_minutes: int = 60  # Increased for better UX
     refresh_token_expire_days: int = 7
     
-    # Stripe
-    stripe_secret_key: str = "sk_test_51RVi9b00tZAh2watNguPPSVIAwj7mll7RsiqeXfWIvR6JbwsO1vW2j4KWFlh8Tgkpozue2zq993aKn59wCRLZK5O00sbBOVXzr"
-    stripe_publishable_key: str = "pk_test_51RVi9b00tZAh2watbNFlPjw4jKS02yZbKHQ1t97GcyMTOGLwcL8QhzxDSGtGu2EAJP4DHcEWOkut5N0CCTnuqBgh00p44dvGCb"
-    stripe_webhook_secret: str = "whsec_your_webhook_secret"
+    # Stripe - Set via environment variables
+    stripe_secret_key: str = ""  # Set STRIPE_SECRET_KEY env var
+    stripe_publishable_key: str = ""  # Set STRIPE_PUBLISHABLE_KEY env var
+    stripe_webhook_secret: str = ""  # Set STRIPE_WEBHOOK_SECRET env var
     
-    # Razorpay (TEST MODE)
-    razorpay_key_id: str = "rzp_test_Rqxl4tVNxYqSuO"
-    razorpay_key_secret: str = "f6dpsDsOyxnl25UsTudmow1N"
+    # Razorpay - Set via environment variables
+    razorpay_key_id: str = ""  # Set RAZORPAY_KEY_ID env var
+    razorpay_key_secret: str = ""  # Set RAZORPAY_KEY_SECRET env var
     
     # Application
     app_name: str = "User Management Backend"
-    debug: bool = True
+    debug: bool = False  # IMPORTANT: Default to False for production safety
     api_v1_str: str = "/api"
     project_name: str = "User Management API"
     environment: str = "development"
@@ -64,25 +64,25 @@ class Settings(BaseSettings):
     # OAuth
     oauth_providers: List[str] = ["openrouter", "google", "github"]
 
-    # OAuth Client Credentials
-    openrouter_client_id: str = "your_openrouter_client_id"
-    openrouter_client_secret: str = "your_openrouter_client_secret"
-    google_client_id: str = "your_google_client_id"
-    google_client_secret: str = "your_google_client_secret"
-    google_redirect_uri: str = "http://localhost:8000/api/auth/google/callback"
-    github_client_id: str = "your_github_client_id"
-    github_client_secret: str = "your_github_client_secret"
+    # OAuth Client Credentials - Set via environment variables
+    openrouter_client_id: str = ""  # Set OPENROUTER_CLIENT_ID env var
+    openrouter_client_secret: str = ""  # Set OPENROUTER_CLIENT_SECRET env var
+    google_client_id: str = ""  # Set GOOGLE_CLIENT_ID env var
+    google_client_secret: str = ""  # Set GOOGLE_CLIENT_SECRET env var
+    google_redirect_uri: str = "https://api.codemurf.com/api/auth/google/callback"
+    github_client_id: str = ""  # Set GITHUB_CLIENT_ID env var
+    github_client_secret: str = ""  # Set GITHUB_CLIENT_SECRET env var
     
-    # LLM Provider API Keys
-    openrouter_api_key: str = "your_openrouter_api_key"
+    # LLM Provider API Keys - Set via environment variables
+    openrouter_api_key: str = ""  # Set OPENROUTER_API_KEY env var
     openrouter_provisioning_api_key: str = ""  # Provisioning key for per-user API keys
     openrouter_api_base: str = "https://openrouter.ai/api/v1"
-    glama_api_key: str = "your_glama_api_key"
-    requesty_api_key: str = "your_requesty_api_key"
-    aiml_api_key: str = "your_aiml_api_key"
+    glama_api_key: str = ""  # Set GLAMA_API_KEY env var
+    requesty_api_key: str = ""  # Set REQUESTY_API_KEY env var
+    aiml_api_key: str = ""  # Set AIML_API_KEY env var
     
-    # A4F API Key for VS Code Extension
-    a4f_api_key: str = "ddc-a4f-a480842d898b49d4a15e14800c2f3c72"
+    # A4F API Key for VS Code Extension - Set via environment variable
+    a4f_api_key: str = ""  # Set A4F_API_KEY env var
     a4f_base_url: str = "https://api.a4f.co/v1"
     
     # Rate Limiting
