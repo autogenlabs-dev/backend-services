@@ -173,6 +173,36 @@ async def get_all_components(
             detail=f"Failed to fetch components: {str(e)}"
         )
 
+@router.get("/categories", response_model=Dict[str, Any])
+async def get_component_categories():
+    """Get all unique component categories."""
+    try:
+        logger.info("🔍 GET /api/components/categories called")
+        
+        # Get distinct categories from approved, active components
+        categories = await Component.distinct(
+            "category",
+            {"is_active": True, "approval_status": "approved"}
+        )
+        
+        # Filter out None/empty values
+        categories = [c for c in categories if c]
+        categories.sort()
+        
+        logger.info(f"✅ Found {len(categories)} unique categories")
+        
+        return {
+            "success": True,
+            "categories": categories,
+            "total": len(categories)
+        }
+    except Exception as e:
+        logger.error(f"❌ Error in get_component_categories: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch categories: {str(e)}"
+        )
+
 @router.get("/my", response_model=Dict[str, Any])
 async def get_my_components(
     current_user: User = Depends(get_current_user_unified),
