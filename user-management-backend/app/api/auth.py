@@ -18,7 +18,7 @@ from datetime import datetime
 from ..database import get_database, get_redis
 from ..schemas.auth import TokenRefresh, OAuthCallback, UserCreate, UserLogin
 from ..models.user import User
-from ..auth.jwt import create_access_token, create_refresh_token, verify_token
+from ..auth.jwt import create_access_token, create_refresh_token, verify_token, get_password_hash
 from ..auth.oauth import get_oauth_client, get_provider_config, oauth
 from ..auth.dependencies import get_current_user
 from ..auth.unified_auth import get_current_user_unified
@@ -976,3 +976,118 @@ async def exchange_extension_ticket(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to exchange ticket: {str(e)}"
         )
+
+
+# ============== PASSWORD RESET ENDPOINTS ==============
+
+class ForgotPasswordRequest(BaseModel):
+    """Request model for forgot password."""
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Request model for reset password."""
+    token: str
+    new_password: str = Field(..., min_length=8)
+
+
+@router.post("/forgot-password")
+async def forgot_password(
+    request: ForgotPasswordRequest,
+    db: AsyncIOMotorDatabase = Depends(get_database),
+    redis_client = Depends(get_redis)
+):
+    """
+    Request a password reset. Generates a reset token stored in Redis.
+    In production, this should send an email with the reset link.
+    """
+    # Find user by email
+    user = await User.find_one(User.email == request.email)
+    
+    # Always return success to prevent email enumeration
+    if not user:
+        return {"message": "If an account with this email exists, a reset link has been sent."}
+    
+    # Generate reset token
+    reset_token = secrets.token_urlsafe(32)
+    
+    # Store token in Redis with 15 minute expiry
+    import json
+    token_data = {
+        "user_id": str(user.id),
+        "email": user.email,
+        "created_at": datetime.utcnow().isoformat()
+    }
+    redis_client.setex(
+        f"password_reset:{reset_token}",
+        900,  # 15 minutes
+        json.dumps(token_data)
+    )
+    
+    # In development, return the token. In production, send email instead.
+    frontend_url = getattr(settings, 'frontend_url', None) or 'http://localhost:3000'
+    reset_url = f"{frontend_url}/reset-password?token={reset_token}"
+    
+    # Log for development (remove in production)
+    print(f"🔑 Password reset token for {user.email}: {reset_token}")
+    print(f"🔗 Reset URL: {reset_url}")
+    
+    return {
+        "message": "If an account with this email exists, a reset link has been sent.",
+        # DEV ONLY: Remove in production
+        "dev_token": reset_token,
+        "dev_reset_url": reset_url
+    }
+
+
+@router.post("/reset-password")
+async def reset_password(
+    request: ResetPasswordRequest,
+    db: AsyncIOMotorDatabase = Depends(get_database),
+    redis_client = Depends(get_redis)
+):
+    """
+    Reset password using a valid reset token.
+    """
+    import json
+    from datetime import timezone
+    
+    # Get token data from Redis
+    token_key = f"password_reset:{request.token}"
+    token_data_str = redis_client.get(token_key)
+    
+    if not token_data_str:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
+        )
+    
+    token_data = json.loads(token_data_str)
+    user_id = token_data.get("user_id")
+    
+    # Find user
+    try:
+        user = await User.get(PydanticObjectId(user_id))
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid reset token"
+        )
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User not found"
+        )
+    
+    # Update password using the existing password hash function
+    user.password_hash = get_password_hash(request.new_password)
+    user.updated_at = datetime.now(timezone.utc)
+    await user.save()
+    
+    # Delete used token
+    redis_client.delete(token_key)
+    
+    return {"message": "Password has been reset successfully. You can now sign in."}
+
+
