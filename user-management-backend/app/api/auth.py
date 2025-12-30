@@ -1024,20 +1024,37 @@ async def forgot_password(
         json.dumps(token_data)
     )
     
-    # In development, return the token. In production, send email instead.
-    frontend_url = getattr(settings, 'frontend_url', None) or 'http://localhost:3000'
+    # Build reset URL
+    frontend_url = getattr(settings, 'production_frontend_url', None) or getattr(settings, 'frontend_url', None) or 'http://localhost:3000'
+    if settings.environment == 'production':
+        frontend_url = 'https://codemurf.com'
     reset_url = f"{frontend_url}/reset-password?token={reset_token}"
     
-    # Log for development (remove in production)
-    print(f"🔑 Password reset token for {user.email}: {reset_token}")
-    print(f"🔗 Reset URL: {reset_url}")
+    # Send password reset email
+    from ..services.email_service import send_password_reset_email
+    email_result = await send_password_reset_email(
+        to_email=user.email,
+        reset_url=reset_url,
+        user_name=user.name
+    )
     
-    return {
-        "message": "If an account with this email exists, a reset link has been sent.",
-        # DEV ONLY: Remove in production
-        "dev_token": reset_token,
-        "dev_reset_url": reset_url
-    }
+    if email_result.get("success"):
+        print(f"✉️ Password reset email sent to {user.email}")
+    else:
+        print(f"⚠️ Failed to send email: {email_result.get('error')}")
+        # In development, log the reset URL for testing
+        if settings.environment != 'production':
+            print(f"🔗 DEV Reset URL: {reset_url}")
+    
+    # Response - always show success to prevent email enumeration
+    response = {"message": "If an account with this email exists, a reset link has been sent."}
+    
+    # Only include dev info in non-production
+    if settings.environment != 'production':
+        response["dev_token"] = reset_token
+        response["dev_reset_url"] = reset_url
+    
+    return response
 
 
 @router.post("/reset-password")
