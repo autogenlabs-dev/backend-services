@@ -1091,3 +1091,63 @@ async def reset_password(
     return {"message": "Password has been reset successfully. You can now sign in."}
 
 
+class ProvisionOAuthUserRequest(BaseModel):
+    """Request model for provisioning OAuth user."""
+    email: EmailStr
+    name: str
+    avatar: Optional[str] = None
+    provider: str  # google, github, etc.
+    provider_id: Optional[str] = None
+
+
+@router.post("/provision-oauth-user")
+async def provision_oauth_user(
+    request: ProvisionOAuthUserRequest,
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """
+    Provision or retrieve an OAuth user.
+    This endpoint is called by the frontend after successful OAuth sign-in
+    to ensure the user exists in the backend database.
+    """
+    from datetime import timezone
+    
+    # Check if user already exists by email
+    existing_user = await User.find_one(User.email == request.email)
+    
+    if existing_user:
+        # Update last login
+        existing_user.last_login_at = datetime.now(timezone.utc)
+        await existing_user.save()
+        
+        return {
+            "id": str(existing_user.id),
+            "email": existing_user.email,
+            "name": existing_user.name or request.name,
+            "subscription_tier": existing_user.subscription_tier or "free",
+            "is_new": False
+        }
+    
+    # Create new user
+    new_user = User(
+        email=request.email,
+        name=request.name,
+        profile_picture=request.avatar,
+        oauth_provider=request.provider,
+        oauth_provider_id=request.provider_id,
+        is_active=True,
+        subscription_tier="free",
+        created_at=datetime.now(timezone.utc),
+        last_login_at=datetime.now(timezone.utc),
+    )
+    
+    await new_user.insert()
+    
+    return {
+        "id": str(new_user.id),
+        "email": new_user.email,
+        "name": new_user.name,
+        "subscription_tier": new_user.subscription_tier,
+        "is_new": True
+    }
+
