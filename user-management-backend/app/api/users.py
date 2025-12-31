@@ -347,3 +347,81 @@ async def get_user_dashboard(
         "has_openrouter_key": bool(current_user.openrouter_api_key),
         "has_glm_key": bool(current_user.glm_api_key),
     }
+
+
+@router.post("/me/refresh-api-keys")
+async def refresh_api_keys(
+    current_user: User = Depends(get_current_user_unified),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """
+    Refresh or create API keys based on user's subscription plan.
+    
+    - Free: OpenRouter key only (basic tier)
+    - Pro: OpenRouter + GLM key
+    - Ultra: OpenRouter + GLM + Bytez key
+    """
+    from ..services.subscription_service import SubscriptionService
+    
+    result = {
+        "success": True,
+        "user_id": str(current_user.id),
+        "email": current_user.email,
+        "subscription": current_user.subscription.value if current_user.subscription else "free",
+        "keys_updated": [],
+        "keys_status": {}
+    }
+    
+    subscription = current_user.subscription.value if current_user.subscription else "free"
+    
+    # 1. OpenRouter key - available for all plans
+    try:
+        if not current_user.openrouter_api_key:
+            # Try to provision a new key
+            openrouter_result = await refresh_user_openrouter_key(current_user, db)
+            if openrouter_result.get("success"):
+                result["keys_updated"].append("openrouter")
+                result["keys_status"]["openrouter"] = "created"
+            else:
+                result["keys_status"]["openrouter"] = f"failed: {openrouter_result.get('error', 'unknown')}"
+        else:
+            result["keys_status"]["openrouter"] = "exists"
+    except Exception as e:
+        result["keys_status"]["openrouter"] = f"error: {str(e)}"
+    
+    # 2. GLM key - available for Pro and Ultra plans
+    if subscription in ["pro", "ultra"]:
+        try:
+            if not current_user.glm_api_key:
+                # GLM keys need to be assigned from a pool or provisioned
+                # For now, mark as needing manual assignment
+                result["keys_status"]["glm"] = "requires_provisioning"
+            else:
+                result["keys_status"]["glm"] = "exists"
+        except Exception as e:
+            result["keys_status"]["glm"] = f"error: {str(e)}"
+    else:
+        result["keys_status"]["glm"] = "not_available_for_plan"
+    
+    # 3. Bytez key - available for Ultra plan only
+    if subscription == "ultra":
+        try:
+            if not current_user.bytez_api_key:
+                result["keys_status"]["bytez"] = "requires_provisioning"
+            else:
+                result["keys_status"]["bytez"] = "exists"
+        except Exception as e:
+            result["keys_status"]["bytez"] = f"error: {str(e)}"
+    else:
+        result["keys_status"]["bytez"] = "not_available_for_plan"
+    
+    # Reload user to get updated keys
+    await current_user.sync()
+    
+    result["current_keys"] = {
+        "openrouter_api_key": current_user.openrouter_api_key[:20] + "..." if current_user.openrouter_api_key else None,
+        "glm_api_key": current_user.glm_api_key[:20] + "..." if current_user.glm_api_key else None,
+        "bytez_api_key": current_user.bytez_api_key[:20] + "..." if current_user.bytez_api_key else None,
+    }
+    
+    return result

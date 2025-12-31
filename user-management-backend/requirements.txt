@@ -20,3 +20,4 @@ itsdangerous>=2.1.0
 authlib>=1.2.0
 passlib[bcrypt]>=1.7.4
 resend>=0.7.0
+
