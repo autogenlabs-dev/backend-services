@@ -40,7 +40,6 @@ async def get_my_profile(
         )
     
     # Auto-provision API keys if missing for eligible users
-    import os
     keys_updated = False
     subscription = current_user.subscription.value if current_user.subscription else "free"
     
@@ -54,13 +53,28 @@ async def get_my_profile(
         except Exception as e:
             print(f"[get_my_profile] Failed to auto-provision OpenRouter key: {e}")
     
-    # Auto-provision GLM key for Pro+ users
+    # Auto-provision GLM key for Pro+ users from ApiKeyPool
     if subscription in ["pro", "ultra"] and not current_user.glm_api_key:
-        shared_glm_key = os.getenv("SHARED_GLM_API_KEY")
-        if shared_glm_key:
-            current_user.glm_api_key = shared_glm_key
-            keys_updated = True
-            print(f"[get_my_profile] Auto-provisioned GLM key for {current_user.email}")
+        try:
+            from ..models.api_key_pool import ApiKeyPool
+            
+            # Find an available GLM key with capacity
+            available_key = await ApiKeyPool.find_one(
+                ApiKeyPool.key_type == "glm",
+                ApiKeyPool.is_active == True
+            )
+            
+            if available_key and available_key.has_capacity:
+                # Assign user to this key
+                if available_key.assign_user(current_user.id):
+                    await available_key.save()
+                    current_user.glm_api_key = available_key.key_value
+                    keys_updated = True
+                    print(f"[get_my_profile] Assigned GLM key from pool for {current_user.email}")
+            else:
+                print(f"[get_my_profile] No available GLM keys in pool for {current_user.email}")
+        except Exception as e:
+            print(f"[get_my_profile] Failed to auto-provision GLM key from pool: {e}")
     
     # Save if keys were updated
     if keys_updated:
