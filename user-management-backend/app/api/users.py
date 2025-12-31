@@ -393,9 +393,16 @@ async def refresh_api_keys(
     if subscription in ["pro", "ultra"]:
         try:
             if not current_user.glm_api_key:
-                # GLM keys need to be assigned from a pool or provisioned
-                # For now, mark as needing manual assignment
-                result["keys_status"]["glm"] = "requires_provisioning"
+                # Auto-assign GLM key from environment variable for Pro+ users
+                import os
+                shared_glm_key = os.getenv("SHARED_GLM_API_KEY")
+                if shared_glm_key:
+                    current_user.glm_api_key = shared_glm_key
+                    await current_user.save()
+                    result["keys_updated"].append("glm")
+                    result["keys_status"]["glm"] = "assigned"
+                else:
+                    result["keys_status"]["glm"] = "no_key_available"
             else:
                 result["keys_status"]["glm"] = "exists"
         except Exception as e:
