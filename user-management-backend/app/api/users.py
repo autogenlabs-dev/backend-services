@@ -58,23 +58,31 @@ async def get_my_profile(
         try:
             from ..models.api_key_pool import ApiKeyPool
             
-            # Find an available GLM key with capacity
-            available_key = await ApiKeyPool.find_one(
+            # Find all active GLM keys and pick one with capacity
+            all_glm_keys = await ApiKeyPool.find(
                 ApiKeyPool.key_type == "glm",
                 ApiKeyPool.is_active == True
-            )
+            ).to_list()
             
-            if available_key and available_key.has_capacity:
+            # Find a key with available capacity
+            available_key = None
+            for key in all_glm_keys:
+                if key.has_capacity:
+                    available_key = key
+                    break
+            
+            if available_key:
                 # Assign user to this key
                 if available_key.assign_user(current_user.id):
                     await available_key.save()
                     current_user.glm_api_key = available_key.key_value
                     keys_updated = True
-                    print(f"[get_my_profile] Assigned GLM key from pool for {current_user.email}")
+                    print(f"[get_my_profile] Assigned GLM key '{available_key.label}' to {current_user.email}")
             else:
-                print(f"[get_my_profile] No available GLM keys in pool for {current_user.email}")
+                print(f"[get_my_profile] No available GLM keys with capacity for {current_user.email}")
         except Exception as e:
             print(f"[get_my_profile] Failed to auto-provision GLM key from pool: {e}")
+
     
     # Save if keys were updated
     if keys_updated:
