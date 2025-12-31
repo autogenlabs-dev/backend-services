@@ -39,6 +39,34 @@ async def get_my_profile(
             detail="User not authenticated"
         )
     
+    # Auto-provision API keys if missing for eligible users
+    import os
+    keys_updated = False
+    subscription = current_user.subscription.value if current_user.subscription else "free"
+    
+    # Auto-provision OpenRouter key for all users
+    if not current_user.openrouter_api_key:
+        try:
+            openrouter_result = await refresh_user_openrouter_key(current_user, db)
+            if openrouter_result.get("success"):
+                keys_updated = True
+                print(f"[get_my_profile] Auto-provisioned OpenRouter key for {current_user.email}")
+        except Exception as e:
+            print(f"[get_my_profile] Failed to auto-provision OpenRouter key: {e}")
+    
+    # Auto-provision GLM key for Pro+ users
+    if subscription in ["pro", "ultra"] and not current_user.glm_api_key:
+        shared_glm_key = os.getenv("SHARED_GLM_API_KEY")
+        if shared_glm_key:
+            current_user.glm_api_key = shared_glm_key
+            keys_updated = True
+            print(f"[get_my_profile] Auto-provisioned GLM key for {current_user.email}")
+    
+    # Save if keys were updated
+    if keys_updated:
+        await current_user.save()
+        await current_user.sync()
+    
     # Get OAuth accounts
     oauth_accounts_raw = await get_user_oauth_accounts(db, current_user.id)
     
