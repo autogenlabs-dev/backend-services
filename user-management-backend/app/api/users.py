@@ -439,18 +439,32 @@ async def refresh_api_keys(
     except Exception as e:
         result["keys_status"]["openrouter"] = f"error: {str(e)}"
     
-    # 2. GLM key - available for Pro and Ultra plans
+    # 2. GLM key - available for Pro and Ultra plans (from ApiKeyPool)
     if subscription in ["pro", "ultra"]:
         try:
             if not current_user.glm_api_key:
-                # Auto-assign GLM key from environment variable for Pro+ users
-                import os
-                shared_glm_key = os.getenv("SHARED_GLM_API_KEY")
-                if shared_glm_key:
-                    current_user.glm_api_key = shared_glm_key
-                    await current_user.save()
-                    result["keys_updated"].append("glm")
-                    result["keys_status"]["glm"] = "assigned"
+                from ..models.api_key_pool import ApiKeyPool
+                
+                # Find all active GLM keys and pick one with capacity
+                all_glm_keys = await ApiKeyPool.find(
+                    ApiKeyPool.key_type == "glm",
+                    ApiKeyPool.is_active == True
+                ).to_list()
+                
+                # Find a key with available capacity
+                available_key = None
+                for key in all_glm_keys:
+                    if key.has_capacity:
+                        available_key = key
+                        break
+                
+                if available_key:
+                    if available_key.assign_user(current_user.id):
+                        await available_key.save()
+                        current_user.glm_api_key = available_key.key_value
+                        await current_user.save()
+                        result["keys_updated"].append("glm")
+                        result["keys_status"]["glm"] = f"assigned from {available_key.label}"
                 else:
                     result["keys_status"]["glm"] = "no_key_available"
             else:
@@ -458,6 +472,7 @@ async def refresh_api_keys(
         except Exception as e:
             result["keys_status"]["glm"] = f"error: {str(e)}"
     else:
+
         result["keys_status"]["glm"] = "not_available_for_plan"
     
     # 3. Bytez key - available for Ultra plan only
