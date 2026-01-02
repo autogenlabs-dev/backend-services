@@ -168,7 +168,15 @@ async def update_user(db: AsyncIOMotorDatabase, user_id: PydanticObjectId, user_
         
         # Also update the name field with the full name
         if user.full_name:
-            user.name = user.full_name    # Update other fields
+            user.name = user.full_name    # Handle password update separately to ensure hashing
+    if 'password' in update_fields:
+        if update_fields['password']:
+            from ..auth.jwt import get_password_hash
+            user.password_hash = get_password_hash(update_fields['password'])
+        # Remove from fields to update so we don't set plain 'password' field
+        del update_fields['password']
+
+    # Update other fields
     for field, value in update_fields.items():
         if field not in ['email', 'first_name', 'last_name']: # Skip already handled fields
              setattr(user, field, value)
