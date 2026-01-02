@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     google_redirect_uri: str = "https://api.codemurf.com/api/auth/google/callback"
     github_client_id: str = ""  # Set GITHUB_CLIENT_ID env var
     github_client_secret: str = ""  # Set GITHUB_CLIENT_SECRET env var
+    github_redirect_uri: str = "https://api.codemurf.com/api/auth/github/callback"
     
     # LLM Provider API Keys - Set via environment variables
     openrouter_api_key: str = ""  # Set OPENROUTER_API_KEY env var

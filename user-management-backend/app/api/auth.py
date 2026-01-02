@@ -278,12 +278,14 @@ async def google_login(
     oauth_redirect_uri = redirect_uri or settings.google_redirect_uri
     
     # Ensure OAuth client is properly initialized
-    if not oauth.google:
+    google_client = oauth.create_client('google')
+    if not google_client:
         # Re-register OAuth clients if not available
         from ..auth.oauth import register_oauth_clients
         register_oauth_clients()
+        google_client = oauth.create_client('google')
     
-    if not oauth.google:
+    if not google_client:
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail="Google OAuth client is not available"
@@ -296,13 +298,13 @@ async def google_login(
             "code_challenge": code_challenge,
             "code_challenge_method": code_challenge_method or "S256",
             "redirect_uri": oauth_redirect_uri,
-            "source": source or "web",  # ← Store source parameter
+            "source": source or "web",
             "created_at": datetime.utcnow().isoformat()
         }
         # Store with 10 minute expiry
         redis_client.setex(f"oauth:pkce:{state}", 600, json.dumps(pkce_data))
     
-    return await oauth.google.authorize_redirect(request, oauth_redirect_uri, state=state)
+    return await google_client.authorize_redirect(request, oauth_redirect_uri, state=state)
 
 
 # Google OAuth callback
@@ -321,12 +323,14 @@ async def google_callback(
     """
     try:
         # Ensure OAuth client is properly initialized
-        if not oauth.google:
+        google_client = oauth.create_client('google')
+        if not google_client:
             # Re-register OAuth clients if not available
             from ..auth.oauth import register_oauth_clients
             register_oauth_clients()
+            google_client = oauth.create_client('google')
         
-        if not oauth.google:
+        if not google_client:
             raise HTTPException(
                 status_code=status.HTTP_501_NOT_IMPLEMENTED,
                 detail="Google OAuth client is not available"
@@ -355,10 +359,10 @@ async def google_callback(
                 redis_client.delete(pkce_key)
         
         # Exchange authorization code for access token
-        token = await oauth.google.authorize_access_token(request)
+        token = await google_client.authorize_access_token(request)
 
         # Fetch user info from Google
-        user_info = await oauth.google.get("userinfo", token=token)
+        user_info = await google_client.get("userinfo", token=token)
         user_data = user_info.json()
 
         # Example: Extract useful info
@@ -454,6 +458,108 @@ async def google_callback(
             status_code=302
         )
 
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
+
+
+# GitHub Login
+@router.get("/github/login")
+async def github_login(
+    request: Request,
+    state: Optional[str] = None,
+    redirect_uri: Optional[str] = None
+):
+    """Initiate GitHub OAuth login."""
+    # Use provided redirect_uri or fallback to configured one
+    # Note: For GitHub, redirect_uri must match exactly what's registered in OAuth app
+    oauth_redirect_uri = redirect_uri or settings.github_redirect_uri
+    
+    github_client = oauth.create_client('github')
+    if not github_client:
+        from ..auth.oauth import register_oauth_clients
+        register_oauth_clients()
+        github_client = oauth.create_client('github')
+    
+    if not github_client:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="GitHub OAuth client is not available"
+        )
+        
+    return await github_client.authorize_redirect(request, oauth_redirect_uri, state=state)
+
+
+# GitHub OAuth callback
+@router.get("/github/callback")
+async def github_callback(
+    request: Request,
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """Handle GitHub OAuth callback."""
+    try:
+        github_client = oauth.create_client('github')
+        if not github_client:
+            from ..auth.oauth import register_oauth_clients
+            register_oauth_clients()
+            github_client = oauth.create_client('github')
+            
+        if not github_client:
+             raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail="GitHub OAuth client is not available"
+            )
+            
+        token = await github_client.authorize_access_token(request)
+        
+        # Fetch user info
+        user_info_resp = await github_client.get('user', token=token)
+        user_data = user_info_resp.json()
+        
+        # Special handling for GitHub email (might be private)
+        email = user_data.get("email")
+        if not email:
+            # Fetch emails if not in profile
+            emails_resp = await github_client.get('user/emails', token=token)
+            emails = emails_resp.json()
+            for e in emails:
+                if e.get('primary') and e.get('verified'):
+                    email = e.get('email')
+                    break
+                    
+        if not email:
+             raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not retrieve email from GitHub"
+            )
+
+        # Get or create user
+        user = await get_or_create_user_by_oauth(
+            db=db,
+            provider_name="github",
+            provider_user_id=str(user_data.get("id")),
+            email=email
+        )
+        
+        if user and user.id:
+            await update_user_last_login(db, user.id)
+
+        # Create JWT tokens
+        access_token = create_access_token(
+            data={"sub": str(user.id), "email": user.email},
+            expires_delta=timedelta(minutes=settings.access_token_expire_minutes)
+        )
+        refresh_token = create_refresh_token(
+            data={"sub": str(user.id)}
+        )
+        
+        # Redirect to frontend
+        redirect_url = f"http://localhost:3000/auth/callback?access_token={access_token}&refresh_token={refresh_token}&user_id={str(user.id)}"
+        
+        return RedirectResponse(
+            url=redirect_url,
+            status_code=302
+        )
+        
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
 
