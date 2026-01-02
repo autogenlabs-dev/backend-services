@@ -76,13 +76,28 @@ async def create_user_with_password(db: AsyncIOMotorDatabase, user_data: UserCre
 
 
 async def authenticate_user(db: AsyncIOMotorDatabase, email: str, password: str) -> Optional[User]:
-    """Authenticate user with email and password."""
+    """Authenticate user with email and password.
+    
+    On successful authentication, if the stored password hash is using the
+    legacy SHA-256 format, it will be automatically upgraded to bcrypt.
+    """
+    from ..auth.jwt import needs_password_rehash, get_password_hash
+    
     user = await get_user_by_email(db, email)
     if not user or not user.password_hash:
         return None
     if not verify_password(password, user.password_hash):
         return None
+    
+    # Upgrade legacy SHA-256 hashes to bcrypt on successful login
+    if needs_password_rehash(user.password_hash):
+        user.password_hash = get_password_hash(password)
+        user.updated_at = datetime.now(timezone.utc)
+        await user.save()
+        logger.info(f"Upgraded password hash to bcrypt for user: {user.email}")
+    
     return user
+
 
 
 async def create_user(db: AsyncIOMotorDatabase, user_data: UserCreate) -> User:

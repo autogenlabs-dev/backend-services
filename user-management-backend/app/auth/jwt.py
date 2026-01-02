@@ -2,36 +2,17 @@
 
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
-
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
-from sqlalchemy import select
-import uuid
-
-from ..config import settings
-from ..database import get_database # Changed from get_db to get_database
-from ..models.user import User
-
-# Password hashing context
-"""JWT token utilities for authentication."""
-
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
 import hashlib
 import secrets
 
 from jose import JWTError, jwt
+import bcrypt  # Direct bcrypt usage instead of passlib for better compatibility
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
-from sqlalchemy import select
 import uuid
 
 from ..config import settings
-from ..database import get_database # Changed from get_db to get_database
+from ..database import get_database
 from ..models.user import User
 
 # Bearer token authentication scheme
@@ -71,27 +52,59 @@ def verify_token(token: str) -> Optional[Dict[str, Any]]:
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash using SHA-256."""
-    # Hash the plain password and compare
-    password_hash = hashlib.sha256(plain_password.encode('utf-8')).hexdigest()
-    return password_hash == hashed_password
+    """
+    Verify a password against its hash.
+    
+    Supports both bcrypt (new) and SHA-256 (legacy) hashed passwords.
+    This allows seamless migration from old SHA-256 hashes to bcrypt.
+    """
+    # Try bcrypt first (new format)
+    try:
+        if hashed_password.startswith("$2"):  # bcrypt hash indicator
+            # Ensure bytes for bcrypt
+            return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+    except Exception:
+        pass
+    
+    # Fallback to SHA-256 (legacy format) for existing passwords
+    sha256_hash = hashlib.sha256(plain_password.encode('utf-8')).hexdigest()
+    return sha256_hash == hashed_password
 
 
 def get_password_hash(password: str) -> str:
-    """Hash a password using SHA-256 - simple and secure."""
-    # Use SHA-256 for simple, secure password hashing
-    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+    """
+    Hash a password using bcrypt.
+    
+    bcrypt is designed specifically for password hashing with:
+    - Built-in salt generation
+    - Configurable work factor for future-proofing
+    - Resistance to timing attacks
+    """
+    # Hash password using bcrypt (generates salt automatically)
+    hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    return hashed.decode('utf-8')
+
+
+def needs_password_rehash(hashed_password: str) -> bool:
+    """
+    Check if a password hash needs to be upgraded to bcrypt.
+    
+    Returns True if the hash is SHA-256 (legacy) and should be 
+    rehashed with bcrypt on next successful login.
+    """
+    return not hashed_password.startswith("$2")
 
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Any = Depends(get_database) # Changed type hint from Session to Any, and get_db to get_database
+    db: Any = Depends(get_database)
 ) -> User:
     """Get the current authenticated user from the JWT token."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},    )
+        headers={"WWW-Authenticate": "Bearer"},
+    )
     
     try:
         payload = verify_token(credentials.credentials)
@@ -108,9 +121,9 @@ async def get_current_user(
                 user_id = uuid.UUID(user_id)
         except (ValueError, TypeError):
             raise credentials_exception
-              # Get user from database
+        
         # MongoDB: Find user by ID
-        user = await User.get(user_id) # Use Beanie's get method
+        user = await User.get(user_id)
         
         if user is None:
             raise credentials_exception
