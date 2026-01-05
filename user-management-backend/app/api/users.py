@@ -54,7 +54,16 @@ async def get_my_profile(
             print(f"[get_my_profile] Failed to auto-provision OpenRouter key: {e}")
     
     # Auto-provision GLM key for Pro+ users from ApiKeyPool
-    if subscription in ["pro", "ultra"] and not current_user.glm_api_key:
+    # Also clear invalid/placeholder keys first
+    current_glm_key = current_user.glm_api_key
+    is_invalid_key = (
+        not current_glm_key or 
+        len(current_glm_key) < 20 or  # Real API keys are longer
+        "active" in current_glm_key.lower() or  # Placeholder like "NOT Active users"
+        "not_" in current_glm_key.lower()
+    )
+    
+    if subscription in ["pro", "ultra"] and is_invalid_key:
         try:
             from ..models.api_key_pool import ApiKeyPool
             
@@ -442,7 +451,21 @@ async def refresh_api_keys(
     # 2. GLM key - available for Pro and Ultra plans (from ApiKeyPool)
     if subscription in ["pro", "ultra"]:
         try:
-            if not current_user.glm_api_key:
+            # Check for invalid/placeholder keys
+            current_glm_key = current_user.glm_api_key
+            is_invalid_key = (
+                not current_glm_key or 
+                len(current_glm_key) < 20 or  # Real API keys are longer
+                "active" in current_glm_key.lower() or  # Placeholder like "NOT Active users"
+                "not_" in current_glm_key.lower()
+            )
+            
+            if is_invalid_key:
+                # Clear invalid key first
+                if current_glm_key:
+                    current_user.glm_api_key = None
+                    await current_user.save()
+                    
                 from ..models.api_key_pool import ApiKeyPool
                 
                 # Find all active GLM keys and pick one with capacity
