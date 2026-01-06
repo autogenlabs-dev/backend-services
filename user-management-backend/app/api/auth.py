@@ -493,10 +493,13 @@ async def github_login(
 @router.get("/github/callback")
 async def github_callback(
     request: Request,
-    db: AsyncIOMotorDatabase = Depends(get_database)
+    db: AsyncIOMotorDatabase = Depends(get_database),
+    redis_client = Depends(get_redis)
 ):
-    """Handle GitHub OAuth callback."""
+    """Handle GitHub OAuth callback with extension support."""
     try:
+        import json
+        
         github_client = oauth.create_client('github')
         if not github_client:
             from ..auth.oauth import register_oauth_clients
@@ -510,6 +513,18 @@ async def github_callback(
             )
             
         token = await github_client.authorize_access_token(request)
+        
+        # Get state parameter to check for extension flow
+        state = request.query_params.get("state")
+        extension_data = None
+        
+        if state:
+            # Check if this is an extension OAuth flow
+            extension_data_str = redis_client.get(f"extension:auth:{state}")
+            if extension_data_str:
+                extension_data = json.loads(extension_data_str)
+                # Clean up Redis key
+                redis_client.delete(f"extension:auth:{state}")
         
         # Fetch user info
         user_info_resp = await github_client.get('user', token=token)
@@ -543,7 +558,31 @@ async def github_callback(
         if user and user.id:
             await update_user_last_login(db, user.id)
 
-        # Create JWT tokens
+        # If extension flow, generate ticket and redirect to VS Code
+        if extension_data:
+            # Generate authorization ticket
+            ticket = secrets.token_urlsafe(32)
+            
+            # Store ticket with user data in Redis
+            ticket_data = {
+                "user_id": str(user.id),
+                "email": user.email,
+                "provider": "github",
+                "created_at": datetime.utcnow().isoformat()
+            }
+            # Store with 5 minute expiry
+            redis_client.setex(f"extension:ticket:{ticket}", 300, json.dumps(ticket_data))
+            
+            # Redirect to extension callback with ticket
+            auth_redirect = extension_data.get("auth_redirect")
+            redirect_url = f"{auth_redirect}/auth/clerk/callback?code={ticket}&state={state}"
+            
+            return RedirectResponse(
+                url=redirect_url,
+                status_code=302
+            )
+
+        # Standard flow - Create JWT tokens
         access_token = create_access_token(
             data={"sub": str(user.id), "email": user.email},
             expires_delta=timedelta(minutes=settings.access_token_expire_minutes)
@@ -553,7 +592,8 @@ async def github_callback(
         )
         
         # Redirect to frontend
-        redirect_url = f"http://localhost:3000/auth/callback?access_token={access_token}&refresh_token={refresh_token}&user_id={str(user.id)}"
+        base_url = settings.frontend_url if hasattr(settings, 'frontend_url') else "http://localhost:3000"
+        redirect_url = f"{base_url}/auth/callback?access_token={access_token}&refresh_token={refresh_token}&user_id={str(user.id)}"
         
         return RedirectResponse(
             url=redirect_url,
@@ -956,44 +996,75 @@ async def clerk_to_ticket(
 async def extension_sign_in(
     state: str,
     auth_redirect: str,
+    provider: str = "google",  # Support google or github
     redis = Depends(get_redis)
 ):
     """
-    Extension sign-in endpoint - redirects to Google OAuth with extension parameters.
-    Called by frontend when user is not signed in with Clerk.
+    Extension sign-in endpoint - redirects to OAuth provider with extension parameters.
+    Supports both Google and GitHub OAuth.
+    Called by frontend when user is not signed in.
+    
+    Args:
+        state: CSRF state token
+        auth_redirect: VS Code deep link URI for callback
+        provider: OAuth provider - 'google' or 'github' (default: google)
     """
     try:
-        # Store extension parameters in Redis with the key pattern expected by callback
         import json
+        
+        # Validate provider
+        if provider not in ["google", "github"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid provider: {provider}. Must be 'google' or 'github'"
+            )
+        
+        # Store extension parameters in Redis
         extension_data = {
             "state": state,
             "auth_redirect": auth_redirect,
-            "is_extension": True
+            "is_extension": True,
+            "provider": provider
         }
         
-        # Store with key pattern that google_callback expects: extension:auth:{state}
+        # Store with key pattern that callback expects: extension:auth:{state}
         redis.setex(
             f"extension:auth:{state}",
             600,  # 10 minutes
             json.dumps(extension_data)
         )
         
-        # Redirect to Google OAuth with extension state
-        google_config = get_provider_config("google")
         # Use production URL if in production, otherwise localhost
         base_url = settings.production_backend_url if settings.environment == "production" else "http://localhost:8000"
-        redirect_uri = f"{base_url}/api/auth/google/callback"
         
-        oauth_url = (
-            f"{google_config['auth_url']}?"
-            f"response_type=code&"
-            f"client_id={google_config['client_id']}&"
-            f"redirect_uri={redirect_uri}&"
-            f"scope=openid email profile&"
-            f"state={state}&"
-            f"access_type=offline&"
-            f"prompt=consent"
-        )
+        if provider == "github":
+            # Redirect to GitHub OAuth
+            github_config = get_provider_config("github")
+            redirect_uri = f"{base_url}/api/auth/github/callback"
+            
+            oauth_url = (
+                f"{github_config['auth_url']}?"
+                f"response_type=code&"
+                f"client_id={github_config['client_id']}&"
+                f"redirect_uri={redirect_uri}&"
+                f"scope=user:email&"
+                f"state={state}"
+            )
+        else:
+            # Redirect to Google OAuth (default)
+            google_config = get_provider_config("google")
+            redirect_uri = f"{base_url}/api/auth/google/callback"
+            
+            oauth_url = (
+                f"{google_config['auth_url']}?"
+                f"response_type=code&"
+                f"client_id={google_config['client_id']}&"
+                f"redirect_uri={redirect_uri}&"
+                f"scope=openid email profile&"
+                f"state={state}&"
+                f"access_type=offline&"
+                f"prompt=consent"
+            )
         
         return RedirectResponse(url=oauth_url, status_code=302)
         
