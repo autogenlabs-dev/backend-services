@@ -45,8 +45,11 @@ async def require_admin(current_user: User = Depends(get_current_user_unified)) 
     # Handle both enum and string role representations
     role = current_user.role
     role_value = role.value if hasattr(role, 'value') else str(role)
+    print(f"[ADMIN CHECK] User: {current_user.email}, Role raw: {role}, Role type: {type(role)}, Role value: {role_value}")
     if role_value != "admin":
+        print(f"[ADMIN CHECK] DENIED - role_value '{role_value}' != 'admin'")
         raise HTTPException(status_code=403, detail="Admin access required")
+    print(f"[ADMIN CHECK] GRANTED for {current_user.email}")
     return current_user
 
 
