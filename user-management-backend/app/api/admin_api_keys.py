@@ -42,7 +42,10 @@ class KeyPoolStats(BaseModel):
 # Helper function to check admin role
 async def require_admin(current_user: User = Depends(get_current_user_unified)) -> User:
     """Require admin role for access."""
-    if current_user.role != UserRole.ADMIN:
+    # Handle both enum and string role representations
+    role = current_user.role
+    role_value = role.value if hasattr(role, 'value') else str(role)
+    if role_value != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 
