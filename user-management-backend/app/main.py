@@ -313,9 +313,7 @@ app.include_router(components.router, tags=["Components (Legacy)"])
 app.include_router(users.router, prefix="", tags=["Users (Legacy)"])
 app.include_router(item_payments.router, prefix="", tags=["Payments (Legacy)"])
 
-# Additional legacy routes for exact path matching
-from .api import legacy as legacy_api
-app.include_router(legacy_api.router, prefix="", tags=["Legacy API"])
+# Legacy routes already mounted above (users.router, item_payments.router without /api prefix)
 
 
 # Import interaction routers
