@@ -449,53 +449,61 @@ async def refresh_api_keys(
         result["keys_status"]["openrouter"] = f"error: {str(e)}"
     
     # 2. GLM key - available for Pro and Ultra plans (from ApiKeyPool)
+    #    ALWAYS assign a new key when refresh is called (force rotation)
     if subscription in ["pro", "ultra"]:
         try:
-            # Check for invalid/placeholder keys
-            current_glm_key = current_user.glm_api_key
-            is_invalid_key = (
-                not current_glm_key or 
-                len(current_glm_key) < 20 or  # Real API keys are longer
-                "active" in current_glm_key.lower() or  # Placeholder like "NOT Active users"
-                "not_" in current_glm_key.lower()
-            )
+            from ..models.api_key_pool import ApiKeyPool
             
-            if is_invalid_key:
-                # Clear invalid key first
-                if current_glm_key:
-                    current_user.glm_api_key = None
-                    await current_user.save()
-                    
-                from ..models.api_key_pool import ApiKeyPool
-                
-                # Find all active GLM keys and pick one with capacity
-                all_glm_keys = await ApiKeyPool.find(
-                    ApiKeyPool.key_type == "glm",
-                    ApiKeyPool.is_active == True
-                ).to_list()
-                
-                # Find a key with available capacity
-                available_key = None
+            # First, unassign from current key if exists
+            current_glm_key = current_user.glm_api_key
+            if current_glm_key:
+                # Find and unassign from old key
+                old_key = await ApiKeyPool.find_one(
+                    ApiKeyPool.key_value == current_glm_key,
+                    ApiKeyPool.key_type == "glm"
+                )
+                if old_key:
+                    old_key.release_user(current_user.id)
+                    await old_key.save()
+            
+            # Clear user's current key
+            current_user.glm_api_key = None
+            await current_user.save()
+            
+            # Find all active GLM keys and pick one with capacity
+            all_glm_keys = await ApiKeyPool.find(
+                ApiKeyPool.key_type == "glm",
+                ApiKeyPool.is_active == True
+            ).to_list()
+            
+            # Find a key with available capacity (prefer one user isn't already on)
+            available_key = None
+            for key in all_glm_keys:
+                if key.has_capacity and key.key_value != current_glm_key:
+                    available_key = key
+                    break
+            
+            # Fallback: any key with capacity
+            if not available_key:
                 for key in all_glm_keys:
                     if key.has_capacity:
                         available_key = key
                         break
-                
-                if available_key:
-                    if available_key.assign_user(current_user.id):
-                        await available_key.save()
-                        current_user.glm_api_key = available_key.key_value
-                        await current_user.save()
-                        result["keys_updated"].append("glm")
-                        result["keys_status"]["glm"] = f"assigned from {available_key.label}"
+            
+            if available_key:
+                if available_key.assign_user(current_user.id):
+                    await available_key.save()
+                    current_user.glm_api_key = available_key.key_value
+                    await current_user.save()
+                    result["keys_updated"].append("glm")
+                    result["keys_status"]["glm"] = f"assigned from {available_key.label}"
                 else:
-                    result["keys_status"]["glm"] = "no_key_available"
+                    result["keys_status"]["glm"] = "assignment_failed"
             else:
-                result["keys_status"]["glm"] = "exists"
+                result["keys_status"]["glm"] = "no_key_available"
         except Exception as e:
             result["keys_status"]["glm"] = f"error: {str(e)}"
     else:
-
         result["keys_status"]["glm"] = "not_available_for_plan"
     
     # 3. Bytez key - available for Ultra plan only
