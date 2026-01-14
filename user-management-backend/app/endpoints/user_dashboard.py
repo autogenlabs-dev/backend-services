@@ -48,8 +48,14 @@ async def get_user_dashboard(current_user: User = Depends(require_auth)):
                     "username": current_user.username,
                     "email": current_user.email,
                     "role": current_user.role,
+                    "subscription": current_user.subscription.value if current_user.subscription else "free",
+                    "subscription_end_date": current_user.subscription_end_date.isoformat() if current_user.subscription_end_date else None,
                     "wallet_balance": getattr(current_user, 'wallet_balance', 0),
-                    "profile_image": getattr(current_user, 'profile_image', None)
+                    "profile_image": getattr(current_user, 'profile_image', None),
+                    # Include API keys for SubscriptionStatus component
+                    "openrouter_api_key": current_user.openrouter_api_key,
+                    "glm_api_key": current_user.glm_api_key,
+                    "bytez_api_key": current_user.bytez_api_key,
                 },
                 "purchase_statistics": purchase_stats,
                 "recent_purchases": [purchase.to_dict() for purchase in recent_purchases],

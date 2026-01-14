@@ -109,7 +109,7 @@ async def get_current_user_unified(
                 else:
                     auth_method += " - Token verification failed"
             except JWTError as e:
-                logger.warning(f"JWT validation failed: {type(e).__name__}")
+                logger.warning(f"JWT validation failed: {type(e).__name__} - {str(e)}")
                 auth_method += f" - JWT Error"
             except Exception as e:
                 auth_method += f" - Exception"
