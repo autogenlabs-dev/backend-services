@@ -337,12 +337,8 @@ async def get_component_comments(
         
         print(f"Component found: {component.title}")
         
-        # Convert string ID to ObjectId for querying
-        from bson import ObjectId
-        component_object_id = ObjectId(component_id)
-        
-        # Build query
-        query = {"component_id": component_object_id, "is_approved": True}
+        # Query with component_id as string (matching how it's stored)
+        query = {"component_id": component_id, "is_approved": True}
         print(f"Query: {query}")
         
         # Get comments with pagination
